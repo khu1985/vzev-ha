@@ -132,11 +132,7 @@ Angezeigt wird nur die Vorschau aus Home Assistant. Prüfe die Dateien unter <a 
 <tr><th>Rechnung</th><th class="l">Position</th><th>Primeo kWh</th><th>Berechnet kWh</th><th>Differenz</th><th></th></tr>
 {% for r in abg.itertuples() %}<tr><td>{{ r.rechnung }}</td><td class="l">{{ r.position }}</td><td>{{ r.primeo_kwh }}</td><td>{{ r.berechnet_kwh|f2 }}</td><td>{{ r.diff|f2 }}</td>
 <td><span class="pill {{ 'ok' if r.ok else 'warn' }}">{{ 'stimmt' if r.ok else 'prüfen' }}</span></td></tr>{% endfor %}</table></div></details>{% endif %}
-<details class="card"><summary><b>Wertschöpfung Betreiber</b> {{ w.total_chf.sum()|f2 }} CHF</summary><div class="scroll" style="margin-top:12px"><table class="wide">
-<tr><th>Monat</th><th>Rücklieferung</th><th>Verkauf Mieter</th><th>Eigenverbrauch</th><th>Übrige</th><th>Total CHF</th></tr>
-{% for m, r in w.iterrows() %}<tr><td>{{ m.strftime('%m.%Y') }}{{ '*' if m in vorl }}</td><td>{{ r.export_chf|f2 }}</td><td>{{ r.mieter_chf|f2 }}</td><td>{{ r.eigen_chf|f2 }}</td><td>{{ r.uebrige_chf|f2 }}</td><td><b>{{ r.total_chf|f2 }}</b></td></tr>{% endfor %}
-<tr class="sum"><td>Summe</td><td>{{ w.export_chf.sum()|f2 }}</td><td>{{ w.mieter_chf.sum()|f2 }}</td><td>{{ w.eigen_chf.sum()|f2 }}</td><td>{{ w.uebrige_chf.sum()|f2 }}</td><td>{{ w.total_chf.sum()|f2 }}</td></tr>
-</table></div><p class="muted">Rücklieferung leer = Tarif noch nicht bekannt. Allgemeinstrom zu 50 % als verkauft gerechnet; Leerstand zählt als Eigenverbrauch. * vorläufig.</p></details>
+<p class="muted">Wertschöpfung im Detail mit Diagrammen: <a href="wertschoepfung">Auswertung → Wertschöpfung</a>.</p>
 {% endif %}"""
 
 
@@ -325,9 +321,91 @@ def verlauf():
     return S.page("Verlauf", render_template_string(VERLAUF, ok=True, zl=ZL, z=z, zeilen=zeilen, tot=tot, chart=chart, gp=z in ("1OG", "AllgC")))
 
 
+# =============================================================================
+# Wertschöpfung
+# =============================================================================
+WERT = diagramme.STIL + """
+<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin:-8px 0 16px">
+<form method="get" action="wertschoepfung"><select name="j" onchange="this.form.submit()"><option value="">Seit Beginn</option>
+{% for y in jahre %}<option {{ 'selected' if y|string == j }}>{{ y }}</option>{% endfor %}</select></form>
+<span class="muted">{{ zeitraum }}{% if vorl %} · * vorläufig{% endif %}</span></div>
+{% if not ok %}<div class="msg warn">Noch keine Daten: {{ fehler }}</div>{% else %}
+{% if offen %}<div class="msg warn">Rückliefertarif für {{ offen|join(', ') }} noch offen – diese Rücklieferung ist im Total nicht enthalten ({{ offen_kwh|k0 }} kWh).</div>{% endif %}
+<div class="grid" style="margin-bottom:20px">
+ <div class="kpi"><div class="t">Wertschöpfung</div><div class="v">{{ k.total|f2 }} <small>CHF</small></div><div class="s">Ø {{ k.pro_monat|f2 }} CHF pro Monat</div></div>
+ <div class="kpi"><div class="t">Pro kWh Produktion</div><div class="v">{{ '%.1f'|format(k.pro_kwh * 100) if k.pro_kwh else '–' }} <small>Rp.</small></div><div class="s">{{ k.produktion|k0 }} kWh produziert (ab vZEV-Start)</div></div>
+ <div class="kpi"><div class="t">Im Haus genutzt</div><div class="v">{{ '%.0f'|format(k.haus_anteil) }} <small>%</small></div><div class="s">des Solarstroms, Rest eingespeist</div></div>
+ <div class="kpi"><div class="t">Rücklieferung</div><div class="v">{{ '%.0f'|format(k.export_anteil_chf) }} <small>% des Ertrags</small></div><div class="s">bei {{ '%.0f'|format(100 - k.haus_anteil) }} % der Menge</div></div>
+</div>
+<div class="card"><h2>Wertschöpfung pro Monat</h2>{{ c_monat|safe }}
+<p class="muted">CHF. Verkauf Mieter = Solarstrom 1. OG und Mieteranteil Allgemeinstrom zum vZEV-Preis; Eigenverbrauch = vermiedener Netzbezug (2. OG, Rest Allgemeinstrom, Ladestation, Leerstand) zum Netztarif; Rücklieferung zum Primeo-Tarif; Übrige = Gutschriften.</p></div>
+<div class="card"><h2>Kumuliert</h2>{{ c_kum|safe }}</div>
+<div class="card"><h2>Wohin geht der Solarstrom?</h2>{{ c_kwh|safe }}<p class="muted">kWh pro Monat ab vZEV-Start.</p></div>
+<div class="card"><h2>Was eine kWh wert ist</h2>{{ c_wert|safe }}
+<p class="muted">Durchschnitt im Zeitraum. Selbst genutzter oder an Mieter verkaufter Solarstrom bringt ein Mehrfaches der Einspeisung – Verbrauch in sonnige Stunden zu verschieben (Ladestation, Batterie) lohnt sich deshalb.</p></div>
+<div class="card"><h2>Monate</h2><div class="scroll"><table class="wide">
+<tr><th>Monat</th><th>Verkauf Mieter kWh</th><th>CHF</th><th>Eigenverbrauch kWh</th><th>CHF</th><th>Rücklieferung kWh</th><th>CHF</th><th>Übrige CHF</th><th>Total CHF</th></tr>
+{% for m, r in w.iterrows() %}<tr><td>{{ m.strftime('%m.%Y') }}{{ '*' if m in vorl }}</td><td>{{ r.mieter_kwh|f2 }}</td><td>{{ r.mieter_chf|f2 }}</td><td>{{ r.eigen_kwh|f2 }}</td><td>{{ r.eigen_chf|f2 }}</td>
+<td>{{ r.export_kwh|f2 }}</td><td>{{ r.export_chf|f2 if r.export_chf == r.export_chf else 'offen' }}</td><td>{{ r.uebrige_chf|f2 }}</td><td><b>{{ r.total_chf|f2 }}</b></td></tr>{% endfor %}
+<tr class="sum"><td>Summe</td><td>{{ w.mieter_kwh.sum()|f2 }}</td><td>{{ w.mieter_chf.sum()|f2 }}</td><td>{{ w.eigen_kwh.sum()|f2 }}</td><td>{{ w.eigen_chf.sum()|f2 }}</td>
+<td>{{ w.export_kwh.sum()|f2 }}</td><td>{{ w.export_chf.sum()|f2 }}</td><td>{{ w.uebrige_chf.sum()|f2 }}</td><td>{{ w.total_chf.sum()|f2 }}</td></tr></table></div>
+<p class="muted">Monate vor dem vZEV-Start enthalten nur die manuell erfassten Erträge (Einspeisevergütung, Gutschriften).</p></div>{% endif %}"""
+
+
+def wertschoepfung():
+    d = daten()
+    res, cfg = d["res"], d["cfg"]
+    if res is None:
+        return S.page("Wertschöpfung", render_template_string(WERT, ok=False, fehler=d["b"].get("fehler"), jahre=[], j="", zeitraum="", vorl=set()))
+    w_alle = _memo("w", lambda: core.wertschoepfung(res, cfg))
+    mon = _memo("monate", lambda: monate(res))
+    jahre = sorted({p.year for p in w_alle.index}, reverse=True)
+    j = request.args.get("j", "")
+    w = (w_alle[[str(p.year) == j for p in w_alle.index]] if j else w_alle).copy()
+    for c in ("mieter_kwh", "eigen_kwh", "export_kwh"):
+        w[c] = w[c].fillna(0)
+    vorl = {p for p in w.index if p in mon.index and mon.loc[p, "vorlaeufig"]}
+    labels = [_ml(p) + (f" {str(p.year)[2:]}" if p.month == 1 or i == 0 else "") for i, p in enumerate(w.index)]
+    idx_vorl = {i for i, p in enumerate(w.index) if p in vorl}
+    F = diagramme.FARBEN
+    reihen = [("Verkauf Mieter", F["solar"], list(w["mieter_chf"].fillna(0))), ("Rücklieferung", F["rueck"], list(w["export_chf"].fillna(0))),
+              ("Eigenverbrauch", F["netz"], list(w["eigen_chf"].fillna(0))), ("Übrige", F["uebrige"], list(w["uebrige_chf"].fillna(0)))]
+    c_monat = diagramme.saeulen(labels, reihen, einheit="CHF", vorlaeufig=idx_vorl, summe="Total")
+    kum = list(w["total_chf"].fillna(0).cumsum())
+    c_kum = diagramme.linie(labels, kum, "Wertschöpfung kumuliert", F["netz"], vorlaeufig=idx_vorl)
+    ab = [p for p in w.index if w.loc[p, ["mieter_kwh", "eigen_kwh", "export_kwh"]].sum() > 0]
+    wk = w.loc[ab]
+    c_kwh = diagramme.saeulen([labels[list(w.index).index(p)] for p in ab],
+                              [("Verkauf Mieter", F["solar"], list(wk["mieter_kwh"])), ("Rücklieferung", F["rueck"], list(wk["export_kwh"])),
+                               ("Eigenverbrauch", F["netz"], list(wk["eigen_kwh"]))], einheit="kWh",
+                              vorlaeufig={i for i, p in enumerate(ab) if p in vorl}, summe="Solarstrom gesamt")
+    mit_tarif = wk[wk["export_chf"].notna()]
+    pro = lambda chf, kwh: (chf / kwh) if kwh else None
+    c_wert = diagramme.balken_h([
+        ("Eigenverbrauch", pro(wk["eigen_chf"].sum(), wk["eigen_kwh"].sum()), F["netz"], "vermiedener Netzbezug (HT/NT)"),
+        ("Verkauf Mieter", pro(wk["mieter_chf"].sum(), wk["mieter_kwh"].sum()), F["solar"], "vZEV-Preis"),
+        ("Rücklieferung", pro(mit_tarif["export_chf"].sum(), mit_tarif["export_kwh"].sum()), F["rueck"], "Primeo-Rücklieferung inkl. HKN"),
+    ], "CHF/kWh")
+    haus = wk["mieter_kwh"].sum() + wk["eigen_kwh"].sum()
+    gesamt_kwh = haus + wk["export_kwh"].sum()
+    total = float(w["total_chf"].sum())
+    offen_m = [p.strftime("%m.%Y") for p in w.index if pd.isna(w.loc[p, "export_chf"]) and w.loc[p, "export_kwh"] > 0]
+    r_teil = res[res["month"].isin(ab)]
+    k = dict(total=total, pro_monat=total / len(w) if len(w) else 0, produktion=float(r_teil["Prod"].sum()),
+             pro_kwh=(float(wk[["mieter_chf", "eigen_chf"]].sum().sum() + mit_tarif["export_chf"].sum()) / float(r_teil["Prod"].sum())) if float(r_teil["Prod"].sum()) else None,
+             haus_anteil=haus / gesamt_kwh * 100 if gesamt_kwh else 0,
+             export_anteil_chf=(float(w["export_chf"].sum()) / total * 100) if total else 0)
+    zeitraum = f"{w.index.min().strftime('%m.%Y')} – {w.index.max().strftime('%m.%Y')}" if len(w) else ""
+    return S.page("Wertschöpfung", render_template_string(
+        WERT, ok=True, jahre=jahre, j=j, zeitraum=zeitraum, vorl=vorl, w=w, k=k, offen=offen_m,
+        offen_kwh=float(w.loc[[p for p in w.index if p.strftime("%m.%Y") in offen_m], "export_kwh"].sum()) if offen_m else 0,
+        c_monat=c_monat, c_kum=c_kum, c_kwh=c_kwh, c_wert=c_wert))
+
+
 def register(app, server):
     global S
     S = server
     app.jinja_env.filters["k0"] = lambda x: "–" if x is None or pd.isna(x) else f"{x:,.0f}".replace(",", "'")
     app.add_url_rule("/", "index", index)
     app.add_url_rule("/verlauf", "verlauf", verlauf)
+    app.add_url_rule("/wertschoepfung", "wertschoepfung", wertschoepfung)

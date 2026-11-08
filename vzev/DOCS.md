@@ -16,16 +16,19 @@ QR-Einzahlungsschein erstellen, Zahlungen verfolgen und Monate revisionssicher a
 
 **Auswertung**
 - **Übersicht:** Monat wählen; Produktion, Autarkie, Rücklieferung, Wertschöpfung; Diagramm «Energiefluss pro Monat»; Kontrollen (Abgleich mit Primeo, Ladestation, Lücken, Rückliefertarif, Abschluss, offene Rechnungen); Verbraucher des Monats mit Betrag inkl. Grundpreis.
+- **Wertschöpfung:** Ertrag des Betreibers pro Monat nach Quelle (Verkauf an Mieter, Eigenverbrauch, Rücklieferung, Gutschriften), kumuliert, Verwendung des Solarstroms und Wert pro kWh; filterbar nach Jahr.
 - **Verlauf:** pro Zähler Verbrauch, Solar/Netz und Kosten pro Monat, beim 1. OG nach Mietverhältnis gruppiert.
 
 **Abrechnung**
 - **Daten importieren:** Dateien hochladen, ersetzen oder entfernen. Die Zuordnung erfolgt über die Messpunkt-Nummer im Dateikopf, nicht über den Dateinamen. Oben steht, bis wann die Lastgänge reichen.
+- **Jahresabrechnung:** Allgemeinstrom fürs ganze Jahr als PDF für die Nebenkostenabrechnung, Mieter, Wertschöpfung, Excel-Export (auf Wunsch mit allen Viertelstunden).
 - **Rechnungen:** Quartal und Rechnungsdatum wählen und erstellen – pro Mietverhältnis eine Rechnung mit QR-Einzahlungsschein, dazu eine Gesamtrechnung Allgemeinstrom für die Nebenkostenabrechnung. Darunter **Rechnungen und Zahlungen**: offene und überfällige Beträge, Zahlungen erfassen oder entfernen, Rechnungsdatum und Fälligkeit ändern.
 - **Abschluss:** Monate der Reihe nach abschliessen (mit Abschlussdatum). Danach sind Änderungen an Tarifen, Mietern und Erträgen für diesen Monat gesperrt.
 
 **Stammdaten**
-- **Mieter, Tarife:** Mietverhältnisse mit Historie, Tarife mit Gültig-ab-Datum.
-- **Primeo:** **Dynamische Strompreise** (Verlauf heute/morgen, Schnittstelle einstellen), Primeo-Rechnungen für den Abgleich, manuelle Erträge.
+- **Mieter:** Mietverhältnisse mit Historie.
+- **Tarife:** Tarife mit Gültig-ab-Datum und **Dynamische Strompreise** (Verlauf heute/morgen, Schnittstelle einstellen).
+- **Primeo:** Primeo-Rechnungen für den Abgleich, manuelle Erträge.
 - **Einstellungen:** Betreiber, Zähler, Regeln (Aufteilung sowie Batterie und dynamischer Tarif) und die Datei `vzev.yaml` direkt.
 
 **Anlage**
@@ -33,7 +36,7 @@ QR-Einzahlungsschein erstellen, Zahlungen verfolgen und Monate revisionssicher a
 - **Datensammler:** Zählerstände aus Home Assistant (alle 15 Minuten) mit letztem Wert und Status, evcc-Ladevorgänge im Detail.
 - **Protokoll:** Uploads, Rechnungen, Zahlungen, Korrekturen, Warnungen und Fehler.
 
-Oben neben der Version zeigt eine **Statusanzeige**, was im Hintergrund läuft (Berechnung, Abruf von Zählerständen, evcc oder Strompreisen). Seiten, die auf eine Berechnung warten, laden von selbst neu.
+Ein Klick auf die **Versionsnummer** zeigt, was neu ist. Daneben zeigt eine **Statusanzeige**, was im Hintergrund läuft (Berechnung, Abruf von Zählerständen, evcc oder Strompreisen). Seiten, die auf eine Berechnung warten, laden von selbst neu.
 
 ## Monatlicher Ablauf
 
@@ -57,7 +60,7 @@ Für die Zeit nach dem letzten Primeo-Lastgang rechnet die App mit den gesammelt
 
 ## Dynamische Strompreise
 
-Die App holt die Viertelstundenpreise über die Primeo-Schnittstelle (Standard: `https://tarife.primeo-energie.ch/api/v1/tariffs`), stündlich und zwischen 18 und 21 Uhr alle 15 Minuten. Adresse, Tarifname, Tariftyp und Startdatum lassen sich unter **Primeo → Dynamische Strompreise → Schnittstelle einstellen** ändern. Die Preise enthalten keine kantonalen/kommunalen Abgaben und keine MWST. Für die Abrechnung werden sie noch nicht verwendet.
+Die App holt die Viertelstundenpreise über die Primeo-Schnittstelle (Standard: `https://tarife.primeo-energie.ch/api/v1/tariffs`), stündlich und zwischen 18 und 21 Uhr alle 15 Minuten. Adresse, Tarifname, Tariftyp und Startdatum lassen sich unter **Tarife → Dynamische Strompreise → Schnittstelle einstellen** ändern. Die Preise enthalten keine kantonalen/kommunalen Abgaben und keine MWST. Für die Abrechnung werden sie noch nicht verwendet.
 
 ## Daten und Sicherung
 

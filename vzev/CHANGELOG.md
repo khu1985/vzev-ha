@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0
+
+- Jahresabrechnung: neue Seite unter «Abrechnung» mit Allgemeinstrom fürs ganze Jahr (Monatstabelle und Total), Mietern (berechnet, in Rechnung gestellt, bezahlt), Zählern pro Monat und Wertschöpfung. Hinweis «vorläufig», solange nicht alle Monate abgeschlossen sind.
+- Wertschöpfung: eigene Seite unter «Auswertung» mit Kennzahlen (Total, pro kWh Produktion, Anteil im Haus genutzt, Anteil Rücklieferung) und Diagrammen: Wertschöpfung pro Monat nach Quelle, kumuliert, wohin der Solarstrom geht und was eine kWh je Verwendung wert ist; filterbar nach Jahr.
+- PDF Allgemeinstrom: Jahresaufstellung für die Nebenkostenabrechnung, gespeichert unter rechnungen/jahr.
+- Excel-Export: alle Tabellen des Jahres als Excel-Datei, auf Wunsch mit allen Viertelstunden.
+- Was ist neu: Ein Klick auf die Versionsnummer oben zeigt alle Änderungen; nach einem Update erscheint einmalig ein Hinweis.
+- Dynamische Strompreise: jetzt auf der Seite «Tarife» statt «Primeo».
+- Rechnungen: Die Tarife in der Fussnote kommen jetzt aus den Einstellungen statt fest aus dem Text (wichtig für neue Tarife 2027).
+
 ## 0.5.1
 
 - Dynamische Strompreise jetzt auf der Seite «Primeo» (Verlauf, Jetzt abrufen, Schnittstelle einstellen).

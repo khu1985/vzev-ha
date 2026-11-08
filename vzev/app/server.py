@@ -21,6 +21,7 @@ import invoices
 import seiten
 import uebersicht
 import zahlungen
+import jahr
 from collector import Collector
 
 DATA = Path(os.environ.get("VZEV_DIR", Path(__file__).parent / "data"))
@@ -88,9 +89,30 @@ def _version():
 
 
 VERSION = _version()
+
+
+def _changelog():
+    """CHANGELOG.md (liegt im Image neben der App) → [(version, [punkte])]."""
+    for p in (Path(__file__).parent / "CHANGELOG.md", Path(__file__).parent.parent / "CHANGELOG.md"):
+        if p.exists():
+            eintraege, cur = [], None
+            for z in p.read_text(encoding="utf-8").splitlines():
+                if z.startswith("## "):
+                    cur = (z[3:].strip(), [])
+                    eintraege.append(cur)
+                elif z.startswith("- ") and cur:
+                    cur[1].append(z[2:].strip())
+                elif z.startswith("  ") and cur and cur[1]:
+                    cur[1][-1] += " " + z.strip()
+            return eintraege
+    return []
+
+
+CHANGELOG = _changelog()
+NEU_KURZ = (CHANGELOG[0][1][0].split(":")[0] if CHANGELOG and CHANGELOG[0][0] == VERSION and CHANGELOG[0][1] else "Verbesserungen")
 NAVIGATION = [
-    ("Auswertung", [("./", "Übersicht"), ("verlauf", "Verlauf")]),
-    ("Abrechnung", [("import", "Daten importieren"), ("rechnungen", "Rechnungen"), ("abschluss", "Abschluss")]),
+    ("Auswertung", [("./", "Übersicht"), ("verlauf", "Verlauf"), ("wertschoepfung", "Wertschöpfung")]),
+    ("Abrechnung", [("import", "Daten importieren"), ("rechnungen", "Rechnungen"), ("jahr", "Jahresabrechnung"), ("abschluss", "Abschluss")]),
     ("Stammdaten", [("mieter", "Mieter"), ("tarife", "Tarife"), ("primeo", "Primeo"), ("einstellungen", "Einstellungen")]),
     ("Anlage", [("batterie", "Batterie"), ("sammler", "Datensammler"), ("protokoll", "Protokoll")]),
 ]
@@ -330,13 +352,21 @@ form#up{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
  form.felder button{flex-basis:100%;justify-content:center}
  details.card summary{line-height:1.6}
 }
+
+a.ver{text-decoration:none}a.ver:hover{text-decoration:underline;color:var(--ink)}
+.neu-hinweis{position:fixed;right:16px;bottom:16px;max-width:420px;background:var(--ink);color:#fff;padding:12px 40px 12px 16px;border-radius:12px;font-size:13px;line-height:1.45;z-index:30;box-shadow:0 6px 24px rgba(0,0,0,.18)}
+.neu-hinweis a{color:#FFD58A}.neu-hinweis button{position:absolute;top:6px;right:6px;min-height:28px;padding:0 8px;background:transparent;border:0;color:#fff;font-size:18px}
+@media (max-width:759px){.neu-hinweis{left:12px;right:12px;bottom:12px;max-width:none}}
+.changelog h2{margin-top:20px}.changelog h2:first-child{margin-top:0}.changelog li{margin:4px 0;line-height:1.5}
 </style></head><body>
-<div class="app"><aside class="side" id="side"><div class="top"><span class="brand">☀ vZEV {{ anlage }}</span><span class="ver" title="Version der App">v{{ version }}</span><span id="bg" class="bg" role="status" aria-live="polite"></span>
+<div class="app"><aside class="side" id="side"><div class="top"><span class="brand">☀ vZEV {{ anlage }}</span><a class="ver" href="neu" title="Was ist neu in dieser Version">v{{ version }}</a><span id="bg" class="bg" role="status" aria-live="polite"></span>
 <button id="menu" type="button" aria-expanded="false" aria-controls="nav" onclick="var s=document.getElementById('side');var o=s.classList.toggle('offen');this.setAttribute('aria-expanded',o);this.textContent=o?'Schliessen':'Menü'">Menü</button></div>
 <nav id="nav">{% for gruppe, eintraege in navigation %}<div class="grp"><span class="gl">{{ gruppe }}</span>{% for href, label in eintraege %}
 <a href="{{ href }}" class="{{ 'on' if label == title else '' }}"{% if label == title %} aria-current="page"{% endif %}>{{ label }}{% if label == 'Protokoll' and nfehler %} <span class="pill warn">{{ nfehler }}</span>{% endif %}</a>{% endfor %}</div>{% endfor %}</nav></aside>
 <script>(function(){var a=document.querySelector('nav a.on');if(a&&innerWidth<1200&&innerWidth>=760)a.scrollIntoView({block:'nearest',inline:'center'})})()</script>
-<main><h1>{{ title }}</h1>{% if msg %}<div class="msg {{ msgclass or 'ok' }}">{{ msg }}</div>{% endif %}{{ body|safe }}</main></div><script>
+<main><h1>{{ title }}</h1>{% if msg %}<div class="msg {{ msgclass or 'ok' }}">{{ msg }}</div>{% endif %}{{ body|safe }}</main></div>
+<div id="neu-hinweis" class="neu-hinweis" hidden>Neu in v{{ version }}: {{ neu_kurz }} <a href="neu">Alle Änderungen</a> <button type="button" aria-label="Hinweis schliessen" onclick="try{localStorage.setItem('vzev-gesehen','{{ version }}')}catch(e){}this.parentNode.hidden=true">×</button></div>
+<script>try{if(localStorage.getItem('vzev-gesehen')!=='{{ version }}'&&location.pathname.slice(-4)!=='/neu')document.getElementById('neu-hinweis').hidden=false;else if(location.pathname.slice(-4)==='/neu')localStorage.setItem('vzev-gesehen','{{ version }}')}catch(e){}</script><script>
 (function(){
  var el=document.getElementById('bg'),warten=document.getElementById('warten');
  function zeit(s){return s<60?Math.round(s)+' s':Math.round(s/60)+' min'}
@@ -369,7 +399,7 @@ if(!h)return;var i=0;r.querySelectorAll(':scope>td').forEach(function(td){var n=
 
 def page(title, body, **kw):
     b = config().get("betreiber", {})
-    return render_template_string(BASE, title=title, body=body, anlage=f"{b.get('strasse', '')} {b.get('hausnr', '')}".strip(), msg=request.args.get("msg"), msgclass=request.args.get("c"), nfehler=fehler_seit_start(), version=VERSION, navigation=NAVIGATION, **kw)
+    return render_template_string(BASE, title=title, body=body, anlage=f"{b.get('strasse', '')} {b.get('hausnr', '')}".strip(), msg=request.args.get("msg"), msgclass=request.args.get("c"), nfehler=fehler_seit_start(), version=VERSION, navigation=NAVIGATION, neu_kurz=NEU_KURZ, **kw)
 
 
 # --- Import -------------------------------------------------------------------
@@ -712,7 +742,7 @@ def einstellungen():
 
 
 # --- Status und Warteseite ------------------------------------------------------
-BRAUCHT_BERECHNUNG = {"index", "verlauf", "abschluss", "primeo", "sammler", "import_page"}
+BRAUCHT_BERECHNUNG = {"index", "verlauf", "wertschoepfung", "abschluss", "primeo", "sammler", "import_page", "jahr"}
 
 
 @app.get("/status")
@@ -755,6 +785,7 @@ def auf_berechnung_warten():
 seiten.register(app, sys.modules[__name__])
 uebersicht.register(app, sys.modules[__name__])
 zahlungen.register(app, sys.modules[__name__])
+jahr.register(app, sys.modules[__name__])
 app.jinja_env.filters["dmy"] = lambda x: "" if not x else f"{str(x)[8:10]}.{str(x)[5:7]}.{str(x)[:4]}"
 
 # --- Protokoll ----------------------------------------------------------------
@@ -771,6 +802,16 @@ PROT = """
 <td class="l" style="white-space:pre-wrap;word-break:break-word">{{ e.text }}</td></tr>
 {% else %}<tr><td class="l" colspan="3">Keine Einträge.</td></tr>{% endfor %}</table></div>
 <p class="muted">Das Protokoll liegt auch als Datei «vzev.log» im App-Konfigurationsordner.</p></div>"""
+
+
+NEU = """<div class="card changelog">{% for v, punkte in eintraege %}
+<h2>Version {{ v }}{% if v == version %} <span class="pill ok">installiert</span>{% endif %}</h2><ul>{% for p in punkte %}<li>{{ p }}</li>{% endfor %}</ul>{% endfor %}
+{% if not eintraege %}<p>Keine Änderungsliste gefunden.</p>{% endif %}</div>"""
+
+
+@app.route("/neu")
+def neu():
+    return page("Was ist neu", render_template_string(NEU, eintraege=CHANGELOG, version=VERSION))
 
 
 @app.route("/protokoll")

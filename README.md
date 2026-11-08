@@ -143,7 +143,7 @@ flowchart TD
     A["Primeo-Kundenportal: Lastgänge aller 5 Zähler exportieren<br/>go-e: Ladevorgänge exportieren"] --> B["Daten importieren: Dateien hochladen<br/>Zuordnung über die Messpunkt-Nummer, alte Fassung wird ersetzt"]
     B --> C{"Übersicht: Kontrollen ok?<br/>Lücken, Ladestation, Abgleich"}
     C -- nein --> B
-    C -- ja --> D["Primeo-Rechnung erfassen (Seite «Primeo»)<br/>Netzbezug HT/NT und Rücklieferung für den Abgleich"]
+    C -- ja --> D["Primeo-Rechnung erfassen (Seite «Tarife»)<br/>Netzbezug HT/NT und Rücklieferung für den Abgleich"]
     D --> E["Tarife prüfen<br/>Rückliefertarif des Quartals eintragen, sobald publiziert"]
     E --> F["Abschluss: Monat abschliessen<br/>Werte werden festgehalten und gesperrt"]
     F --> G["Rechnungen: Quartal erstellen<br/>PDF pro Mietverhältnis + Allgemeinstrom"]
@@ -184,7 +184,7 @@ GET https://tarife.primeo-energie.ch/api/v1/tariffs
 ```
 
 - Veröffentlichung täglich bis 18 Uhr für den nächsten Tag; die App ruft stündlich und von 18 bis 21 Uhr alle 15 Minuten ab und lädt fehlende Tage nach.
-- Adresse, Tarifname, Tariftyp und Startdatum sind in der App einstellbar (Seite «Primeo»), gespeichert im Abschnitt `dynamisch` von `vzev.yaml`.
+- Adresse, Tarifname, Tariftyp und Startdatum sind in der App einstellbar (Seite «Tarife»), gespeichert im Abschnitt `dynamisch` von `vzev.yaml`.
 - Die Preise enthalten keine kantonalen/kommunalen Abgaben und keine MWST.
 
 Noch offen, bevor die Preise in die Abrechnung einfliessen:

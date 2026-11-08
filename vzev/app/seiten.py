@@ -362,6 +362,7 @@ TARIF_ARTEN = [
 TARIFE = """
 <div class="grid" style="margin-bottom:20px">{% for k, label, felder, _ in arten %}<div class="kpi"><div>{{ label }} heute</div>
 <div>{% for f in felder %}{{ heute[k][f[0]] if heute[k][f[0]] is not none else 'offen' }}{{ ' / ' if not loop.last }}{% endfor %}</div></div>{% endfor %}</div>
+{{ preiskarte|safe }}
 <form method="post" action="tarife">
 {% for k, label, felder, hilfe in arten %}<div class="card"><h2>{{ label }}</h2>{{ tabellen[k]|safe }}<p class="muted">{{ hilfe }} Jeder Eintrag gilt ab dem Datum bis zum nächsten.</p></div>{% endfor %}
 <p><button class="primary">Alle Tarife speichern</button> <span class="muted">Gesperrt bis: {{ sperre.strftime('%d.%m.%Y') if sperre else 'kein Monat abgeschlossen' }}</span></p></form>"""
@@ -369,6 +370,19 @@ TARIFE = """
 
 def tarife():
     cfg = S.config()
+    if request.method == "POST" and request.args.get("teil") == "dynamisch":
+        url = (request.form.get("api_url") or "").strip()
+        if not url.startswith(("http://", "https://")):
+            return redirect("tarife?c=warn&msg=Nicht gespeichert: Die Adresse muss mit http:// oder https:// beginnen")
+        try:
+            ab = _d(request.form.get("abrufen_ab") or "2027-01-01")
+        except ValueError:
+            return redirect("tarife?c=warn&msg=Nicht gespeichert: ungültiges Datum")
+        neu = {"api_url": url, "tarif_name": (request.form.get("tarif_name") or "NetzDynamisch").strip(),
+               "tarif_typ": request.form.get("tarif_typ") or "", "abrufen_ab": ab, "aktiv": bool(request.form.get("aktiv"))}
+        abschnitt_speichern("dynamisch", neu, "Dynamische Strompreise – bearbeitet in der App")
+        S.log.info("Preis-Schnittstelle gespeichert: %s (%s, %s)", url, neu["tarif_name"], neu["tarif_typ"] or "alle")
+        return redirect("tarife?msg=Gespeichert")
     tar = cfg.get("tarife") or {}
     felder = {k: [dict(key="ab", label="Gültig ab", typ="datum")] + [dict(key=f, label=l, typ="zahl", breite=110) for f, l in fs]
               for k, _, fs, _ in TARIF_ARTEN}
@@ -397,12 +411,11 @@ def tarife():
             return redirect(f"tarife?c=warn&msg=Nicht gespeichert: {e}")
     heute = {k: {f: _gueltig(tar.get(k), date.today(), f) for f, _ in fs} for k, _, fs, _ in TARIF_ARTEN}
     tabellen = {k: editor(k, felder[k], [dict(r, ab=_d(r["ab"])) for r in tar.get(k) or []]) for k, _, _, _ in TARIF_ARTEN}
-    return S.page("Tarife", render_template_string(TARIFE, arten=TARIF_ARTEN, heute=heute, tabellen=tabellen, sperre=gesperrt_bis()))
+    return S.page("Tarife", render_template_string(TARIFE, preiskarte=render_template_string(PREISKARTE, p=preis_infos()), arten=TARIF_ARTEN, heute=heute, tabellen=tabellen, sperre=gesperrt_bis()))
 
 
 # --- Primeo -------------------------------------------------------------------
 PRIMEO = """
-{{ preiskarte|safe }}
 <form method="post" action="primeo">
 <div class="card"><h2>Primeo-Rechnungen für den Abgleich</h2>{{ t_rech|safe }}
 <h2 style="margin-top:16px">Rücklieferung laut Primeo-Rechnung</h2>{{ t_rueck|safe }}
@@ -434,19 +447,6 @@ def _monat(x, i):
 
 def primeo():
     cfg = S.config()
-    if request.method == "POST" and request.args.get("teil") == "dynamisch":
-        url = (request.form.get("api_url") or "").strip()
-        if not url.startswith(("http://", "https://")):
-            return redirect("primeo?c=warn&msg=Nicht gespeichert: Die Adresse muss mit http:// oder https:// beginnen")
-        try:
-            ab = _d(request.form.get("abrufen_ab") or "2027-01-01")
-        except ValueError:
-            return redirect("primeo?c=warn&msg=Nicht gespeichert: ungültiges Datum")
-        neu = {"api_url": url, "tarif_name": (request.form.get("tarif_name") or "NetzDynamisch").strip(),
-               "tarif_typ": request.form.get("tarif_typ") or "", "abrufen_ab": ab, "aktiv": bool(request.form.get("aktiv"))}
-        abschnitt_speichern("dynamisch", neu, "Dynamische Strompreise – bearbeitet in der App")
-        S.log.info("Preis-Schnittstelle gespeichert: %s (%s, %s)", url, neu["tarif_name"], neu["tarif_typ"] or "alle")
-        return redirect("primeo?msg=Gespeichert")
     if request.method == "POST":
         try:
             rech, rueck = lesen("r", F_RECH), lesen("rl", F_RUECK)
@@ -481,7 +481,7 @@ def primeo():
     man = cfg.get("manuell") or {}
     b = S.berechnung() if any(S.PRIMEO.iterdir()) else {}
     abg = core.abgleich(b["res"], b["cfg"]) if b.get("ok") else None
-    return S.page("Primeo", render_template_string(PRIMEO, preiskarte=render_template_string(PREISKARTE, p=preis_infos()), abg=abg, t_rech=editor("r", F_RECH, rows_r), t_rueck=editor("rl", F_RUECK, rows_rl),
+    return S.page("Primeo", render_template_string(PRIMEO, abg=abg, t_rech=editor("r", F_RECH, rows_r), t_rueck=editor("rl", F_RUECK, rows_rl),
                                                    t_vor=editor("v", F_VOR, [dict(e, monat=str(e["monat"])) for e in man.get("ruecklieferung_vor_start") or []]),
                                                    t_ue=editor("u", F_UE, [dict(e, monat=str(e["monat"])) for e in man.get("uebrige_ertraege") or []])))
 
@@ -605,7 +605,7 @@ BATTERIE = """
 <td>{{ '%.0f %%'|format(m.entladen / m.geladen * 100) if m.geladen else '–' }}</td><td>{{ m.pv|f2 }}</td><td>{{ m.bezug|f2 }}</td><td>{{ m.einspeisung|f2 }}</td></tr>
 {% else %}<tr><td colspan="8" class="l">Noch keine Daten vom Wechselrichter. Der Datensammler speichert sie alle 15 Minuten.</td></tr>{% endfor %}</table></div>
 <p class="muted">Tageswerte des Solis-Wechselrichters (Höchstwert pro Tag), gesammelt vom Datensammler. Für die Abrechnung zählen weiterhin die Primeo-Lastgänge.</p></div>
-<p class="muted">Dynamische Strompreise: Seite <a href="primeo">Primeo</a>. Regeln für Netzladung und Entladung: <a href="einstellungen?tab=regeln">Einstellungen → Regeln</a>.</p>"""
+<p class="muted">Dynamische Strompreise: Seite <a href="tarife">Tarife</a>. Regeln für Netzladung und Entladung: <a href="einstellungen?tab=regeln">Einstellungen → Regeln</a>.</p>"""
 
 
 def batterie():
@@ -684,7 +684,7 @@ PREISKARTE = """<div class="card"><h2>Dynamische Strompreise</h2>
 {{ p.chart|safe }}<p class="muted">Typ «{{ p.typ }}», ohne kantonale/kommunale Abgaben und MWST.</p>{% endif %}
 <form method="post" action="preise_abrufen" data-busy="Strompreise werden abgerufen …" style="margin-top:8px"><button>Jetzt abrufen</button></form>
 <details style="margin-top:12px"><summary class="muted">Schnittstelle einstellen</summary>
-<form method="post" action="primeo?teil=dynamisch"><table class="form">
+<form method="post" action="tarife?teil=dynamisch"><table class="form">
 <tr><td class="l">Adresse (URL)</td><td class="l"><input name="api_url" value="{{ p.e.api_url }}" style="width:420px" required></td></tr>
 <tr><td class="l">Tarifname</td><td class="l"><input name="tarif_name" value="{{ p.e.tarif_name }}" style="width:200px"> <span class="muted">NetzDynamisch, NetzDynamischAVAG, NetzDynamischELAG</span></td></tr>
 <tr><td class="l">Tariftyp</td><td class="l"><select name="tarif_typ">{% for k, v in [('', 'alle'), ('integrated', 'integrated – Netz + Energie'), ('electricity', 'electricity – Energie'), ('grid', 'grid – Netz inkl. nationale Abgaben'), ('grid_usage', 'grid_usage – nur Netznutzung')] %}<option value="{{ k }}" {{ 'selected' if k == p.e.tarif_typ }}>{{ v }}</option>{% endfor %}</select></td></tr>
@@ -796,5 +796,5 @@ def preise_abrufen():
         S.collector.aktiv = None
     pa = S.preisabruf
     if pa.fehler:
-        return redirect(f"primeo?c=warn&msg=Abruf fehlgeschlagen: {pa.fehler}")
-    return redirect(f"primeo?msg={pa.status}")
+        return redirect(f"tarife?c=warn&msg=Abruf fehlgeschlagen: {pa.fehler}")
+    return redirect(f"tarife?msg={pa.status}")

@@ -54,6 +54,113 @@ def grundpreis(cfg, d):
     return gp[-1]["chf"] if gp else 0.0
 
 
+def _werte_im_zeitraum(eintraege, von, bis, key):
+    """Werte der Tarifeinträge, die zwischen von und bis gelten (in zeitlicher Reihenfolge, ohne Wiederholung)."""
+    es = sorted(eintraege or [], key=lambda e: str(e["ab"]))
+    out = []
+    for i, e in enumerate(es):
+        ab = pd.Timestamp(e["ab"]).date()
+        ende = pd.Timestamp(es[i + 1]["ab"]).date() - timedelta(days=1) if i + 1 < len(es) else date.max
+        if ab <= bis and ende >= von and e.get(key) is not None and e[key] not in out:
+            out.append(e[key])
+    return out
+
+
+def tarif_hinweise(cfg, von, bis):
+    """Fussnoten mit den im Zeitraum gültigen Tarifen (statt fester Zahlen)."""
+    t = cfg["tarife"]
+    rp = lambda xs: " bzw. ".join(f"{x * 100:.2f}" for x in xs) or "–"
+    ht, nt = _werte_im_zeitraum(t.get("netz"), von, bis, "ht"), _werte_im_zeitraum(t.get("netz"), von, bis, "nt")
+    gp = _werte_im_zeitraum(t.get("grundpreis_zaehler"), von, bis, "chf")
+    return [f"Tarife: Solarstrom {rp(_werte_im_zeitraum(t.get('solar'), von, bis, 'chf'))} Rp./kWh · Netzstrom HT {rp(ht)} / NT {rp(nt)} Rp./kWh "
+            "(Primeo, inkl. Abgaben und MWST).",
+            "* Grundpreis Netznutzung anteilig, Messtarif, Konzessionsabgabe: "
+            + (" bzw. ".join(f"{x:.2f}" for x in gp) or "–") + " CHF pro Zähler und Monat."]
+
+
+def render_jahr(path, cfg, rows, jahr, von, bis, vorlaeufig):
+    """Jahresaufstellung Allgemeinstrom für die Nebenkostenabrechnung."""
+    W, H = A4
+    c = canvas.Canvas(str(path), pagesize=A4)
+    c.setTitle(f"Allgemeinstrom {jahr}")
+    b = cfg["betreiber"]
+    L, R = 20 * mm, W - 20 * mm
+    y = H - 20 * mm
+    c.setFillColor(INK)
+    c.setFont("Helvetica-Bold", 13)
+    c.drawString(L, y, b["name"])
+    c.setFont("Helvetica", 8.5)
+    c.setFillColor(MUTED)
+    c.drawString(L, y - 5 * mm, f"{b['strasse']} {b['hausnr']} · {b['plz']} {b['ort']}")
+    c.setStrokeColor(AMBER)
+    c.setLineWidth(1.5)
+    c.line(L, y - 9 * mm, R, y - 9 * mm)
+    c.setFont("Helvetica", 8.5)
+    for i, (k, v) in enumerate([("Liegenschaft", f"{b['strasse']} {b['hausnr']}, {b['plz']} {b['ort']}"),
+                                 ("Zeitraum", f"{de(von)} – {de(bis)}"), ("Erstellt", de(date.today()))]):
+        c.setFillColor(MUTED)
+        c.drawString(L, y - 20 * mm - i * 4.6 * mm, k)
+        c.setFillColor(INK)
+        c.drawString(L + 24 * mm, y - 20 * mm - i * 4.6 * mm, v)
+    ty = y - 40 * mm
+    c.setFont("Helvetica-Bold", 15)
+    c.drawString(L, ty, f"Allgemeinstrom {jahr} · Aufstellung für die Nebenkostenabrechnung" if not vorlaeufig
+                 else f"Allgemeinstrom {jahr} · Aufstellung (vorläufig)")
+    cols = [("Monat", 0, "l"), ("Solar kWh", 52, "r"), ("Netz HT kWh", 74, "r"), ("Netz NT kWh", 96, "r"),
+            ("Solar CHF", 116, "r"), ("Netz CHF", 134, "r"), ("Grundpreis*", 153, "r"), ("Total CHF", 170, "r")]
+    hy = ty - 10 * mm
+    c.setFillColor(HexColor("#26313A"))
+    c.rect(L, hy - 2.2 * mm, R - L, 7 * mm, stroke=0, fill=1)
+    c.setFillColor(white)
+    c.setFont("Helvetica-Bold", 7.5)
+    for name, x, al in cols:
+        (c.drawString if al == "l" else c.drawRightString)(L + (2 if al == "l" else x) * mm, hy, name)
+    yy = hy - 7 * mm
+    c.setFont("Helvetica", 8.5)
+    sums = dict(solar=0, ht=0, nt=0, solar_chf=0, netz_chf=0, grundpreis=0, total=0)
+    for r in rows:
+        c.setFillColor(INK)
+        vals = [r["monat"], kwh(r["solar"]), kwh(r["ht"]), kwh(r["nt"]), chf(r["solar_chf"]), chf(r["netz_chf"]),
+                chf(r["grundpreis"]), chf(r["total"])]
+        for (name, x, al), v in zip(cols, vals):
+            (c.drawString if al == "l" else c.drawRightString)(L + (2 if al == "l" else x) * mm, yy, v)
+        for k in sums:
+            sums[k] += r[k]
+        c.setStrokeColor(LINE)
+        c.setLineWidth(0.4)
+        c.line(L, yy - 2.5 * mm, R, yy - 2.5 * mm)
+        yy -= 6.5 * mm
+    total = round(sums["total"], 2)
+    c.setFillColor(SOFT)
+    c.rect(L, yy - 2.2 * mm, R - L, 6.5 * mm, stroke=0, fill=1)
+    c.setFillColor(INK)
+    c.setFont("Helvetica-Bold", 8.5)
+    vals = ["Total", kwh(sums["solar"]), kwh(sums["ht"]), kwh(sums["nt"]), chf(sums["solar_chf"]),
+            chf(sums["netz_chf"]), chf(sums["grundpreis"]), chf(total)]
+    for (name, x, al), v in zip(cols, vals):
+        (c.drawString if al == "l" else c.drawRightString)(L + (2 if al == "l" else x) * mm, yy, v)
+    ny = yy - 9 * mm
+    c.setFont("Helvetica", 7)
+    c.setFillColor(MUTED)
+    notes = tarif_hinweise(cfg, von, bis) + [
+        "Ohne Ladestation (separat erfasst); inkl. Standby-Netzbezug der PV-Anlage. Grundlage: Primeo-Lastgänge in 15-Minuten-Auflösung."]
+    if vorlaeufig:
+        notes.append("Vorläufig: Nicht alle Monate des Zeitraums sind abgeschlossen oder es fehlen noch Lastgänge.")
+    for i, n in enumerate(notes):
+        c.drawString(L, ny - i * 3.6 * mm, n)
+    by = ny - len(notes) * 3.6 * mm - 18 * mm
+    c.setFillColor(HexColor("#FDF3DF"))
+    c.roundRect(L, by, R - L, 13 * mm, 2 * mm, stroke=0, fill=1)
+    c.setFillColor(INK)
+    c.setFont("Helvetica", 8.5)
+    c.drawString(L + 4 * mm, by + 5 * mm, "Betrag zur Übernahme in die Nebenkostenabrechnung.")
+    c.setFont("Helvetica-Bold", 14)
+    c.drawRightString(R - 4 * mm, by + 4.5 * mm, f"CHF {chf(total)}")
+    c.showPage()
+    c.save()
+    return total
+
+
 def lines_for(res, cfg, zaehler, von, bis):
     """Monatszeilen für einen Zähler zwischen von und bis (inkl.), Grundpreis anteilig nach Tagen."""
     mask = (res.index >= pd.Timestamp(von)) & (res.index < pd.Timestamp(bis) + pd.Timedelta(days=1))
@@ -297,8 +404,7 @@ def render(path, cfg, inv, nummer, rechnungsdatum, quartal_label):
     ny = yy - 8 * mm
     c.setFont("Helvetica", 7)
     c.setFillColor(MUTED)
-    notes = ["Tarife: Solarstrom 23.80 Rp./kWh · Netzstrom HT 34.85 / NT 27.99 Rp./kWh (Primeo Standard, inkl. Abgaben und MWST).",
-             "* Grundpreis Netznutzung anteilig, Messtarif, Konzessionsabgabe: 8.25 CHF pro Zähler und Monat."]
+    notes = tarif_hinweise(cfg, inv["von"], inv["bis"])
     if not wohnung:
         notes.append("Ohne Ladestation (separat erfasst); inkl. Standby-Netzbezug der PV-Anlage. Zur Übernahme in die Nebenkostenabrechnung.")
     for i, n in enumerate(notes):

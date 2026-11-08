@@ -5,7 +5,7 @@ Die Werte stehen zusätzlich in den Tabellen und im Tooltip.
 """
 from html import escape
 
-FARBEN = {"solar": "#D4900A", "rueck": "#2E8B57", "netz": "#2F6DB5"}
+FARBEN = {"solar": "#D4900A", "rueck": "#2E8B57", "netz": "#2F6DB5", "uebrige": "#A0446E"}
 
 
 def _ticks(maximum):
@@ -117,3 +117,47 @@ def tagesverlauf(reihen, einheit="Rp./kWh", hoehe=240):
     t.append("</svg>")
     legende = "".join(f'<span class="lg"><i style="background:{f}"></i>{escape(n)}</span>' for n, f, p in reihen if p)
     return f'<div class="legende">{legende}</div><div class="scroll">{"".join(t)}</div>'
+
+
+def linie(labels, werte, name, farbe, einheit="CHF", hoehe=220, vorlaeufig=()):
+    """Einfache Linie mit Punkten über Kategorien (z. B. Monate), mit Tooltip pro Punkt."""
+    n = len(labels)
+    if not n:
+        return '<p class="muted">Noch keine Daten.</p>'
+    hi = max(max(werte), 0) * 1.08 or 1
+    ticks = _ticks(hi)
+    hi = ticks[-1]
+    links, unten, oben = 64, 26, 12
+    breite = max(1000, n * 56 + links)
+    band = (breite - links) / n
+    ph = hoehe - unten - oben
+    x = lambda i: links + band * i + band / 2
+    y = lambda v: oben + ph - v / hi * ph
+    t = [f'<svg class="chart" viewBox="0 0 {breite} {hoehe}" role="img" aria-label="{escape(name)}" style="width:100%;min-width:{min(breite, 560)}px;height:auto">']
+    for v in ticks:
+        t.append(f'<line x1="{links}" x2="{breite}" y1="{y(v):.1f}" y2="{y(v):.1f}" class="grid"/>'
+                 f'<text x="{links - 8}" y="{y(v) + 4:.1f}" text-anchor="end" class="ax">{_zahl(v)}</text>')
+    pts = " ".join(f"{x(i):.1f},{y(v):.1f}" for i, v in enumerate(werte))
+    t.append(f'<polyline points="{pts}" fill="none" stroke="{farbe}" stroke-width="2" stroke-linejoin="round"/>')
+    for i, (lab, v) in enumerate(zip(labels, werte)):
+        t.append(f'<circle cx="{x(i):.1f}" cy="{y(v):.1f}" r="4" fill="{farbe}" stroke="#fff" stroke-width="2"{" opacity=\"0.55\"" if i in vorlaeufig else ""}/>')
+        t.append(f'<rect class="hit" x="{links + band * i:.1f}" y="{oben}" width="{band:.1f}" height="{ph}" data-tip="{escape(lab)}&#10;{escape(name)}: {_zahl(v, 2)} {einheit}"/>')
+        t.append(f'<text x="{x(i):.1f}" y="{hoehe - 8}" text-anchor="middle" class="ax">{escape(lab)}{"*" if i in vorlaeufig else ""}</text>')
+    t.append(f'<text x="{x(n - 1):.1f}" y="{y(werte[-1]) - 10:.1f}" text-anchor="end" class="ax b">{_zahl(werte[-1])} {einheit}</text>')
+    t.append("</svg>")
+    return f'<div class="scroll">{"".join(t)}</div>'
+
+
+def balken_h(zeilen, einheit):
+    """Horizontale Balken mit Beschriftung: zeilen = [(label, wert, farbe, notiz)]."""
+    hi = max((w for _, w, _, _ in zeilen if w), default=1) or 1
+    out = ['<div class="hbalken">']
+    for label, w, farbe, notiz in zeilen:
+        breite = 0 if not w else max(2, w / hi * 100)
+        out.append(f'<div class="hb"><div class="hb-l">{escape(label)}</div><div class="hb-s"><i style="width:{breite:.1f}%;background:{farbe}"></i></div>'
+                   f'<div class="hb-w">{"–" if w is None else _zahl(w, 3 if w < 1 else 2)} {einheit}</div><div class="hb-n muted">{escape(notiz)}</div></div>')
+    out.append('</div><style>.hbalken{display:grid;gap:10px}.hb{display:grid;grid-template-columns:150px 1fr 120px;gap:4px 12px;align-items:center}'
+               '.hb-s{background:#F1F3EF;border-radius:6px;height:14px;overflow:hidden}.hb-s i{display:block;height:100%;border-radius:6px}'
+               '.hb-w{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}.hb-n{grid-column:2 / 4}'
+               '@media (max-width:759px){.hb{grid-template-columns:1fr auto}.hb-s{grid-column:1 / 3;grid-row:2}.hb-n{grid-column:1 / 3}}</style>')
+    return "".join(out)

@@ -249,18 +249,19 @@ def test_strompreise_einstellen_und_abrufen(app):
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     try:
         url = f"http://127.0.0.1:{srv.server_port}/api/v1/tariffs"
-        assert "nicht gespeichert" in ziel(c.post("/primeo?teil=dynamisch", data={"api_url": "ftp://x"})).lower()
+        assert "nicht gespeichert" in ziel(c.post("/tarife?teil=dynamisch", data={"api_url": "ftp://x"})).lower()
         heute = date.today()
-        r = c.post("/primeo?teil=dynamisch", data={"api_url": url, "tarif_name": "NetzDynamisch", "tarif_typ": "",
+        r = c.post("/tarife?teil=dynamisch", data={"api_url": url, "tarif_name": "NetzDynamisch", "tarif_typ": "",
                                                      "abrufen_ab": (heute - timedelta(days=2)).isoformat(), "aktiv": "1"})
         assert "Gespeichert" in ziel(r)
         assert yaml.safe_load((d / "vzev.yaml").read_text())["dynamisch"]["api_url"] == url
         r = c.post("/preise_abrufen")
-        assert "Viertelstunden" in ziel(r) and ziel(r).startswith("primeo"), ziel(r)
+        assert "Viertelstunden" in ziel(r) and ziel(r).startswith("tarife"), ziel(r)
         warten(server)
-        h = c.get("/primeo").get_data(as_text=True)
+        h = c.get("/tarife").get_data(as_text=True)
         assert "Dynamische Strompreise" in h and "Heute" in h and "Rp./kWh" in h and url in h
         assert "preise_abrufen" not in c.get("/batterie").get_data(as_text=True)
+        assert "preise_abrufen" not in c.get("/primeo").get_data(as_text=True)
         h = c.get("/einstellungen?tab=regeln").get_data(as_text=True)
         assert "Batterie und dynamischer Tarif" in h and "Netzladung zahlt" in h
         r = c.post("/einstellungen?tab=batterie", data={"netzladung_zahlt": "betreiber", "entladung_netzanteil": "offen",
@@ -269,6 +270,51 @@ def test_strompreise_einstellen_und_abrufen(app):
         assert yaml.safe_load((d / "vzev.yaml").read_text())["batterie"]["notiz"] == "Test"
     finally:
         srv.shutdown()
+
+
+def test_jahresabrechnung(app):
+    server, c, d, quelle = app
+    warten(server)
+    h = c.get("/jahr?j=2026").get_data(as_text=True)
+    assert "Allgemeinstrom 01.03.–30.04.2026" in h and "Mieter 2026" in h and "Vorläufig" in h
+    assert "Erika Muster" in h and "Max Beispiel" in h
+    b = server.berechnung()
+    import invoices
+    from datetime import date
+    erwartet = round(sum(r["total"] for r in invoices.lines_for(b["res"], b["cfg"], "AllgC", date(2026, 3, 1), date(2026, 4, 30))), 2)
+    assert f"{erwartet:,.2f}".replace(",", "'") in h
+    r = c.get("/jahr/pdf?j=2026")
+    assert r.status_code == 200 and r.data[:4] == b"%PDF"
+    r = c.get("/jahr/excel?j=2026")
+    assert r.status_code == 200 and r.data[:2] == b"PK"
+    import openpyxl
+    wb = openpyxl.load_workbook(io.BytesIO(r.data))
+    assert {"Übersicht", "Allgemeinstrom", "Mieter", "Zähler pro Monat", "Wertschöpfung", "Rechnungen"} <= set(wb.sheetnames)
+    assert wb["Allgemeinstrom"].max_row == 3  # Kopf + März + April
+    r = c.get("/jahr/excel?j=2026&viertelstunden=1")
+    wb = openpyxl.load_workbook(io.BytesIO(r.data), read_only=True)
+    assert wb["Viertelstunden"].max_row == len(b["res"]) + 1
+    assert "Keine Daten" in c.get("/jahr?j=2025").get_data(as_text=True)
+
+
+def test_wertschoepfung_seite(app):
+    server, c, d, quelle = app
+    warten(server)
+    h = c.get("/wertschoepfung").get_data(as_text=True)
+    assert r'Wertschöpfung pro Monat' in h and "Kumuliert" in h and "Wohin geht der Solarstrom" in h and "Was eine kWh wert ist" in h
+    assert h.count("<svg") >= 3 and "CHF/kWh" in h
+    b = server.berechnung()
+    total = server.core.wertschoepfung(b["res"], b["cfg"])["total_chf"].sum()
+    assert f"{total:,.2f}".replace(",", "'") in h
+    assert c.get("/wertschoepfung?j=2026").status_code == 200
+    assert 'href="wertschoepfung"' in c.get("/").get_data(as_text=True)
+
+
+def test_was_ist_neu(app):
+    server, c, d, quelle = app
+    h = c.get("/neu").get_data(as_text=True)
+    assert "Version " + server.VERSION in h and "installiert" in h
+    assert 'href="neu"' in c.get("/protokoll").get_data(as_text=True)
 
 
 def test_abschnitt_speichern_behaelt_kommentare(app):
