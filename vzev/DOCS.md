@@ -9,12 +9,15 @@ Abrechnung eines vZEV direkt in Home Assistant.
 - **Rechnungen:** Quartalsrechnungen als PDF – Wohnung mit QR-Einzahlungsschein, Allgemeinstrom als Gesamtrechnung für die Nebenkostenabrechnung.
 - **Datensammler:** speichert alle 15 Minuten die Zählerstände von whatwatt, go-e, Solis und Kia sowie die evcc-Ladevorgänge.
 - **Protokoll:** Uploads, Rechnungen, Warnungen und Fehler direkt in der App; zusätzlich als `vzev.log` im Konfigurationsordner.
-- **Einstellungen:** Tarife, Mietverhältnisse und Regeln in der Datei `vzev.yaml`.
+- **Abschluss:** Monate abschliessen und sperren; Korrekturen nur mit Begründung, alles nachvollziehbar.
+- **Mieter, Tarife, Primeo:** Mietverhältnisse mit Historie, Tarife mit Gültig-ab-Datum, Primeo-Rechnungen und manuelle Erträge in Formularen.
+- **Batterie:** Monatswerte des Speichers aus den Solis-Daten und Regeln für die Netzladung ab dem dynamischen Tarif.
+- **Einstellungen:** Betreiber, Zähler und Regeln in Formularen; alles liegt in der Datei `vzev.yaml`, die sich auch direkt bearbeiten lässt.
 
 ## Daten
 
 Alles liegt im App-Konfigurationsordner (`/addon_configs/…_vzev/`) und ist damit im Home-Assistant-Backup enthalten:
-`vzev.yaml`, `primeo/`, `rechnungen/`, `messwerte.sqlite`.
+`vzev.yaml`, `primeo/`, `rechnungen/`, `abschluss.json`, `messwerte.sqlite`, `vzev.log`.
 
 ## Optionen
 

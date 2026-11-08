@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import shutil
+import sys
 from logging.handlers import RotatingFileHandler
 import traceback
 from datetime import date, datetime
@@ -15,6 +16,7 @@ from werkzeug.utils import secure_filename
 
 import core
 import invoices
+import seiten
 from collector import Collector
 
 DATA = Path(os.environ.get("VZEV_DIR", Path(__file__).parent / "data"))
@@ -182,7 +184,7 @@ BASE = """<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name=
 :root{--ink:#16201C;--muted:#5B6660;--line:#E2E5E1;--bg:#F6F7F5;--amber:#E8A21B;--soft:#FDF3DF;--ok:#23603A;--okbg:#E3F1E8;--warn:#8A4307;--warnbg:#FCEBD9;--blue:#3B5B8C}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
 header{background:#fff;border-bottom:1px solid var(--line);padding:12px 24px;display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center}
-header b{font-size:16px;margin-right:12px}nav a{color:#3F4A44;text-decoration:none;padding:10px 12px;border-radius:8px;font-weight:500;display:inline-block}
+header b{font-size:16px;margin-right:12px}nav a{color:#3F4A44;text-decoration:none;padding:8px 10px;border-radius:8px;font-weight:500;display:inline-block}
 nav a.on{background:var(--soft);color:var(--ink)}main{max-width:1180px;margin:0 auto;padding:24px}
 h1{font-size:26px;margin:4px 0 16px}h2{font-size:16px;margin:0 0 12px}.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:20px}
 .scroll{overflow-x:auto}table{border-collapse:collapse;width:100%}th{font-size:12px;color:var(--muted);text-align:right;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -196,7 +198,7 @@ input,select,textarea{font:inherit;padding:8px 10px;border:1px solid #D3D8D2;bor
 .kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px}.kpi div:first-child{color:var(--muted);font-size:13px}.kpi div:last-child{font-size:22px;font-weight:600;margin-top:4px}
 form.inline{display:inline}</style></head><body>
 <header><b>☀ vZEV {{ anlage }}</b><nav>
-{% for href, label in [('./','Übersicht'),('import','Daten importieren'),('rechnungen','Rechnungen'),('sammler','Datensammler'),('einstellungen','Einstellungen'),('protokoll','Protokoll')] %}
+{% for href, label in [('./','Übersicht'),('import','Daten importieren'),('rechnungen','Rechnungen'),('abschluss','Abschluss'),('mieter','Mieter'),('tarife','Tarife'),('primeo','Primeo'),('batterie','Batterie'),('sammler','Datensammler'),('einstellungen','Einstellungen'),('protokoll','Protokoll')] %}
 <a href="{{ href }}" class="{{ 'on' if label == title else '' }}">{{ label }}{% if label == 'Protokoll' and nfehler %} <span class="pill warn">{{ nfehler }}</span>{% endif %}</a>{% endfor %}</nav></header>
 <main><h1>{{ title }}</h1>{% if msg %}<div class="msg {{ msgclass or 'ok' }}">{{ msg }}</div>{% endif %}{{ body|safe }}</main></body></html>"""
 
@@ -210,6 +212,7 @@ def page(title, body, **kw):
 UEBERSICHT = """
 {% if not b.ok %}<div class="msg warn">Noch keine vollständige Berechnung: {{ b.fehler }}. <a href="import">Dateien importieren</a></div>
 {% else %}
+{% if abw %}<div class="msg warn">Abgeschlossene Monate haben sich verändert: {% for m, t in abw %}{{ m }} ({{ t }}){{ ', ' if not loop.last }}{% endfor %}. Details unter <a href="abschluss">Abschluss</a>.</div>{% endif %}
 <div class="grid" style="margin-bottom:20px">
  <div class="kpi"><div>Daten bis</div><div>{{ b.res.index.max()|d }}</div></div>
  <div class="kpi"><div>Ladestation verteilt</div><div>{{ 'stimmt' if b.ev < 0.01 else 'Abweichung %.2f kWh'|format(b.ev) }}</div></div>
@@ -243,7 +246,7 @@ def index():
         months = sums["1OG"].index
         tab = [(m.strftime("%m.%Y"), [(sums[k].loc[m, "solar"], sums[k].loc[m, "ht"], sums[k].loc[m, "nt"],
                                        sums[k].loc[m, "solar_chf"] + sums[k].loc[m, "netz_chf"]) for k, _ in zl]) for m in months]
-        ctx.update(zl=zl, tab=tab, abg=core.abgleich(res, cfg), w=core.wertschoepfung(res, cfg))
+        ctx.update(zl=zl, tab=tab, abg=core.abgleich(res, cfg), w=core.wertschoepfung(res, cfg), abw=seiten.abweichungen(b))
     return page("Übersicht", render_template_string(UEBERSICHT, **ctx))
 
 
@@ -358,7 +361,9 @@ RECH = """
 <div class="card"><h2>Quartalsrechnungen erstellen</h2>
 <form method="post" action="rechnungen">Jahr <input name="jahr" type="number" value="{{ jahr }}" style="width:90px">
 Quartal <select name="quartal">{% for q in [1,2,3,4] %}<option {{ 'selected' if q == quartal }}>{{ q }}</option>{% endfor %}</select>
-Rechnungsdatum <input name="datum" type="date" value="{{ heute }}"> <button class="primary">Erstellen</button></form>
+Rechnungsdatum <input name="datum" type="date" value="{{ heute }}">
+{% if korr %}<br><br>Begründung der Korrektur <input name="grund" style="width:420px" required placeholder="z. B. Lastgang Primeo korrigiert">{% endif %}
+<button class="primary">{{ 'Korrektur erstellen' if korr else 'Erstellen' }}</button></form>
 <p class="muted">Pro Mietverhältnis eine Rechnung für die Wohnung (mit QR-Einzahlungsschein) und eine Gesamtrechnung Allgemeinstrom für die Nebenkostenabrechnung. Ein erneutes Erstellen überschreibt die Dateien dieses Quartals.</p></div>
 <div class="card"><h2>Erstellte Rechnungen</h2><table><tr><th class="l">Quartal</th><th class="l">Datei</th><th>Erstellt</th><th></th></tr>
 {% for q, p, t in pdfs %}<tr><td class="l">{{ q }}</td><td class="l">{{ p }}</td><td>{{ t }}</td><td><a class="btn" href="datei?pfad={{ q }}/{{ p }}" target="_blank">Öffnen</a></td></tr>
@@ -369,6 +374,16 @@ Rechnungsdatum <input name="datum" type="date" value="{{ heute }}"> <button clas
 def rechnungen():
     if request.method == "POST":
         j, q = int(request.form["jahr"]), int(request.form["quartal"])
+        ziel = RECHNUNGEN / f"{j}-Q{q}"
+        zu = seiten.quartal_gesperrt(j, q)
+        if zu and ziel.exists() and any(ziel.glob("*.pdf")):
+            grund = (request.form.get("grund") or "").strip()
+            if not grund:
+                return redirect(f"rechnungen?c=warn&msg=Q{q} {j} enthält abgeschlossene Monate ({', '.join(zu)}) und hat schon Rechnungen. Für eine Korrektur eine Begründung angeben.&korr={j}-{q}")
+            alt = RECHNUNGEN / "_alt" / f"{datetime.now():%Y%m%d%H%M%S}_{j}-Q{q}"
+            alt.parent.mkdir(exist_ok=True)
+            shutil.move(str(ziel), alt)
+            seiten.korrektur(f"{j}-Q{q}", "Rechnungen neu erstellt (alte Fassung unter rechnungen/_alt)", grund)
         try:
             made = invoices.main(PRIMEO, j, q, RECHNUNGEN / f"{j}-Q{q}", request.form.get("datum") or None, CFG)
             txt = ", ".join(f"{n} (CHF {t:.2f})" for n, t, _ in made)
@@ -380,7 +395,12 @@ def rechnungen():
     pdfs = sorted(((p.parent.name, p.name, datetime.fromtimestamp(p.stat().st_mtime).strftime("%d.%m.%Y %H:%M"))
                    for p in RECHNUNGEN.glob("*/*.pdf")), reverse=True)
     t = date.today()
-    return page("Rechnungen", render_template_string(RECH, pdfs=pdfs, jahr=t.year, quartal=max(1, (t.month - 1) // 3), heute=t.isoformat()))
+    jahr, quartal = t.year, max(1, (t.month - 1) // 3)
+    korr = request.args.get("korr")
+    if korr:
+        jahr, quartal = (int(x) for x in korr.split("-"))
+    pdfs = [p for p in pdfs if p[0] != "_alt"]
+    return page("Rechnungen", render_template_string(RECH, pdfs=pdfs, jahr=jahr, quartal=quartal, heute=t.isoformat(), korr=korr))
 
 
 @app.route("/datei")
@@ -460,12 +480,15 @@ def sammler():
 # --- Einstellungen ------------------------------------------------------------
 EINST = """
 <div class="card"><h2>Konfiguration (vzev.yaml)</h2>
-<form method="post" action="einstellungen"><textarea name="text" rows="40">{{ text }}</textarea>
+<form method="post" action="einstellungen?tab=datei"><textarea name="text" rows="40">{{ text }}</textarea>
 <p><button class="primary">Speichern</button> <span class="muted">Wird vor dem Speichern geprüft; die vorherige Version bleibt als vzev.yaml.bak erhalten.</span></p></form></div>"""
 
 
 @app.route("/einstellungen", methods=["GET", "POST"])
 def einstellungen():
+    tab = request.args.get("tab", "betreiber")
+    if tab != "datei":
+        return seiten.einstellungen_formulare(tab)
     if request.method == "POST":
         text = request.form["text"].replace("\r\n", "\n")
         try:
@@ -474,12 +497,15 @@ def einstellungen():
                 if k not in data:
                     raise ValueError(f"Abschnitt «{k}» fehlt")
         except Exception as e:
-            return redirect(f"einstellungen?c=warn&msg=Nicht gespeichert: {e}")
+            return redirect(f"einstellungen?tab=datei&c=warn&msg=Nicht gespeichert: {e}")
         shutil.copy(CFG, CFG.with_suffix(".yaml.bak"))
         CFG.write_text(text, encoding="utf-8")
-        return redirect("einstellungen?msg=Gespeichert")
-    return page("Einstellungen", render_template_string(EINST, text=CFG.read_text(encoding="utf-8")))
+        log.info("vzev.yaml direkt bearbeitet")
+        return redirect("einstellungen?tab=datei&msg=Gespeichert")
+    return page("Einstellungen", render_template_string(seiten.EINST_TABS, tab="datei") + render_template_string(EINST, text=CFG.read_text(encoding="utf-8")))
 
+
+seiten.register(app, sys.modules[__name__])
 
 # --- Protokoll ----------------------------------------------------------------
 PROT = """

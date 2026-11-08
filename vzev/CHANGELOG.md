@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0
+
+- Neue Seite «Mieter»: Mietverhältnisse als Tabelle bearbeiten, mit Historie pro Einheit inkl. Leerstand. Prüft Überschneidungen.
+- Neue Seite «Tarife»: Solarstrom, Netzstrom HT/NT, Rücklieferung und Grundpreis mit Gültig-ab-Datum, plus die heute gültigen Werte.
+- Neue Seite «Primeo»: Primeo-Rechnungen für den Abgleich, Einspeisevergütung vor dem vZEV-Start und übrige Erträge bearbeiten.
+- Neue Seite «Abschluss»: Monate der Reihe nach abschliessen. Die Werte werden festgehalten; Änderungen an Tarifen, Mietern und Erträgen, die einen abgeschlossenen Monat betreffen, werden abgelehnt. Wieder öffnen nur mit Begründung. Verändern sich abgeschlossene Monate trotzdem (z. B. durch eine ersetzte Datei), warnen Übersicht und Abschluss.
+- Rechnungen: Ein Quartal mit abgeschlossenen Monaten lässt sich nur mit Begründung neu erstellen; die alte Fassung bleibt unter rechnungen/_alt. Alles erscheint unter «Korrekturen».
+- Neue Seite «Batterie»: geladen, entladen, Wirkungsgrad, PV-Ertrag, Netzbezug und Einspeisung pro Monat aus den Solis-Daten; Regeln für die Netzladung ab dem dynamischen Tarif.
+- Einstellungen in Formularen: Betreiber und Rechnungen, Zähler (Messpunkte und Home-Assistant-Sensoren), Regeln. Die Datei vzev.yaml lässt sich weiterhin direkt bearbeiten.
+- Formulare ändern nur ihren Abschnitt in vzev.yaml; die vorherige Fassung bleibt als vzev.yaml.bak.
+
 ## 0.1.4
 
 - Datensammler: Ladevorgänge aus evcc im Detail – Start, Ende, Dauer, Ladepunkt, Fahrzeug, kWh, Solaranteil, Kosten, Preis pro kWh und km-Stand, filterbar nach Monat.
