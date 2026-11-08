@@ -1,6 +1,9 @@
 """Web-Oberfläche der vZEV-App (läuft über Home-Assistant-Ingress, daher nur relative Links)."""
+import json
+import logging
 import os
 import shutil
+from logging.handlers import RotatingFileHandler
 import traceback
 from datetime import date, datetime
 from pathlib import Path
@@ -22,6 +25,52 @@ for d in (PRIMEO, RECHNUNGEN, PRIMEO / "_entfernt"):
     d.mkdir(parents=True, exist_ok=True)
 if not CFG.exists():
     shutil.copy(Path(__file__).parent / "default_config.yaml", CFG)
+
+# --- Protokoll ----------------------------------------------------------------
+LOGFILE = DATA / "vzev.log"
+START = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+log = logging.getLogger("vzev")
+
+
+def _logging_einrichten():
+    if getattr(log, "_eingerichtet", False):
+        return
+    fh = RotatingFileHandler(LOGFILE, maxBytes=1_000_000, backupCount=1, encoding="utf-8")
+    fh.setFormatter(logging.Formatter("%(asctime)s\t%(levelname)s\t%(message)s", "%Y-%m-%d %H:%M:%S"))
+    sh = logging.StreamHandler()
+    sh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    for h in (fh, sh):
+        log.addHandler(h)
+    log.setLevel(logging.INFO)
+    log.propagate = False
+    wz = logging.getLogger("werkzeug")  # Zugriffe nur bei Problemen ins Protokoll
+    wz.addHandler(fh)
+    fh.addFilter(lambda r: r.name != "werkzeug" or r.levelno >= logging.WARNING)
+    log._eingerichtet = True
+
+
+_logging_einrichten()
+
+
+def protokoll(n=500):
+    zeilen = []
+    for p in (Path(str(LOGFILE) + ".1"), LOGFILE):
+        if p.exists():
+            zeilen += p.read_text(encoding="utf-8", errors="replace").splitlines()
+    eintraege, cur = [], None
+    for z in zeilen:
+        teile = z.split("\t", 2)
+        if len(teile) == 3 and len(teile[0]) == 19 and teile[0][4] == "-":
+            cur = {"zeit": teile[0], "stufe": teile[1], "text": teile[2]}
+            eintraege.append(cur)
+        elif cur is not None:  # Fortsetzung, z. B. Fehlerdetails
+            cur["text"] += "\n" + z
+    return eintraege[-n:][::-1]
+
+
+def fehler_seit_start():
+    return sum(1 for e in protokoll(300) if e["stufe"] in ("ERROR", "CRITICAL") and e["zeit"] >= START)
+
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
@@ -50,41 +99,70 @@ def berechnung():
             _cache.update(key=key, ok=True, cfg=cfg, res=res, files=files, ev=ev, fehler=None)
         except BaseException as e:  # SystemExit bei fehlenden Dateien
             _cache.update(key=key, ok=False, fehler=str(e) or traceback.format_exc(limit=1))
+            log.warning("Berechnung nicht möglich: %s", _cache["fehler"])
     return _cache
 
 
-_info_cache = {}
+INFO_DATEI = DATA / ".dateiinfo.json"
+try:
+    _info_cache = json.loads(INFO_DATEI.read_text(encoding="utf-8"))
+except Exception:
+    _info_cache = {}
 
 
 def datei_info(p, cfg):
-    key = (p.name, p.stat().st_mtime, p.stat().st_size, id(cfg.get("messpunkte")))
+    """Infos zu einer importierten Datei; zwischengespeichert, damit die Import-Seite auch nach einem Neustart sofort lädt."""
+    st = p.stat()
+    key = [st.st_mtime, st.st_size]
     hit = _info_cache.get(p.name)
-    if hit and hit[0][:3] == key[:3]:
+    if hit and hit[0] == key:
         info = dict(hit[1])
-        if info["art"] == "Lastgang":
-            info["rolle"] = cfg["messpunkte"].get(info["messpunkt"]) or "unbekannt"
-            info["ok"] = info["rolle"] != "unbekannt"
-        return info
-    info = _datei_info(p, cfg)
-    _info_cache[p.name] = (key, info)
+    else:
+        info = _datei_info(p)
+        _info_cache[p.name] = [key, info]
+        for alt in [n for n in _info_cache if not (PRIMEO / n).is_file()]:
+            _info_cache.pop(alt)
+        try:
+            INFO_DATEI.write_text(json.dumps(_info_cache), encoding="utf-8")
+        except OSError:
+            pass
+    if info["art"] == "Lastgang":
+        info["rolle"] = (cfg.get("messpunkte") or {}).get(info["messpunkt"]) or "unbekannt"
+        info["ok"] = info["rolle"] != "unbekannt"
     return info
 
 
-def _datei_info(p, cfg):
-    if p.suffix.lower() == ".xlsx":
-        try:
-            s, mp, lst = core.read_lastgang(p)
-            rolle = cfg["messpunkte"].get(mp)
-            return dict(name=p.name, art="Lastgang", messpunkt=mp, rolle=rolle or "unbekannt", lieferstelle=lst,
-                        von=s.index.min(), bis=s.index.max(), ok=bool(rolle))
-        except Exception as e:
-            return dict(name=p.name, art="?", messpunkt="", rolle="nicht lesbar", lieferstelle=str(e)[:80], von=None, bis=None, ok=False)
-    if p.suffix.lower() == ".csv":
-        t = pd.read_csv(p, sep=";", dtype=str)
-        ok = "Zaehlerstand Differenz [kWh]" in t.columns
-        return dict(name=p.name, art="Wallbox", messpunkt="", rolle="Ladestation" if ok else "unbekannt",
-                    lieferstelle=f"{len(t.dropna(subset=['Start']))} Ladevorgänge" if ok else "", von=None, bis=None, ok=ok)
-    return dict(name=p.name, art="?", messpunkt="", rolle="unbekannt", lieferstelle="", von=None, bis=None, ok=False)
+def _lastgang_zeitraum(path):
+    import openpyxl
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    try:
+        von = bis = None
+        for r in wb["Lastgang"].iter_rows(min_row=9, max_col=1, values_only=True):
+            if isinstance(r[0], datetime):
+                von = von or r[0]
+                bis = r[0]
+        return (von.date().isoformat() if von else None), (bis.date().isoformat() if bis else None)
+    finally:
+        wb.close()
+
+
+def _datei_info(p):
+    leer = dict(name=p.name, art="?", messpunkt="", rolle="unbekannt", lieferstelle="", von=None, bis=None, ok=False)
+    try:
+        if p.suffix.lower() == ".xlsx":
+            mp, lst = core.read_header(p)
+            von, bis = _lastgang_zeitraum(p)
+            return dict(leer, art="Lastgang", messpunkt=mp, lieferstelle=lst, von=von, bis=bis)
+        if p.suffix.lower() == ".csv":
+            t = pd.read_csv(p, sep=";", dtype=str)
+            if "Zaehlerstand Differenz [kWh]" in t.columns:
+                n = len(t.dropna(subset=["Start"])) if "Start" in t.columns else len(t)
+                return dict(leer, art="Wallbox", rolle="Ladestation", lieferstelle=f"{n} Ladevorgänge", ok=True)
+            return dict(leer, art="CSV")
+    except Exception as e:
+        log.warning("Datei %s nicht lesbar: %s", p.name, e)
+        return dict(leer, rolle="nicht lesbar", lieferstelle=str(e)[:80])
+    return leer
 
 
 ROLLEN = {"1OG": "Verbrauch 1. OG", "2OG": "Verbrauch 2. OG", "Allg": "Allgemein (inkl. Ladestation)",
@@ -118,14 +196,14 @@ input,select,textarea{font:inherit;padding:8px 10px;border:1px solid #D3D8D2;bor
 .kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px}.kpi div:first-child{color:var(--muted);font-size:13px}.kpi div:last-child{font-size:22px;font-weight:600;margin-top:4px}
 form.inline{display:inline}</style></head><body>
 <header><b>☀ vZEV {{ anlage }}</b><nav>
-{% for href, label in [('./','Übersicht'),('import','Daten importieren'),('rechnungen','Rechnungen'),('sammler','Datensammler'),('einstellungen','Einstellungen')] %}
-<a href="{{ href }}" class="{{ 'on' if label == title else '' }}">{{ label }}</a>{% endfor %}</nav></header>
+{% for href, label in [('./','Übersicht'),('import','Daten importieren'),('rechnungen','Rechnungen'),('sammler','Datensammler'),('einstellungen','Einstellungen'),('protokoll','Protokoll')] %}
+<a href="{{ href }}" class="{{ 'on' if label == title else '' }}">{{ label }}{% if label == 'Protokoll' and nfehler %} <span class="pill warn">{{ nfehler }}</span>{% endif %}</a>{% endfor %}</nav></header>
 <main><h1>{{ title }}</h1>{% if msg %}<div class="msg {{ msgclass or 'ok' }}">{{ msg }}</div>{% endif %}{{ body|safe }}</main></body></html>"""
 
 
 def page(title, body, **kw):
     b = config().get("betreiber", {})
-    return render_template_string(BASE, title=title, body=body, anlage=f"{b.get('strasse', '')} {b.get('hausnr', '')}".strip(), msg=request.args.get("msg"), msgclass=request.args.get("c"), **kw)
+    return render_template_string(BASE, title=title, body=body, anlage=f"{b.get('strasse', '')} {b.get('hausnr', '')}".strip(), msg=request.args.get("msg"), msgclass=request.args.get("c"), nfehler=fehler_seit_start(), **kw)
 
 
 # --- Übersicht ----------------------------------------------------------------
@@ -239,7 +317,7 @@ def hochladen():
     teile, fehler = [], False
     dateien = [fs for fs in request.files.getlist("dateien") if fs and fs.filename]
     if not dateien:
-        app.logger.warning("Upload ohne Dateien (Content-Length %s)", request.content_length)
+        log.warning("Upload ohne Dateien (Content-Length %s)", request.content_length)
         teile.append("Keine Datei empfangen")
         fehler = True
     for fs in dateien:
@@ -247,9 +325,9 @@ def hochladen():
             neu, ersetzt = speichern(fs)
             teile.append(f"{neu['name']} → {ROLLEN.get(neu['rolle'], neu['rolle'])}" + (f" (ersetzt {', '.join(ersetzt)})" if ersetzt else ""))
             fehler |= not neu["ok"]
-            app.logger.info("Upload %s -> %s", neu["name"], neu["rolle"])
+            log.info("Hochgeladen: %s → %s", neu["name"], ROLLEN.get(neu["rolle"], neu["rolle"]))
         except Exception as e:
-            app.logger.exception("Upload %s fehlgeschlagen", fs.filename)
+            log.exception("Upload %s fehlgeschlagen", fs.filename)
             teile.append(f"{fs.filename}: Fehler {e}")
             fehler = True
     msg = "; ".join(teile)
@@ -294,8 +372,10 @@ def rechnungen():
         try:
             made = invoices.main(PRIMEO, j, q, RECHNUNGEN / f"{j}-Q{q}", request.form.get("datum") or None, CFG)
             txt = ", ".join(f"{n} (CHF {t:.2f})" for n, t, _ in made)
+            log.info("Rechnungen %s Q%s erstellt: %s", j, q, txt)
             return redirect(f"rechnungen?msg=Erstellt: {txt}")
         except BaseException as e:
+            log.exception("Rechnungen %s Q%s fehlgeschlagen", j, q)
             return redirect(f"rechnungen?c=warn&msg=Fehler: {e}")
     pdfs = sorted(((p.parent.name, p.name, datetime.fromtimestamp(p.stat().st_mtime).strftime("%d.%m.%Y %H:%M"))
                    for p in RECHNUNGEN.glob("*/*.pdf")), reverse=True)
@@ -359,11 +439,44 @@ def einstellungen():
     return page("Einstellungen", render_template_string(EINST, text=CFG.read_text(encoding="utf-8")))
 
 
+# --- Protokoll ----------------------------------------------------------------
+PROT = """
+<div class="card"><form method="get" action="protokoll" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+<select name="stufe" onchange="this.form.submit()">{% for k, v in [('', 'Alle Einträge'), ('WARNING', 'Warnungen und Fehler'), ('ERROR', 'Nur Fehler')] %}
+<option value="{{ k }}" {{ 'selected' if k == stufe }}>{{ v }}</option>{% endfor %}</select>
+<a class="btn" href="protokoll?stufe={{ stufe }}">Aktualisieren</a>
+<span class="muted">App gestartet {{ start }} · {{ eintraege|length }} Einträge</span></form></div>
+<div class="card"><div class="scroll"><table>
+<tr><th class="l">Zeit</th><th class="l">Art</th><th class="l">Meldung</th></tr>
+{% for e in eintraege %}<tr><td class="l" style="vertical-align:top">{{ e.zeit[8:10] }}.{{ e.zeit[5:7] }}. {{ e.zeit[11:] }}</td>
+<td class="l" style="vertical-align:top"><span class="pill {{ 'warn' if e.stufe in ('WARNING','ERROR','CRITICAL') else 'ok' }}">{{ stufen.get(e.stufe, e.stufe) }}</span></td>
+<td class="l" style="white-space:pre-wrap;word-break:break-word">{{ e.text }}</td></tr>
+{% else %}<tr><td class="l" colspan="3">Keine Einträge.</td></tr>{% endfor %}</table></div>
+<p class="muted">Das Protokoll liegt auch als Datei «vzev.log» im App-Konfigurationsordner.</p></div>"""
+
+
+@app.route("/protokoll")
+def protokoll_seite():
+    stufe = request.args.get("stufe", "")
+    rang = {"INFO": 0, "WARNING": 1, "ERROR": 2, "CRITICAL": 2}
+    eintraege = [e for e in protokoll() if rang.get(e["stufe"], 0) >= rang.get(stufe, 0)]
+    return page("Protokoll", render_template_string(PROT, eintraege=eintraege, stufe=stufe, start=START[8:10] + "." + START[5:7] + ". " + START[11:16],
+                                                   stufen={"INFO": "Info", "WARNING": "Warnung", "ERROR": "Fehler", "CRITICAL": "Fehler"}))
+
+
+@app.errorhandler(Exception)
+def unerwartet(e):
+    from werkzeug.exceptions import HTTPException
+    if isinstance(e, HTTPException):
+        return e
+    log.exception("Fehler auf Seite %s", request.path)
+    return page("Fehler", f'<div class="msg warn">Da ist etwas schiefgelaufen: {e}. Details stehen im <a href="protokoll">Protokoll</a>.</div>'), 500
+
+
 if __name__ == "__main__":
     if os.environ.get("SUPERVISOR_TOKEN") or config().get("homeassistant", {}).get("token"):
         collector.start()
     import logging
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    app.logger.setLevel(logging.INFO)
-    app.logger.info("Daten in %s, %d Dateien im Import", DATA, sum(1 for p in PRIMEO.iterdir() if p.is_file()))
+    log.info("App gestartet. Daten in %s, %d Dateien im Import", DATA, sum(1 for p in PRIMEO.iterdir() if p.is_file()))
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8099)), threaded=True)

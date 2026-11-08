@@ -3,6 +3,7 @@
 Home Assistant speichert Detaildaten nur rund 10 Tage; deshalb legt die App die Zählerstände selbst ab.
 """
 import json
+import logging
 import os
 import sqlite3
 import threading
@@ -12,6 +13,7 @@ from datetime import datetime, timedelta
 import requests
 
 SUPERVISOR = "http://supervisor/core/api"
+log = logging.getLogger("vzev")
 
 
 class Collector:
@@ -53,17 +55,27 @@ class Collector:
             raise RuntimeError("Kein Zugang zu Home Assistant (läuft die App im HA?)")
         ts = datetime.now().replace(second=0, microsecond=0)
         ts = ts - timedelta(minutes=ts.minute % 15)
-        rows = []
+        rows, fehlt = [], []
         for eid in self.entities():
             r = requests.get(f"{base}/states/{eid}", headers={"Authorization": f"Bearer {token}"}, timeout=10)
             if r.status_code != 200:
+                fehlt.append(f"{eid} (HTTP {r.status_code})")
                 continue
             try:
                 rows.append((ts.isoformat(timespec="minutes"), eid, float(r.json()["state"])))
             except (ValueError, KeyError):
-                pass  # unavailable/unknown
+                fehlt.append(f"{eid} ({r.json().get('state')})")  # unavailable/unknown
+        meldung = ", ".join(fehlt)
+        if meldung != getattr(self, "_fehlt", ""):  # nur Änderungen protokollieren
+            if fehlt:
+                log.warning("Datensammler: keine Werte für %s", meldung)
+            elif getattr(self, "_fehlt", None):
+                log.info("Datensammler: alle Entitäten liefern wieder Werte")
+            self._fehlt = meldung
         with self._db() as c:
             c.executemany("INSERT OR REPLACE INTO messwerte VALUES (?, ?, ?)", rows)
+        if self.last_run is None:
+            log.info("Datensammler: erster Abruf, %d von %d Entitäten gespeichert", len(rows), len(self.entities()))
         self.last_run = ts
         return len(rows)
 
@@ -79,6 +91,8 @@ class Collector:
             s.post(ev["url"].rstrip("/") + "/api/auth/login", json={"password": pw}, timeout=10)
         r = s.get(ev["url"].rstrip("/") + ev.get("sessions", "/api/sessions"), timeout=15)
         if r.status_code in (401, 403):
+            if not self.evcc_status.startswith("Anmeldung"):
+                log.warning("evcc: Anmeldung nötig – evcc-Passwort in den App-Optionen eintragen")
             self.evcc_status = "Anmeldung nötig – evcc-Passwort in den App-Optionen eintragen"
             return
         r.raise_for_status()
@@ -89,6 +103,8 @@ class Collector:
             for sess in data or []:
                 sid = str(sess.get("id") or f"{sess.get('created')}_{sess.get('loadpoint')}")
                 c.execute("INSERT OR REPLACE INTO evcc_sessions VALUES (?, ?, ?)", (sid, json.dumps(sess), now))
+        if not self.evcc_status[:1].isdigit():
+            log.info("evcc: %d Ladevorgänge abgerufen", len(data or []))
         self.evcc_status = f"{len(data or [])} Ladevorgänge abgerufen ({now[:16].replace('T', ' ')})"
 
     # --- Status --------------------------------------------------------
@@ -108,11 +124,15 @@ class Collector:
                 self.read_now()
                 self.last_error = None
             except Exception as e:  # weiterlaufen, Fehler anzeigen
+                if self.last_error is None or str(e) not in self.last_error:
+                    log.error("Datensammler: %s", e)
                 self.last_error = f"{datetime.now():%d.%m. %H:%M}: {e}"
             if tick % 4 == 0:
                 try:
                     self.fetch_evcc()
                 except Exception as e:
+                    if self.evcc_status != f"Fehler: {e}":
+                        log.error("evcc: %s", e)
                     self.evcc_status = f"Fehler: {e}"
             tick += 1
             now = datetime.now()
