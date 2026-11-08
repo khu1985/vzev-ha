@@ -11,6 +11,7 @@ ENV MPLCONFIGDIR=/tmp/matplotlib PYTHONUNBUFFERED=1
 
 COPY app /app
 COPY config.yaml /app/addon.yaml
+COPY CHANGELOG.md /app/CHANGELOG.md
 COPY run.sh /run.sh
 RUN chmod a+x /run.sh
 

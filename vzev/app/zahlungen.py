@@ -75,7 +75,9 @@ def nachtragen():
     """Rechnungen, die vor dem Register erstellt wurden: Betrag aus der aktuellen Berechnung, Datum der Datei."""
     reg = laden()
     bekannt = {r["datei"] for r in reg["rechnungen"].values()}
-    fehlend = [p for p in S.RECHNUNGEN.glob("*/*.pdf") if p.parent.name != "_alt" and f"{p.parent.name}/{p.name}" not in bekannt]
+    import re
+    fehlend = [p for p in S.RECHNUNGEN.glob("*/*.pdf")  # nur Quartalsordner wie 2026-Q3
+               if re.fullmatch(r"\d{4}-Q[1-4]", p.parent.name) and f"{p.parent.name}/{p.name}" not in bekannt]
     if not fehlend:
         return
     b = S.berechnung() if any(S.PRIMEO.iterdir()) else {}
