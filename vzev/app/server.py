@@ -508,7 +508,12 @@ RECH = """
 <td><b>{{ r.betrag|f2 if r.betrag is not none else '?' }}</b></td><td>{{ r.bezahlt|f2 if r.art != 'allgemein' else '–' }}</td>
 <td>{{ r.offen|f2 if r.art != 'allgemein' and r.offen is not none else '–' }}</td>
 <td class="l"><span class="pill {{ {'bezahlt':'ok','überzahlt':'warn','überfällig':'warn','teilweise':'warn','intern':'','offen':''}[r.stand] }}">{{ r.stand }}</span>{% if r.nachgetragen %} <span class="muted" title="Vor dem Zahlungsregister erstellt; Betrag aus der aktuellen Berechnung, Datum der Datei">nachgetragen</span>{% endif %}</td>
-<td class="l akt">{% if r.art == 'allgemein' %}<span class="muted">für die Nebenkostenabrechnung</span>{% else %}
+<td class="l akt"><details class="datum-aendern"><summary>Datum ändern</summary>
+<form method="post" action="rechnung_datum" class="felder" data-busy="Datum wird geändert …"><input type="hidden" name="key" value="{{ r.key }}">
+<label class="feld">Rechnungsdatum <input type="date" name="datum" value="{{ r.datum }}" required></label>
+{% if r.art != 'allgemein' %}<label class="feld">Fällig <input type="date" name="faellig" value="{{ r.faellig }}"></label>{% endif %}
+<button>Übernehmen</button></form><p class="muted">Ändert das Register (Fälligkeit, Status), nicht das PDF. Fällig leer = Datum + Zahlungsfrist.</p></details>
+{% if r.art == 'allgemein' %}<span class="muted">für die Nebenkostenabrechnung</span>{% else %}
 {% for zz in r.zahlungen %}<form class="inline" method="post" action="zahlung_entfernen" onsubmit="return confirm('Zahlung vom {{ zz.datum|dmy }} über CHF {{ zz.betrag|f2 }} entfernen?')">
 <input type="hidden" name="key" value="{{ r.key }}"><input type="hidden" name="index" value="{{ loop.index0 }}">
 <span class="muted">{{ zz.datum|dmy }}: {{ zz.betrag|f2 }}{{ ' · ' ~ zz.notiz if zz.notiz }}</span> <button title="Zahlung entfernen" style="min-height:28px;padding:0 8px">×</button></form><br>{% endfor %}
@@ -524,7 +529,10 @@ RECH = """
 {% for r in ersetzt %}<tr><td class="l">{{ r.nummer }}</td><td class="l">{{ r.partei }}</td><td>{{ r.datum|dmy }}</td><td>{{ r.betrag|f2 if r.betrag is not none else '?' }}</td><td>{{ r.ersetzt_am }}</td></tr>{% endfor %}
 </table></div></details>{% endif %}
 <p class="muted">Bei einer Korrektur übernimmt die neue Rechnung die bereits erfassten Zahlungen. Die alten PDFs liegen unter rechnungen/_alt.</p>
-<style>@media (min-width:760px){form.zahlung{flex-wrap:nowrap!important}td.akt{min-width:370px}}form.zahlung{display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center}form.zahlung input{padding:6px 8px}form.zahlung button{min-height:34px;padding:0 10px}</style></div>"""
+<style>details.datum-aendern{margin-bottom:8px}details.datum-aendern summary{cursor:pointer;color:var(--muted);font-size:13px}
+details.datum-aendern form{margin-top:8px;text-align:left}details.datum-aendern p{text-align:left}
+details.datum-aendern[open]{background:var(--bg);border-radius:10px;padding:8px 12px;margin-bottom:12px}details.datum-aendern .feld input{padding:6px 8px}
+@media (min-width:760px){form.zahlung{flex-wrap:nowrap!important}td.akt{min-width:370px}}form.zahlung{display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center}form.zahlung input{padding:6px 8px}form.zahlung button{min-height:34px;padding:0 10px}</style></div>"""
 
 
 @app.route("/rechnungen", methods=["GET", "POST"])
@@ -571,6 +579,19 @@ def zahlung_erfassen():
         return redirect(f"rechnungen?c=warn&msg=Zahlung nicht erfasst: {e}")
     log.info("Zahlung erfasst: %s, CHF %.2f am %s", r["nummer"], betrag, datum.strftime("%d.%m.%Y"))
     return redirect(f"rechnungen?msg=Zahlung CHF {betrag:.2f} für {r['nummer']} erfasst")
+
+
+@app.post("/rechnung_datum")
+def rechnung_datum():
+    try:
+        datum = date.fromisoformat(request.form["datum"])
+        f = request.form.get("faellig") or ""
+        faellig = date.fromisoformat(f) if f else None
+        r, alt = zahlungen.daten_aendern(request.form["key"], datum, faellig)
+    except (ValueError, KeyError) as e:
+        return redirect(f"rechnungen?c=warn&msg=Datum nicht geändert: {e}")
+    log.info("Rechnung %s: Datum %s → %s, fällig %s → %s", r["nummer"], alt[0], r["datum"], alt[1], r["faellig"])
+    return redirect(f"rechnungen?msg={r['nummer']}: Rechnungsdatum {r['datum'][8:10]}.{r['datum'][5:7]}.{r['datum'][:4]}, fällig {r['faellig'][8:10]}.{r['faellig'][5:7]}.{r['faellig'][:4]}")
 
 
 @app.post("/zahlung_entfernen")

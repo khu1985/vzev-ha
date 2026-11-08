@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- Rechnungen: «Datum ändern» pro Rechnung – Rechnungsdatum und Fälligkeit im Register anpassen (z. B. wenn die Rechnung früher verschickt wurde). Fällig leer = Datum + Zahlungsfrist. Jede Änderung wird festgehalten und ins Protokoll geschrieben; das PDF bleibt unverändert.
+
 ## 0.4.0
 
 - Zahlungseingang: Jede erstellte Rechnung kommt ins Register (Betrag, Rechnungsdatum, Fälligkeit). Zahlungen lassen sich unter «Rechnungen» mit Datum und Betrag erfassen und wieder entfernen; Status offen, teilweise, überfällig, bezahlt oder überzahlt. Oben: offener und überfälliger Betrag.
