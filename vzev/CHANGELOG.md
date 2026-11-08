@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.9
+
+- Handy: Versionsnummer wieder in der Kopfzeile neben dem Namen. Der Name wird bei sehr schmalen Bildschirmen gekürzt, damit «Menü» in derselben Zeile bleibt; die Statusanzeige erscheint darunter.
+
 ## 0.3.8
 
 - Statusanzeige oben neben der Version: «Berechnung läuft (12 s)», «Zählerstände abrufen», «evcc-Ladevorgänge abrufen» oder «bereit · gerechnet 13:03». Aktualisiert sich von selbst.

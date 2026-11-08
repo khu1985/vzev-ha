@@ -251,7 +251,7 @@ nav .gl{display:none;font-size:11px;text-transform:uppercase;letter-spacing:.06e
 @media (max-width:1199px){.side{position:sticky;top:0;z-index:5;border-bottom:1px solid var(--line);padding:10px 16px 0}
  nav{display:flex;overflow-x:auto;scrollbar-width:none;padding:6px 0 8px}nav::-webkit-scrollbar{display:none}
  nav .grp{display:flex;flex-shrink:0}nav .grp+.grp{border-left:1px solid var(--line);margin-left:6px;padding-left:6px}}
-@media (max-width:759px){ #menu{display:inline-flex}.ver{display:none}nav{display:none}
+@media (max-width:759px){ #menu{display:inline-flex}.ver{flex-shrink:0}.brand{flex:1 1 0}nav{display:none}
  .side{padding:10px 16px}.side.offen nav{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;padding:8px 0 12px;max-height:calc(100vh - 70px);overflow-y:auto}
  .side.offen nav .grp{display:block;border:0;margin:0;padding:0}.side.offen nav .gl{display:block;margin:10px 10px 2px}.side.offen nav a{display:block}
  main{padding:16px}h1{font-size:22px}.card{padding:16px}}
@@ -299,7 +299,7 @@ form.inline{display:inline}
 .spin{width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;display:inline-block;animation:dreh .8s linear infinite;flex-shrink:0}
 @keyframes dreh{to{transform:rotate(360deg)}}
 button[disabled]{opacity:.75;cursor:progress}
-@media (max-width:759px){ .bg.an{font-size:11px;padding:2px 8px}.bg:not(.an){display:none}.top{flex-wrap:wrap}}
+@media (max-width:759px){ .bg.an{font-size:11px;padding:2px 8px;order:5;flex-basis:100%;justify-content:center}.bg:not(.an){display:none}.top{flex-wrap:wrap}}
 </style></head><body>
 <div class="app"><aside class="side" id="side"><div class="top"><span class="brand">☀ vZEV {{ anlage }}</span><span class="ver" title="Version der App">v{{ version }}</span><span id="bg" class="bg" role="status" aria-live="polite"></span>
 <button id="menu" type="button" aria-expanded="false" aria-controls="nav" onclick="var s=document.getElementById('side');var o=s.classList.toggle('offen');this.setAttribute('aria-expanded',o);this.textContent=o?'Schliessen':'Menü'">Menü</button></div>
