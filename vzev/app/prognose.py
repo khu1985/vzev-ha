@@ -101,7 +101,13 @@ class Prognose:
         if not token:
             self.status = "kein Zugang zu Home Assistant"
             return 0
-        ids = self.eingestellt() or self.finden(base, token)
+        ids = self.eingestellt()
+        if not ids or any(not x.startswith("sensor.") for x in ids):
+            gefunden = self.finden(base, token)
+            if ids:  # Kurznamen wie «prognose_heute» → passenden Solcast-Sensor nehmen
+                ids = [x if x.startswith("sensor.") else next((g for g in gefunden if g.endswith(x)), None) for x in ids]
+                ids = [x for x in ids if x]
+            ids = ids or gefunden
         self.entitaeten = ids
         if not ids:
             self.status = "keine Solcast-Sensoren gefunden"

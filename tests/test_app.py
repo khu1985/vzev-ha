@@ -387,7 +387,11 @@ def test_waermepumpen(app):
         h = c.get("/uebersicht?m=2026-04").get_data(as_text=True)
         assert "Wärmepumpen aus dem Allgemeinstrom herausgerechnet" in h and "Heizung und Warmwasser, Gesamtrechnung" in h
         h = c.get("/verlauf?z=WP").get_data(as_text=True)
-        assert "Wärmepumpen" in h
+        assert "Wärmepumpen" in h and "Gemessen ab 01.04.2026" in h
+        h = c.get("/verlauf?z=WP2").get_data(as_text=True)
+        assert 'href="verlauf?z=WP1">Heizung' in h and 'class="btn primary" href="verlauf?z=WP2">Warmwasser' in h
+        h = c.get("/?p=monat&m=2026-04").get_data(as_text=True)
+        assert "Heizung" in h and "Warmwasser" in h
         h = c.get("/jahr?j=2026").get_data(as_text=True)
         assert "Heizung und Warmwasser" in h and "Heizung kWh" in h and "Warmwasser kWh" in h
         r = c.get("/jahr/pdf?j=2026&teil=wp")

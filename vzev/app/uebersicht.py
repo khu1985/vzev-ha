@@ -73,6 +73,14 @@ def zl(cfg):
     return [x for x in ZL if x[0] != "WP" or _mit_wp(cfg)]
 
 
+def zl_einzeln(cfg):
+    """Wie zl, aber statt der Summe «Wärmepumpen» jede Wärmepumpe einzeln, wenn es mehrere gibt."""
+    namen = core.wp_namen(cfg)
+    if len(namen) < 2:
+        return zl(cfg)
+    return [x for x in zl(cfg) if x[0] != "WP"] + namen
+
+
 def monate(res):
     """Monatswerte für Diagramm und Kennzahlen."""
     g = res["month"]
@@ -343,6 +351,7 @@ def _pv_kurz():
 VERLAUF = diagramme.STIL + """
 <div style="display:flex;gap:6px;margin:-8px 0 16px;flex-wrap:wrap">{% for k, l in zl %}<a class="btn {{ 'primary' if k == z }}" href="verlauf?z={{ k }}">{{ l }}</a>{% endfor %}</div>
 {% if not ok %}<div class="msg warn">Noch keine Daten: {{ fehler }}</div>{% else %}
+{% if wp_hinweis %}<div class="msg" style="background:var(--soft)">{{ wp_hinweis }}</div>{% endif %}
 <div class="grid" style="margin-bottom:20px">
  <div class="kpi"><div>Verbrauch gesamt</div><div>{{ tot.verbrauch|k0 }} <small>kWh</small></div></div>
  <div class="kpi"><div>davon Solar</div><div>{{ tot.solar|k0 }} <small>kWh</small></div></div>
@@ -364,12 +373,15 @@ VERLAUF = diagramme.STIL + """
 
 def verlauf():
     z = request.args.get("z", "1OG")
-    if z not in dict(ZL):
+    alle_z = dict(zl(S.config()) + core.wp_namen(S.config()))
+    if z not in alle_z:
         z = "1OG"
     d = daten()
     res, cfg = d["res"], d["cfg"]
     if res is None:
-        return S.page("Verlauf", render_template_string(VERLAUF, ok=False, zl=zl(S.config()), z=z, fehler=d["b"].get("fehler")))
+        return S.page("Verlauf", render_template_string(VERLAUF, ok=False, zl=list(alle_z.items()), z=z, fehler=d["b"].get("fehler")))
+    if f"S_{z}" not in res:  # Wärmepumpe neu eingerichtet, Berechnung noch nicht aktualisiert
+        z = "WP"
     import invoices
     mon = _memo("monate", lambda: monate(res))
     s = _memo("s_" + z, lambda: core.zaehler_summen(res, z))
@@ -397,7 +409,13 @@ def verlauf():
     chart = diagramme.saeulen([_ml(p) for p in perioden],
                               [("Solar", diagramme.FARBEN["solar"], list(s["solar"])), ("Netz", diagramme.FARBEN["netz"], list(s["ht"] + s["nt"]))],
                               vorlaeufig=vorl, hoehe=220, summe="Verbrauch gesamt")
-    return S.page("Verlauf", render_template_string(VERLAUF, ok=True, zl=zl(cfg), z=z, zeilen=zeilen, tot=tot, chart=chart, gp=z in ("1OG", "AllgC")))
+    wp_hinweis = None
+    if z.startswith("WP"):
+        gem = res["WP_gemessen"] > 0
+        wp_hinweis = (f"Gemessen ab {res.index[gem].min():%d.%m.%Y %H:%M} (Home Assistant). Davor ist der Verbrauch im Allgemeinstrom enthalten."
+                      if gem.any() else "Noch keine Werte: Der Datensammler speichert die Wärmepumpen-Zähler ab dem Eintragen alle 15 Minuten; "
+                      "die ersten Werte erscheinen nach der zweiten Ablesung. Den Stand siehst du unter «Datensammler».")
+    return S.page("Verlauf", render_template_string(VERLAUF, ok=True, zl=list(alle_z.items()), z=z, wp_hinweis=wp_hinweis, zeilen=zeilen, tot=tot, chart=chart, gp=z in ("1OG", "AllgC")))
 
 
 # =============================================================================

@@ -258,6 +258,10 @@ def compute(df, lade, cfg, ev=None, dyn=None, wp=None):
     if ev is None:
         ev = distribute_ev(df, lade, rules["ladestation_grundlast_kwh"])
     df["EV"] = np.minimum(ev, df["Allg"])
+    einzeln = None
+    if isinstance(wp, pd.DataFrame):  # je Wärmepumpe eine Spalte (Name) → Summe, Aufteilung unten
+        einzeln = wp.reindex(df.index).fillna(0.0).clip(lower=0)
+        wp = einzeln.sum(axis=1)
     wp = pd.Series(0.0, index=df.index) if wp is None else wp.reindex(df.index).fillna(0.0).clip(lower=0)
     df["WP_gemessen"] = wp
     df["WP"] = np.minimum(wp, df["Allg"] - df["EV"])
@@ -287,7 +291,23 @@ def compute(df, lade, cfg, ev=None, dyn=None, wp=None):
     df["occ_1OG"] = occupied(df.index, cfg, "1OG")
     df["month"] = df.index.to_period("M")
     dynamisch(df, cfg, dyn)
+    # Einzelne Wärmepumpen (WP1, WP2 …): Anteil an der gemessenen Summe pro Viertelstunde, gleicher Solaranteil
+    for i, (key, name) in enumerate(wp_namen(cfg), 1):
+        anteil = (einzeln[name] / df["WP_gemessen"].where(df["WP_gemessen"] > 0)).fillna(0.0) \
+            if einzeln is not None and name in einzeln else pd.Series(0.0, index=df.index)
+        for a in ("S", "N", "P", "B"):
+            df[f"{a}_{key}"] = df[f"{a}_WP"] * anteil
+        df[key] = df["WP"] * anteil
     return df
+
+
+def wp_namen(cfg):
+    """[(WP1, Heizung), (WP2, Warmwasser) …] in der Reihenfolge der Einstellungen."""
+    out = []
+    for i, w in enumerate((cfg.get("homeassistant") or {}).get("waermepumpen") or [], 1):
+        if isinstance(w, dict) and w.get("entity"):
+            out.append((f"WP{i}", w.get("name") or w["entity"]))
+    return out
 
 
 def dynamisch(df, cfg, dyn):

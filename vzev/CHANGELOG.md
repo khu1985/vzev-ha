@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.2
+
+- Wärmepumpen einzeln: Im Verlauf eigene Reiter (z. B. Heizung, Warmwasser) neben der Summe, im Energiefluss eigene Kreise; Aufteilung pro Viertelstunde nach den gemessenen Anteilen.
+- Verlauf Wärmepumpen: Hinweis, ab wann gemessen wird bzw. dass die ersten Werte nach der zweiten Ablesung erscheinen.
+- PV-Prognose: Kurznamen wie «prognose_heute» werden dem passenden Solcast-Sensor zugeordnet.
+
 ## 0.10.1
 
 - Übersicht: Jahr auswählbar; oben Produktion, Autarkie, Rücklieferung und Wertschöpfung des gewählten Jahres (bisher). Das Diagramm zeigt die Monate dieses Jahres; ein Klick auf einen Monat zeigt darunter seine Kennzahlen, Kontrollen und Verbraucher. Die Monatsauswahl entfällt.
