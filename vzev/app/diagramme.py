@@ -140,7 +140,8 @@ def linie(labels, werte, name, farbe, einheit="CHF", hoehe=220, vorlaeufig=()):
     pts = " ".join(f"{x(i):.1f},{y(v):.1f}" for i, v in enumerate(werte))
     t.append(f'<polyline points="{pts}" fill="none" stroke="{farbe}" stroke-width="2" stroke-linejoin="round"/>')
     for i, (lab, v) in enumerate(zip(labels, werte)):
-        t.append(f'<circle cx="{x(i):.1f}" cy="{y(v):.1f}" r="4" fill="{farbe}" stroke="#fff" stroke-width="2"{" opacity=\"0.55\"" if i in vorlaeufig else ""}/>')
+        blass = ' opacity="0.55"' if i in vorlaeufig else ""
+        t.append(f'<circle cx="{x(i):.1f}" cy="{y(v):.1f}" r="4" fill="{farbe}" stroke="#fff" stroke-width="2"{blass}/>')
         t.append(f'<rect class="hit" x="{links + band * i:.1f}" y="{oben}" width="{band:.1f}" height="{ph}" data-tip="{escape(lab)}&#10;{escape(name)}: {_zahl(v, 2)} {einheit}"/>')
         t.append(f'<text x="{x(i):.1f}" y="{hoehe - 8}" text-anchor="middle" class="ax">{escape(lab)}{"*" if i in vorlaeufig else ""}</text>')
     t.append(f'<text x="{x(n - 1):.1f}" y="{y(werte[-1]) - 10:.1f}" text-anchor="end" class="ax b">{_zahl(werte[-1])} {einheit}</text>')
