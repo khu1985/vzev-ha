@@ -304,6 +304,28 @@ button[disabled]{opacity:.75;cursor:progress}
 body.laedt main{opacity:.55;transition:opacity .2s ease .15s;pointer-events:none}
 body.laedt::before{content:"";position:fixed;top:0;left:0;height:3px;width:100%;background:linear-gradient(90deg,transparent,var(--amber),transparent);background-size:40% 100%;background-repeat:no-repeat;animation:balken 1s linear infinite;z-index:20}
 @keyframes balken{from{background-position:-40% 0}to{background-position:140% 0}}
+
+form.felder{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end}
+.feld{display:inline-flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:500}.feld.breit{flex-basis:100%}
+.feld input,.feld select{color:var(--ink);font-size:14px}
+form#up{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+@media (max-width:759px){
+ body{line-height:1.45}.muted{font-size:13px}p{margin:8px 0}
+ .card{margin-bottom:16px}h2{margin-bottom:14px}.msg{margin-bottom:14px}
+ .grid{grid-template-columns:1fr 1fr;gap:10px}.kpi{padding:12px 14px}.kpi .v{font-size:20px}.kpi div.s{font-size:12px}
+ table:not(.wide):not(.edit):not(.form) tr{padding:12px 0}
+ table:not(.wide):not(.edit):not(.form) td{padding:6px 0}
+ table:not(.wide):not(.edit):not(.form) td:first-child{font-weight:600}
+ table:not(.wide) td[colspan]{text-align:left}
+ table:not(.wide) td[style*=max-width]{max-width:none!important}
+ table:not(.wide) td .pill{margin:2px 0 2px 6px}
+ table.edit td{padding:6px 0}table.edit tr{padding:10px 14px;margin-bottom:12px}
+ table.edit td label{white-space:nowrap;overflow-wrap:normal}
+ table.form td{padding:3px 0}table.form tr{padding:10px 0}
+ .feld{flex:1 1 140px}.feld input,.feld select{width:100%!important}
+ form.felder button{flex-basis:100%;justify-content:center}
+ details.card summary{line-height:1.6}
+}
 </style></head><body>
 <div class="app"><aside class="side" id="side"><div class="top"><span class="brand">☀ vZEV {{ anlage }}</span><span class="ver" title="Version der App">v{{ version }}</span><span id="bg" class="bg" role="status" aria-live="polite"></span>
 <button id="menu" type="button" aria-expanded="false" aria-controls="nav" onclick="var s=document.getElementById('side');var o=s.classList.toggle('offen');this.setAttribute('aria-expanded',o);this.textContent=o?'Schliessen':'Menü'">Menü</button></div>
@@ -465,10 +487,11 @@ def entfernen():
 # --- Rechnungen ---------------------------------------------------------------
 RECH = """
 <div class="card"><h2>Quartalsrechnungen erstellen</h2>
-<form method="post" action="rechnungen" data-busy="Rechnungen werden erstellt …">Jahr <input name="jahr" type="number" value="{{ jahr }}" style="width:90px">
-Quartal <select name="quartal">{% for q in [1,2,3,4] %}<option {{ 'selected' if q == quartal }}>{{ q }}</option>{% endfor %}</select>
-Rechnungsdatum <input name="datum" type="date" value="{{ heute }}">
-{% if korr %}<br><br>Begründung der Korrektur <input name="grund" style="width:420px" required placeholder="z. B. Lastgang Primeo korrigiert">{% endif %}
+<form method="post" action="rechnungen" data-busy="Rechnungen werden erstellt …" class="felder">
+<label class="feld">Jahr <input name="jahr" type="number" value="{{ jahr }}" style="width:90px"></label>
+<label class="feld">Quartal <select name="quartal">{% for q in [1,2,3,4] %}<option {{ 'selected' if q == quartal }}>{{ q }}</option>{% endfor %}</select></label>
+<label class="feld">Rechnungsdatum <input name="datum" type="date" value="{{ heute }}"></label>
+{% if korr %}<label class="feld breit">Begründung der Korrektur <input name="grund" style="width:420px" required placeholder="z. B. Lastgang Primeo korrigiert"></label>{% endif %}
 <button class="primary">{{ 'Korrektur erstellen' if korr else 'Erstellen' }}</button></form>
 <p class="muted">Pro Mietverhältnis eine Rechnung für die Wohnung (mit QR-Einzahlungsschein) und eine Gesamtrechnung Allgemeinstrom für die Nebenkostenabrechnung. Ein erneutes Erstellen überschreibt die Dateien dieses Quartals.</p></div>
 <div class="card"><h2>Erstellte Rechnungen</h2><div class="scroll"><table><tr><th class="l">Quartal</th><th class="l">Datei</th><th>Erstellt</th><th></th></tr>

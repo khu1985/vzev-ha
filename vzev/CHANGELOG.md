@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.11
+
+- Handy, Lesbarkeit: Kennzahlen zweispaltig, grössere Abstände zwischen den Einträgen der Karten, erste Zeile jeder Karte hervorgehoben, Hinweistexte etwas grösser, mehr Zeilenabstand.
+- Handy: Rechnungsformular mit Beschriftung über den Feldern und Knopf in voller Breite; Upload-Feld und Knopf mit Abstand.
+- Handy: «entfernen» in den Eingabekarten bricht nicht mehr Buchstabe für Buchstabe um; Status im Abschluss nicht mehr eingeklemmt.
+
 ## 0.3.10
 
 - Statusanzeige «Seite wird geladen …» mit Ladebalken oben bei jedem Seitenwechsel: Monat wählen, Klick ins Diagramm, Reiter im Verlauf und in den Einstellungen, Navigation, Filter im Protokoll und Datensammler. Der Inhalt wird bis zum Laden abgeblendet.
