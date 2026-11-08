@@ -57,3 +57,16 @@ def test_verteilen_ueber_luecken():
     assert v.loc["2026-11-08 10:30":"2026-11-08 11:15"].tolist() == [0.5] * 4    # Stunde Lücke: gleichmässig verteilt
     assert "2026-11-08 11:45" not in v.index                                       # Rücksprung (Zählerwechsel): nicht geschätzt
     assert v.sum() == pytest.approx(3.2)                                           # 24-h-Lücke: nicht geschätzt
+
+
+def test_einzelne_waermepumpen():
+    df = _df()
+    cfg = _cfg()
+    cfg["homeassistant"] = {"waermepumpen": [{"name": "Heizung", "entity": "sensor.a"}, {"name": "Warmwasser", "entity": "sensor.b"}]}
+    wp = pd.DataFrame({"Heizung": 0.2, "Warmwasser": 0.1}, index=df.index)
+    res = core.compute(df, None, cfg, ev=pd.Series(0.0, index=df.index), wp=wp)
+    assert core.wp_namen(cfg) == [("WP1", "Heizung"), ("WP2", "Warmwasser")]
+    for a in ("S", "N", "P"):
+        assert (res[f"{a}_WP1"] + res[f"{a}_WP2"]).sum() == pytest.approx(res[f"{a}_WP"].sum())
+    assert res["WP1"].sum() == pytest.approx(2 * res["WP2"].sum())
+    assert res["WP2"].iloc[4] == pytest.approx(0.1 / 3)   # Viertelstunde mit gekapptem Wert: anteilig

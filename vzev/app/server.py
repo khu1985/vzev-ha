@@ -146,7 +146,7 @@ def wp_reihe(cfg):
     """Wärmepumpen am Allgemeinzähler (kWh pro Viertelstunde) aus den gesammelten Zählerständen, sonst None."""
     try:
         import vorschau
-        return vorschau.unterzaehler(collector._db, cfg)
+        return vorschau.unterzaehler_einzeln(collector._db, cfg)
     except Exception:
         log.exception("Wärmepumpen-Zähler nicht lesbar")
         return None

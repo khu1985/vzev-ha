@@ -49,7 +49,10 @@ def solis(db, cfg, von, bis):
 
 def werte(res, cfg):
     """Flüsse und Verbraucher für einen Ausschnitt der Berechnung."""
-    zl = [x for x in core.ZL if x[0] != "WP" or (cfg.get("homeassistant") or {}).get("waermepumpen")]
+    namen = core.wp_namen(cfg)
+    zl = [x for x in core.ZL if x[0] != "WP" or namen]
+    if len(namen) > 1 and all(f"S_{k}" in res for k, _ in namen):  # Heizung, Warmwasser … einzeln zeigen
+        zl = [x for x in zl if x[0] != "WP"] + namen
     verbraucher = []
     for k, label in zl:
         s, n, p = (float(res[f"{a}_{k}"].sum()) for a in ("S", "N", "P"))  # Allgemein inkl. Standby der PV-Anlage
@@ -135,7 +138,9 @@ def diagramm(w, speicher=None):
                             F["solar"], punkte=[F["solar"], F["speicher"], F["solar"]],
                             tip=f"PV ↔ Speicher laut Wechselrichter: geladen {_zahl(g)} kWh, entladen {_zahl(e)} kWh"))
     vb = w["verbraucher"]
-    xs = [W / 2 + (i - (len(vb) - 1) / 2) * min(84, (W - 40) / max(len(vb), 1)) for i in range(len(vb))]
+    abstand = min(84, (W - 24) / max(len(vb), 1))
+    xs = [W / 2 + (i - (len(vb) - 1) / 2) * abstand for i in range(len(vb))]
+    rv = min(31, abstand / 2 - 4)  # bei vielen Verbrauchern kleinere Kreise
     for v, x in zip(vb, xs):
         tot = v["total"]
         pkt = []
@@ -143,7 +148,7 @@ def diagramm(w, speicher=None):
             for i in range(3):
                 q = (i + 0.5) / 3
                 pkt.append(F["solar"] if q < v["solar"] / tot else F["speicher"] if q < (v["solar"] + v["speicher"]) / tot else F["netz"])
-        t.append(_fluss(f"M{hx},{hy + 54} C{hx},{hy + 110} {x:.1f},{hy + 100} {x:.1f},{392 - 31}", tot, gross, "#5B6660", punkte=pkt,
+        t.append(_fluss(f"M{hx},{hy + 54} C{hx},{hy + 110} {x:.1f},{hy + 100} {x:.1f},{392 - rv:.1f}", tot, gross, "#5B6660", punkte=pkt,
                         tip=f"Haus → {v['label']}: {_zahl(tot)} kWh"))
     # Knoten
     t.append(_knoten(sx, sy, 46, F["solar"], "PV-Anlage", [(f"{_zahl(w['prod'])} kWh", "#16201C", True)],
@@ -167,7 +172,7 @@ def diagramm(w, speicher=None):
                          + f"Netzladung {_zahl(w['laden'])} kWh, davon als Speicher NT im Haus {_zahl(w['speicher_haus'])} kWh"))
     for v, x in zip(vb, xs):
         a = v["solar"] / v["total"] if v["total"] else 0
-        t.append(_knoten(round(x, 1), 392, 31, None, v["label"], [(_zahl(v["total"]), "#16201C", True)], oben=False,
+        t.append(_knoten(round(x, 1), 392, rv, None, v["label"], [(_zahl(v["total"]), "#16201C", True)], oben=False,
                          ring=[(a, F["solar"]), (v["speicher"] / v["total"] if v["total"] else 0, F["speicher"]),
                                (v["netz"] / v["total"] if v["total"] else 0, F["netz"])],
                          tip=f"{v['label']}: {_zahl(v['total'])} kWh, {a * 100:.0f} % Solar"))

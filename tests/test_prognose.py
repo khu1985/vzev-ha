@@ -96,5 +96,7 @@ def test_abruf_findet_solcast_sensoren(db, tmp_path):
         assert morgen_kwh == pytest.approx(0.6 * heute_kwh, rel=0.01)
         cfg["homeassistant"]["solcast"] = ["sensor.solcast_pv_forecast_prognose_heute"]   # fest eingestellt
         assert p.abrufen() == 48
+        cfg["homeassistant"]["solcast"] = ["prognose_morgen"]   # Kurzname wird aufgelöst
+        assert p.abrufen() == 48 and p.entitaeten == ["sensor.solcast_pv_forecast_prognose_morgen"]
     finally:
         srv.shutdown()

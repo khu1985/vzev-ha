@@ -148,7 +148,7 @@ def berechnen(db, cfg, ab=None, res_primeo=None):
     except Exception:
         pass
     res = core.compute(df[["1OG", "2OG", "Allg", "PVA", "Prod", "tarif"]], None, cfg, ev=df["EV"], dyn=dyn,
-                       wp=unterzaehler(db, cfg, start))
+                       wp=unterzaehler_einzeln(db, cfg, start))
     res["ha_ok"] = vorhanden.values
     return res, info
 
