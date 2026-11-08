@@ -82,7 +82,7 @@ EDITOR = """
 {% if f.typ == 'auswahl' %}<select name="{{ p }}.{{ f.key }}"><option value=""></option>
 {% for o in f.opts %}<option value="{{ o[0] }}" {{ 'selected' if v is not none and o[0] == v|string }}>{{ o[1] }}</option>{% endfor %}</select>
 {% else %}<input name="{{ p }}.{{ f.key }}" type="{{ 'date' if f.typ == 'datum' else 'text' }}" inputmode="{{ 'decimal' if f.typ == 'zahl' else 'text' }}"
- value="{{ '' if v is none else (v.isoformat() if f.typ == 'datum' and v.isoformat is defined else v) }}" placeholder="{{ f.hinweis or '' }}" style="width:{{ f.breite or 140 }}px">{% endif %}</td>{% endfor %}
+ value="{{ '' if v is none else (v.isoformat() if f.typ == 'datum' and v.isoformat is defined else v) }}" placeholder="{{ f.hinweis or '' }}" style="width:{{ f.breite or 140 }}px"{% if f.liste %} list="{{ f.liste }}"{% endif %}>{% endif %}</td>{% endfor %}
 <td class="l">{% if not loop.last %}<label><input type="checkbox" name="{{ p }}.__weg" value="{{ loop.index0 }}"> entfernen</label>{% else %}<span class="muted">neu</span>{% endif %}</td></tr>{% endfor %}
 </table></div>
 <p><button type="button" onclick="(function(t){var r=t.querySelector('tr.neu');var c=r.cloneNode(true);c.querySelectorAll('input,select').forEach(function(i){i.value=''});r.parentNode.appendChild(c)})(document.getElementById('t-{{ p }}'))">+ Zeile</button></p>"""
@@ -167,7 +167,7 @@ def korrektur(monat, art, grund):
     S.log.warning("Korrektur %s: %s – %s", monat, art, grund)
 
 
-ZL = [("1OG", "1. OG"), ("2OG", "2. OG"), ("AllgC", "Allgemein"), ("EV", "Ladestation")]
+ZL = core.ZL
 
 
 def monatswerte(b):
@@ -206,6 +206,8 @@ def abweichungen(b):
         alt = e["werte"]
         diffs = []
         for k, label in ZL:
+            if k not in alt:  # Zähler, die es beim Abschluss noch nicht gab (z. B. Wärmepumpen): nur melden, wenn jetzt Werte da sind
+                alt = dict(alt, **{k: {"solar": 0.0, "ht": 0.0, "nt": 0.0, "chf": 0.0}})
             dchf = jetzt[k]["chf"] - alt[k]["chf"]
             dkwh = sum(abs(jetzt[k][x] - alt[k][x]) for x in ("solar", "ht", "nt"))
             if abs(dchf) > 0.01 or dkwh > 0.01:
@@ -675,6 +677,12 @@ ZAEHLER = """<form method="post" action="einstellungen?tab=zaehler"><div class="
 <p class="muted">Über die Messpunkt-Nummer erkennt die App beim Import, welche Datei zu welchem Zähler gehört.</p></div>
 <div class="card"><h2>Zähler in Home Assistant</h2>{{ t_ha|safe }}
 <p class="muted">Energie-Sensoren in kWh (total_increasing). Der Datensammler speichert sie alle 15 Minuten.</p></div>
+<div class="card"><h2>Wärmepumpen am Allgemeinzähler</h2>{{ t_wp|safe }}
+<datalist id="energie">{% for e, n, w, u in energie %}<option value="{{ e }}">{{ n }} ({{ w }} {{ u }})</option>{% endfor %}</datalist>
+<p class="muted">Zählerstände in kWh (oder Wh), die immer weiter steigen – z. B. der Energie-Sensor des Shelly und der Stromverbrauch der Wärmepumpe.
+Ihr Verbrauch wird pro Viertelstunde aus dem Allgemeinstrom herausgerechnet und als «Heizung und Warmwasser» separat abgerechnet,
+ab dem Tag, an dem der Datensammler die Sensoren speichert. Faktor: Korrektur, falls die Wärmepumpe den Strom nur schätzt (z. B. 1.1).
+{% if not energie %}Die Liste der Sensoren erscheint, wenn die App im Home Assistant läuft.{% endif %}</p></div>
 <div class="card"><h2>PV-Prognose (Solcast)</h2><table class="form"><tr><td class="l">Sensoren</td><td class="l">
 <input name="solcast" value="{{ solcast }}" style="width:100%;max-width:520px" placeholder="leer = automatisch finden"></td></tr></table>
 <p class="muted">Leer lassen: Die App nimmt alle Sensoren mit Halbstunden-Prognose («detailedForecast»). Sonst Sensoren mit Komma getrennt, z. B. Prognose heute und morgen.</p></div>
@@ -726,6 +734,9 @@ F_MP = [dict(key="mp", label="Messpunkt-Nummer", typ="text", breite=330),
         dict(key="z", label="Zähler", typ="auswahl", opts=[("1OG", "Verbrauch 1. OG"), ("2OG", "Verbrauch 2. OG"), ("Allg", "Allgemein (inkl. Ladestation)"),
                                                           ("PVA", "Netzbezug PV-Anlage"), ("Prod", "Produktion PV-Anlage")])]
 F_HA = [dict(key="z", label="Zähler", typ="text", breite=120), dict(key="e", label="Entität", typ="text", breite=360)]
+F_WP = [dict(key="name", label="Name", typ="text", breite=140, hinweis="z. B. Heizung"),
+        dict(key="entity", label="Energie-Sensor (kWh)", typ="text", breite=360, liste="energie", hinweis="sensor.…"),
+        dict(key="faktor", label="Faktor", typ="zahl", breite=70, hinweis="1")]
 
 
 def einstellungen_formulare(tab):
@@ -756,6 +767,11 @@ def einstellungen_formulare(tab):
                     raise ValueError("Jeder Zähler braucht genau eine Messpunkt-Nummer")
                 ha = dict(cfg.get("homeassistant") or {})
                 ha["zaehler"] = {r["z"]: r["e"] for r in lesen("ha", F_HA) if r["z"] and r["e"]}
+                wp = [dict(name=r["name"] or r["entity"], entity=r["entity"].strip(), faktor=r["faktor"] or 1.0) for r in lesen("wp", F_WP) if r["entity"]]
+                if any(not w["entity"].startswith("sensor.") or not 0.5 <= w["faktor"] <= 2 for w in wp):
+                    raise ValueError("Wärmepumpen: Sensor muss mit «sensor.» beginnen, Faktor zwischen 0.5 und 2")
+                if wp or ha.get("waermepumpen"):
+                    ha["waermepumpen"] = wp
                 sc = [x.strip() for x in (request.form.get("solcast") or "").split(",") if x.strip()]
                 if sc or ha.get("solcast"):
                     ha["solcast"] = sc
@@ -798,7 +814,9 @@ def einstellungen_formulare(tab):
     elif tab == "zaehler":
         body = render_template_string(ZAEHLER, t_mp=editor("mp", F_MP, [dict(mp=k, z=v) for k, v in (cfg.get("messpunkte") or {}).items()]),
                                       t_ha=editor("ha", F_HA, [dict(z=k, e=v) for k, v in ((cfg.get("homeassistant") or {}).get("zaehler") or {}).items()]),
-                                      solcast=", ".join((cfg.get("homeassistant") or {}).get("solcast") or []))
+                                      solcast=", ".join((cfg.get("homeassistant") or {}).get("solcast") or []),
+                                      t_wp=editor("wp", F_WP, list((cfg.get("homeassistant") or {}).get("waermepumpen") or [])),
+                                      energie=S.collector.energie_sensoren())
     else:
         body = render_template_string(REGELN, r=cfg.get("regeln") or {}) + render_template_string(
             BATTERIE_REGELN, sp=core.speicher_regeln(cfg), dy=core.dyn_regeln(cfg))

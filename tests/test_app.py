@@ -359,3 +359,41 @@ def test_prognose_seite(app):
     assert "noch nicht publiziert" in h or "Günstig aus dem Netz laden" in h
     r = c.get("/einstellungen?tab=zaehler").get_data(as_text=True)
     assert "PV-Prognose (Solcast)" in r
+
+
+def test_waermepumpen(app):
+    server, c, d, quelle = app
+    warten(server)
+    cfg_alt = (d / "vzev.yaml").read_text()
+    try:
+        y = yaml.safe_load(cfg_alt)
+        y["homeassistant"]["waermepumpen"] = [{"name": "Heizung", "entity": "sensor.t_wp", "faktor": 1.0},
+                                              {"name": "Warmwasser", "entity": "sensor.t_shelly_ww", "faktor": 1.0}]
+        (d / "vzev.yaml").write_text(yaml.safe_dump(y, allow_unicode=True, sort_keys=False))
+        with server.collector._db() as con:   # April: Heizung 0.04, Warmwasser 0.02 kWh pro Viertelstunde
+            t, a, b = datetime(2026, 4, 1), 100.0, 50.0
+            while t <= datetime(2026, 4, 30, 23, 45):
+                con.execute("INSERT OR REPLACE INTO messwerte VALUES (?, ?, ?)", (t.isoformat(timespec="minutes"), "sensor.t_wp", a))
+                con.execute("INSERT OR REPLACE INTO messwerte VALUES (?, ?, ?)", (t.isoformat(timespec="minutes"), "sensor.t_shelly_ww", b))
+                t, a, b = t + timedelta(minutes=15), a + 0.04, b + 0.02
+        warten(server)
+        b = server.berechnung()
+        assert b["ok"], b.get("fehler")
+        assert b["res"]["WP"].sum() == pytest.approx(0.06 * (len(b["res"].loc["2026-04"]) - 1), rel=0.01)
+        h = c.get("/?m=2026-04").get_data(as_text=True)
+        assert "Wärmepumpen aus dem Allgemeinstrom herausgerechnet" in h and "Heizung und Warmwasser, Gesamtrechnung" in h
+        h = c.get("/verlauf?z=WP").get_data(as_text=True)
+        assert "Wärmepumpen" in h
+        h = c.get("/jahr?j=2026").get_data(as_text=True)
+        assert "Heizung und Warmwasser" in h and "Heizung kWh" in h and "Warmwasser kWh" in h
+        r = c.get("/jahr/pdf?j=2026&teil=wp")
+        assert r.status_code == 200 and r.data[:4] == b"%PDF"
+        r = c.post("/rechnungen", data={"jahr": "2026", "quartal": "2", "datum": "2026-07-05", "grund": "Wärmepumpen"})
+        assert "Waermepumpen" in ziel(r), ziel(r)
+        assert (d / "rechnungen" / "2026-Q2" / "Rechnung_2026-Q2-WP_Waermepumpen.pdf").exists()
+        h = c.get("/rechnungen").get_data(as_text=True)
+        assert "2026-Q2-WP" in h
+        h = c.get("/einstellungen?tab=zaehler").get_data(as_text=True)
+        assert "Wärmepumpen am Allgemeinzähler" in h and "sensor.t_shelly_ww" in h
+    finally:
+        (d / "vzev.yaml").write_text(cfg_alt)

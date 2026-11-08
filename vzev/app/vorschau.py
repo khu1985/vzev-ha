@@ -28,6 +28,60 @@ def _deltas(werte, taeglich):
     return d.dropna()
 
 
+def waermepumpen(cfg):
+    """Konfigurierte Unterzähler am Allgemeinzähler: [{name, entity, faktor}]."""
+    out = []
+    for w in (cfg.get("homeassistant") or {}).get("waermepumpen") or []:
+        if isinstance(w, dict) and w.get("entity"):
+            out.append(dict(name=w.get("name") or w["entity"], entity=w["entity"], faktor=float(w.get("faktor") or 1.0)))
+    return out
+
+
+def verteilen(stand, max_luecke=16):
+    """Zählerstände → kWh pro Viertelstunde. Fehlen Ablesungen, wird die Differenz gleichmässig auf die Viertelstunden
+    dazwischen verteilt (bis 4 Stunden); längere Lücken und Rücksprünge (Zählerwechsel) werden nicht geschätzt."""
+    stand = stand.sort_index()
+    stand = stand[~stand.index.duplicated(keep="last")]
+    if len(stand) < 2:
+        return pd.Series(dtype=float)
+    t = stand.index[:-1]
+    n = np.maximum(1, np.round((stand.index[1:] - t) / VIERTEL).astype(int))
+    diff = np.diff(stand.to_numpy())
+    ok = (diff >= 0) & (n <= max_luecke)
+    zeiten = np.concatenate([t[i] + np.arange(n[i]) * VIERTEL for i in np.flatnonzero(ok)]) if ok.any() else []
+    werte = np.repeat(diff[ok] / n[ok], n[ok])
+    return pd.Series(werte, index=pd.DatetimeIndex(zeiten)).groupby(level=0).sum()
+
+
+def unterzaehler_einzeln(db, cfg, ab=None):
+    """kWh pro Viertelstunde je Wärmepumpe (Zählerstand total_increasing × Faktor) als DataFrame, sonst None."""
+    wps = waermepumpen(cfg)
+    if not wps:
+        return None
+    ids = [w["entity"] for w in wps]
+    q = f"SELECT ts, entity, wert FROM messwerte WHERE entity IN ({','.join('?' * len(ids))})" + (" AND ts >= ?" if ab else "")
+    with db() as c:
+        roh = pd.read_sql_query(q, c, params=ids + ([str(ab)] if ab else []))
+    if roh.empty:
+        return None
+    roh["ts"] = pd.to_datetime(roh["ts"])
+    tab = roh.pivot_table(index="ts", columns="entity", values="wert", aggfunc="last")
+    with db() as c:
+        einheit = dict(c.execute(f"SELECT entity, einheit FROM entitaeten WHERE entity IN ({','.join('?' * len(ids))})", ids).fetchall())
+    spalten = {}
+    for w in wps:
+        if w["entity"] not in tab:
+            continue
+        spalten[w["name"]] = verteilen(tab[w["entity"]].dropna()) * w["faktor"] * (0.001 if einheit.get(w["entity"]) == "Wh" else 1.0)
+    return pd.DataFrame(spalten).fillna(0.0) if spalten else None
+
+
+def unterzaehler(db, cfg, ab=None):
+    """Summe aller Wärmepumpen in kWh pro Viertelstunde (für core.compute), sonst None."""
+    t = unterzaehler_einzeln(db, cfg, ab)
+    return None if t is None else t.sum(axis=1)
+
+
 def tarifmuster(res):
     """HT/NT nach Wochentag und Uhrzeit, so wie Primeo es in den Lastgängen verwendet."""
     if res is None or "tarif" not in res:
@@ -93,7 +147,8 @@ def berechnen(db, cfg, ab=None, res_primeo=None):
         dyn = preise.serie(db, r["bonus_ab"]) if r["bonus"] else None
     except Exception:
         pass
-    res = core.compute(df[["1OG", "2OG", "Allg", "PVA", "Prod", "tarif"]], None, cfg, ev=df["EV"], dyn=dyn)
+    res = core.compute(df[["1OG", "2OG", "Allg", "PVA", "Prod", "tarif"]], None, cfg, ev=df["EV"], dyn=dyn,
+                       wp=unterzaehler(db, cfg, start))
     res["ha_ok"] = vorhanden.values
     return res, info
 

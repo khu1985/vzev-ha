@@ -14,7 +14,7 @@ import seiten
 import zahlungen
 
 S = None
-ZL = [("1OG", "1. OG"), ("2OG", "2. OG"), ("AllgC", "Allgemein"), ("EV", "Ladestation")]
+ZL = core.ZL
 
 
 def _jahre(b, cfg):
@@ -36,6 +36,18 @@ def daten(jahr):
     if r.empty:
         return b, None
     allg = invoices.lines_for(res, cfg, "AllgC", start, bis)
+    mit_wp = bool((cfg.get("homeassistant") or {}).get("waermepumpen"))
+    wp = invoices.lines_for(res, cfg, "WP", start, bis, grundpreis_ja=False) if mit_wp else []
+    wp_einzeln = {}
+    if mit_wp:
+        try:
+            import vorschau
+            t = vorschau.unterzaehler_einzeln(S.collector._db, cfg, start)
+            if t is not None:
+                t = t[(t.index >= pd.Timestamp(start)) & (t.index < pd.Timestamp(bis) + pd.Timedelta(days=1))]
+                wp_einzeln = {n: t[n].groupby(t.index.to_period("M")).sum() for n in t.columns}
+        except Exception:
+            S.log.exception("Wärmepumpen-Zähler nicht lesbar")
     # Mieter
     reg = zahlungen.uebersicht()["zeilen"]
     mieter = []
@@ -70,10 +82,13 @@ def daten(jahr):
         produktion=float(r["Prod"].sum()), export=float(r["Export"].sum()),
         export_chf=float((r["Export"] * r["exprice"]).sum(min_count=1)) if r["exprice"].notna().any() else None,
         export_offen=bool(r["exprice"].isna().any()),
-        solar=float(sum(r[f"S_{k}"].sum() for k, _ in ZL)), netz=float(sum(r[f"N_{k}"].sum() for k, _ in ZL)),
-        wert=float(w["total_chf"].sum()), allg=round(sum(x["total"] for x in allg), 2))
+        solar=float(sum(r[f"S_{k}"].sum() for k, _ in ZL)), netz=float(sum(r[f"N_{k}"].sum() + r[f"P_{k}"].sum() for k, _ in ZL)),
+        wert=float(w["total_chf"].sum()), allg=round(sum(x["total"] for x in allg), 2), wp=round(sum(x["total"] for x in wp), 2),
+        wp_kwh=sum(x["solar"] + x["ht"] + x["nt"] + x["speicher"] for x in wp))
     kennzahlen["autarkie"] = kennzahlen["solar"] / (kennzahlen["solar"] + kennzahlen["netz"]) * 100 if kennzahlen["solar"] + kennzahlen["netz"] else 0
-    return b, dict(jahr=jahr, von=start, bis=bis, daten_bis=ende_daten, allg=allg, mieter=mieter, monate=monate,
+    wp_ab = r.index[r["WP_gemessen"] > 0].min() if mit_wp and (r["WP_gemessen"] > 0).any() else None
+    return b, dict(jahr=jahr, von=start, bis=bis, daten_bis=ende_daten, allg=allg, wp=wp, wp_einzeln=wp_einzeln, wp_ab=wp_ab,
+                   mit_wp=mit_wp, mieter=mieter, monate=monate,
                    perioden=perioden, w=w, offen=offen, vorlaeufig=bool(offen) or bis < date(jahr, 12, 31),
                    k=kennzahlen, res=r, cfg=cfg)
 
@@ -83,6 +98,7 @@ SEITE = """
 <form method="get" action="jahr"><select name="j" onchange="this.form.submit()">{% for y in jahre %}<option {{ 'selected' if y == jahr }}>{{ y }}</option>{% endfor %}</select></form>
 {% if d %}<div style="display:flex;gap:8px;flex-wrap:wrap">
 <a class="btn primary" href="jahr/pdf?j={{ jahr }}" target="_blank">PDF Allgemeinstrom</a>
+{% if d.mit_wp %}<a class="btn primary" href="jahr/pdf?j={{ jahr }}&teil=wp" target="_blank">PDF Heizung und Warmwasser</a>{% endif %}
 <a class="btn" href="jahr/excel?j={{ jahr }}">Excel</a>
 <a class="btn" href="jahr/excel?j={{ jahr }}&viertelstunden=1" title="Zusätzlich alle Viertelstunden des Jahres (grosse Datei)">Excel mit Viertelstunden</a></div>{% endif %}</div>
 {% if not d %}<div class="msg warn">Keine Daten für {{ jahr }}{% if fehler %}: {{ fehler }}{% endif %}.</div>{% else %}
@@ -90,6 +106,7 @@ SEITE = """
 Die Zahlen können sich bis zum Abschluss aller Monate ändern.</div>{% else %}<div class="msg ok">Alle Monate von {{ jahr }} sind abgeschlossen.</div>{% endif %}
 <div class="grid" style="margin-bottom:20px">
  <div class="kpi"><div class="t">Allgemeinstrom {{ jahr }}</div><div class="v">{{ d.k.allg|f2 }} <small>CHF</small></div><div class="s">für die Nebenkostenabrechnung</div></div>
+ {% if d.mit_wp %}<div class="kpi"><div class="t">Heizung und Warmwasser</div><div class="v">{{ d.k.wp|f2 }} <small>CHF</small></div><div class="s">{{ d.k.wp_kwh|k0 }} kWh, für die Heizkostenabrechnung</div></div>{% endif %}
  <div class="kpi"><div class="t">Produktion</div><div class="v">{{ d.k.produktion|k0 }} <small>kWh</small></div><div class="s">Autarkie Haus {{ '%.1f'|format(d.k.autarkie) }} %</div></div>
  <div class="kpi"><div class="t">Rücklieferung</div><div class="v">{{ d.k.export|k0 }} <small>kWh</small></div><div class="s">{{ d.k.export_chf|f2 if d.k.export_chf is not none else '–' }} CHF{{ ', Tarif teilweise offen' if d.k.export_offen }}</div></div>
  <div class="kpi"><div class="t">Wertschöpfung</div><div class="v">{{ d.k.wert|f2 }} <small>CHF</small></div><div class="s">inkl. manuell erfasster Erträge</div></div>
@@ -100,7 +117,15 @@ Die Zahlen können sich bis zum Abschluss aller Monate ändern.</div>{% else %}<
 {% for r in d.allg %}<tr><td>{{ r.monat }}</td><td>{{ r.solar|f2 }}</td><td>{{ r.ht|f2 }}</td><td>{{ r.nt|f2 }}</td>{% if sp %}<td>{{ r.speicher|f2 }}</td>{% endif %}<td>{{ r.solar_chf|f2 }}</td><td>{{ (r.netz_chf + r.speicher_chf)|f2 }}</td><td>{{ r.grundpreis|f2 }}</td>{% if bo %}<td>–{{ r.bonus|f2 }}</td>{% endif %}<td><b>{{ r.total|f2 }}</b></td></tr>{% endfor %}
 <tr class="sum"><td>Total</td><td>{{ d.allg|sum(attribute='solar')|f2 }}</td><td>{{ d.allg|sum(attribute='ht')|f2 }}</td><td>{{ d.allg|sum(attribute='nt')|f2 }}</td>{% if sp %}<td>{{ d.allg|sum(attribute='speicher')|f2 }}</td>{% endif %}
 <td>{{ d.allg|sum(attribute='solar_chf')|f2 }}</td><td>{{ (d.allg|sum(attribute='netz_chf') + d.allg|sum(attribute='speicher_chf'))|f2 }}</td><td>{{ d.allg|sum(attribute='grundpreis')|f2 }}</td>{% if bo %}<td>–{{ d.allg|sum(attribute='bonus')|f2 }}</td>{% endif %}<td>{{ d.k.allg|f2 }}</td></tr>
-</table></div><p class="muted">Ohne Ladestation, inkl. Standby der PV-Anlage. Das PDF fasst diese Tabelle für die Nebenkostenabrechnung zusammen.</p></div>
+</table></div><p class="muted">Ohne Ladestation{{ ' und Wärmepumpen' if d.mit_wp }}, inkl. Standby der PV-Anlage. Das PDF fasst diese Tabelle für die Nebenkostenabrechnung zusammen.</p></div>
+{% if d.mit_wp %}<div class="card"><h2>Heizung und Warmwasser {{ d.von.strftime('%d.%m.') }}–{{ d.bis.strftime('%d.%m.%Y') }}</h2><div class="scroll"><table class="wide">
+{% set namen = d.wp_einzeln.keys()|list %}
+<tr><th>Monat</th>{% for n in namen %}<th>{{ n }} kWh</th>{% endfor %}<th>Solar kWh</th><th>Netz HT</th><th>Netz NT</th><th>Solar CHF</th><th>Netz CHF</th><th>Total CHF</th></tr>
+{% for r in d.wp %}<tr><td>{{ r.monat }}</td>{% for n in namen %}<td>{{ d.wp_einzeln[n].get(r.periode, 0)|f2 }}</td>{% endfor %}<td>{{ r.solar|f2 }}</td><td>{{ r.ht|f2 }}</td><td>{{ r.nt|f2 }}</td>
+<td>{{ r.solar_chf|f2 }}</td><td>{{ (r.netz_chf + r.speicher_chf)|f2 }}</td><td><b>{{ r.total|f2 }}</b></td></tr>{% endfor %}
+<tr class="sum"><td>Total</td>{% for n in namen %}<td>{{ d.wp_einzeln[n].sum()|f2 }}</td>{% endfor %}<td>{{ d.wp|sum(attribute='solar')|f2 }}</td><td>{{ d.wp|sum(attribute='ht')|f2 }}</td><td>{{ d.wp|sum(attribute='nt')|f2 }}</td>
+<td>{{ d.wp|sum(attribute='solar_chf')|f2 }}</td><td>{{ (d.wp|sum(attribute='netz_chf') + d.wp|sum(attribute='speicher_chf'))|f2 }}</td><td>{{ d.k.wp|f2 }}</td></tr>
+</table></div><p class="muted">Gemessen über Home Assistant{% if d.wp_ab %} ab {{ d.wp_ab.strftime('%d.%m.%Y') }}; davor ist der Verbrauch der Wärmepumpen im Allgemeinstrom enthalten{% endif %}. Solaranteil wie bei allen Zählern pro Viertelstunde.</p></div>{% endif %}
 <div class="card"><h2>Mieter {{ jahr }}</h2><div class="scroll"><table>
 <tr><th class="l">Mieter</th><th class="l">Zeitraum</th><th>Verbrauch kWh</th><th>davon Solar</th><th>Berechnet CHF</th><th>In Rechnung gestellt</th><th>Bezahlt</th><th class="l">Rechnungen</th></tr>
 {% for m in d.mieter %}<tr><td class="l">{{ m.name }}</td><td class="l">{{ m.von.strftime('%d.%m.') }}–{{ m.bis.strftime('%d.%m.%Y') }}{{ ' (läuft)' if m.laufend }}</td>
@@ -132,7 +157,9 @@ def seite():
     b0 = S.berechnung() if any(S.PRIMEO.iterdir()) else {}
     j, jahre = _jahr_param(b0, b0.get("cfg") or S.config())
     b, d = daten(j)
-    return S.page("Jahresabrechnung", render_template_string(SEITE, jahr=j, jahre=jahre, d=d, zl=ZL, fehler=b.get("fehler")))
+    import uebersicht
+    return S.page("Jahresabrechnung", render_template_string(SEITE, jahr=j, jahre=jahre, d=d, zl=uebersicht.zl(b.get("cfg") or S.config()),
+                                                            fehler=b.get("fehler")))
 
 
 def pdf():
@@ -143,9 +170,17 @@ def pdf():
         return redirect(f"jahr?j={j}&c=warn&msg=Keine Daten für {j}")
     ziel = S.RECHNUNGEN / "jahr"
     ziel.mkdir(parents=True, exist_ok=True)
-    pfad = ziel / f"Allgemeinstrom_{j}{'_vorlaeufig' if d['vorlaeufig'] else ''}.pdf"
-    total = invoices.render_jahr(pfad, d["cfg"], d["allg"], j, d["von"], d["bis"], d["vorlaeufig"])
-    S.log.info("Jahresaufstellung Allgemeinstrom %s erstellt: CHF %.2f%s", j, total, " (vorläufig)" if d["vorlaeufig"] else "")
+    if request.args.get("teil") == "wp":
+        if not d["mit_wp"]:
+            return redirect(f"jahr?j={j}&c=warn&msg=Keine Wärmepumpen eingerichtet")
+        titel, rows, name = "Heizung und Warmwasser", d["wp"], "Heizung_Warmwasser"
+        hinweis = ("Wärmepumpe Heizung und Warmwasser, Unterzähler am Allgemeinzähler (Home Assistant)"
+                   + (f", gemessen ab {d['wp_ab']:%d.%m.%Y}" if d["wp_ab"] is not None else "") + ". Zur Übernahme in die Heiz- und Nebenkostenabrechnung.")
+    else:
+        titel, rows, name, hinweis = "Allgemeinstrom", d["allg"], "Allgemeinstrom", None
+    pfad = ziel / f"{name}_{j}{'_vorlaeufig' if d['vorlaeufig'] else ''}.pdf"
+    total = invoices.render_jahr(pfad, d["cfg"], rows, j, d["von"], d["bis"], d["vorlaeufig"], titel=titel, hinweis=hinweis)
+    S.log.info("Jahresaufstellung %s %s erstellt: CHF %.2f%s", titel, j, total, " (vorläufig)" if d["vorlaeufig"] else "")
     return send_file(pfad, mimetype="application/pdf", download_name=pfad.name)
 
 
@@ -159,7 +194,7 @@ def excel():
     blaetter = {
         "Übersicht": pd.DataFrame([
             ("Jahr", j), ("Zeitraum", f"{d['von']:%d.%m.%Y} – {d['bis']:%d.%m.%Y}"), ("Stand", "vorläufig" if d["vorlaeufig"] else "abgeschlossen"),
-            ("Allgemeinstrom CHF", k["allg"]), ("Produktion kWh", round(k["produktion"], 2)),
+            ("Allgemeinstrom CHF", k["allg"]), ("Heizung und Warmwasser CHF", k["wp"] if d["mit_wp"] else None), ("Produktion kWh", round(k["produktion"], 2)),
             ("Autarkie Haus %", round(k["autarkie"], 1)), ("Rücklieferung kWh", round(k["export"], 2)),
             ("Rücklieferung CHF", None if k["export_chf"] is None else round(k["export_chf"], 2)),
             ("Wertschöpfung CHF", round(k["wert"], 2))], columns=["Kennzahl", "Wert"]),
@@ -167,6 +202,11 @@ def excel():
                                          "Speicher NT kWh": r["speicher"], "Solar CHF": r["solar_chf"], "Netz CHF": r["netz_chf"],
                                          "Speicher CHF": r["speicher_chf"], "Grundpreis CHF": r["grundpreis"], "Bonus CHF": -r["bonus"],
                                          "Total CHF": r["total"]} for r in d["allg"]]),
+        **({"Heizung und Warmwasser": pd.DataFrame([dict(
+            {"Monat": r["monat"]}, **{f"{n} kWh": float(d["wp_einzeln"][n].get(r["periode"], 0)) for n in d["wp_einzeln"]},
+            **{"Solar kWh": r["solar"], "Netz HT kWh": r["ht"], "Netz NT kWh": r["nt"], "Speicher NT kWh": r["speicher"],
+               "Solar CHF": r["solar_chf"], "Netz CHF": r["netz_chf"], "Speicher CHF": r["speicher_chf"], "Bonus CHF": -r["bonus"],
+               "Total CHF": r["total"]}) for r in d["wp"]])} if d["mit_wp"] else {}),
         "Mieter": pd.DataFrame([{"Mieter": m["name"], "Einheit": m["einheit"], "Von": m["von"], "Bis": m["bis"], "Verbrauch kWh": m["kwh"],
                                  "Solar kWh": m["solar"], "Berechnet CHF": m["betrag"], "In Rechnung gestellt CHF": m["gestellt"],
                                  "Bezahlt CHF": m["bezahlt"], "Rechnungen": ", ".join(m["rechnungen"])} for m in d["mieter"]]),
@@ -189,7 +229,7 @@ def excel():
                                            for x in reg])
     if request.args.get("viertelstunden"):
         spalten = [c for c in ["tarif", "Prod", "1OG", "2OG", "Allg", "PVA", "EV", "AllgC", "Export"] +
-                   [f"{a}_{k}" for k, _ in ZL for a in ("S", "N")] + ["price", "solarprice", "exprice", "occ_1OG"] if c in d["res"]]
+                   [f"{a}_{k}" for k, _ in ZL for a in ("S", "N", "P")] + ["price", "solarprice", "exprice", "occ_1OG"] if c in d["res"]]
         v = d["res"][spalten].copy()
         v.index.name = "Viertelstunde"
         blaetter["Viertelstunden"] = v.reset_index()

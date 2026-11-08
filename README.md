@@ -100,7 +100,8 @@ Grundlage sind die Primeo-Lastgänge in 15-Minuten-Auflösung. Jede Viertelstund
 flowchart TD
     A["Lastgänge pro Viertelstunde<br/>1. OG, 2. OG, Allgemein, Produktion, Netzbezug PV-Anlage"] --> B
     LS["Wallbox-Ladevorgänge<br/>Start, Ende, kWh"] --> B
-    B["Ladestation herausrechnen<br/>Energie jedes Ladevorgangs auf die Viertelstunden verteilen,<br/>in denen der Allgemeinzähler über der Grundlast liegt"] --> C
+    B["Ladestation herausrechnen<br/>Energie jedes Ladevorgangs auf die Viertelstunden verteilen,<br/>in denen der Allgemeinzähler über der Grundlast liegt"] --> WP
+    WP["Wärmepumpen herausrechnen<br/>Zählerstände aus Home Assistant pro Viertelstunde"] --> C
     C["Netzbezug PV-Anlage aufteilen<br/>bis Standby-Grenze: Allgemeinstrom · darüber: Netzladung Speicher (Betreiber)"] --> D
     D["Solaranteil = min(Produktion ÷ Verbrauch aller Zähler, 1)<br/>gleicher Anteil für jeden Zähler"] --> S
     S["Speicher NT: Anlagenstrom stammt zuerst aus dem Netzvorrat<br/>(Netzladung × Wirkungsgrad), Rest ist Solarstrom"] --> E
@@ -121,6 +122,7 @@ Regeln, die in `vzev.yaml` einstellbar sind:
 - **Allgemeinstrom** wird als Gesamtrechnung gestellt (Weiterverrechnung in der Nebenkostenabrechnung). Nur für die Wertschöpfung gilt er zu einem einstellbaren Anteil (Standard 50 %) als an die Mieter verkauft.
 - **Leerstand** zählt als Eigenverbrauch des Betreibers; der Grundpreis wird nach Miettagen aufgeteilt.
 - **Ladestation** gehört dem Betreiber; ihr Solarstrom zählt als Eigenverbrauch.
+- **Wärmepumpen** (Heizung, Warmwasser) am Allgemeinzähler: aus Home-Assistant-Zählerständen pro Viertelstunde herausgerechnet (höchstens bis zum Allgemeinzähler), eigene Gesamtrechnung «Heizung und Warmwasser» für die Heiz- und Nebenkostenabrechnung.
 - **Rücklieferung** ohne bekannten Tarif bleibt offen und wird in der Wertschöpfung nicht geschätzt.
 - **Speicher** (ab einstellbarem Datum, Standard 01.01.2027): Netzbezug am Zähler der PV-Anlage über der Standby-Grenze ist Netzladung und geht auf den Betreiber. Wird dieser Netzstrom später im Haus verbraucht, erscheint er als «Speicher NT» zum vZEV-Preis statt als Solarstrom.
 - **Bonus dynamischer Tarif** (Standard ab 01.01.2027): Die Rechnung bleibt bei HT/NT; der Vorteil gegenüber dem dynamischen Preis pro Viertelstunde wird gutgeschrieben, pro Monat nie negativ.
