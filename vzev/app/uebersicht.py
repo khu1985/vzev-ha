@@ -107,9 +107,18 @@ UEBERSICHT = diagramme.STIL + """
 Angezeigt wird nur die Vorschau aus Home Assistant. Prüfe die Dateien unter <a href="import">Daten importieren</a>.</div>{% endif %}
 {% if abw %}<div class="msg warn">Abgeschlossene Monate haben sich verändert: {% for m, t in abw %}{{ m }} ({{ t }}){{ ', ' if not loop.last }}{% endfor %}. Details unter <a href="abschluss">Abschluss</a>.</div>{% endif %}
 <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin:-8px 0 16px">
-<form method="get" action="uebersicht"><select name="m" onchange="this.form.submit()">{% for k, l in auswahl %}<option value="{{ k }}" {{ 'selected' if k == sel }}>{{ l }}</option>{% endfor %}</select></form>
+<form method="get" action="uebersicht"><select name="j" onchange="this.form.submit()" aria-label="Jahr">{% for y in jahre %}<option {{ 'selected' if y == jahr }}>{{ y }}</option>{% endfor %}</select></form>
 <span class="muted">Primeo-Lastgänge bis {{ primeo_bis }}{% if info.bis %} · Vorschau aus Home Assistant bis {{ info.bis.strftime('%d.%m.%Y %H:%M') }}{% endif %}{% if pv and (pv[0] is not none or pv[1] is not none) %}
  · <a href="prognose">PV-Prognose{% if pv[0] is not none %} heute {{ '%.1f'|format(pv[0]) }}{% endif %}{% if pv[1] is not none %}, morgen {{ '%.1f'|format(pv[1]) }}{% endif %} kWh</a>{% endif %}</span></div>
+<div class="grid" style="margin-bottom:20px">
+ <div class="kpi"><div class="t">Produktion {{ jahr }}</div><div class="v">{{ jk.produktion|k0 }} <small>kWh</small></div><div class="s">{{ jk.zeitraum }}{% if jk.vorjahr %} · Vorjahr gleicher Zeitraum {{ jk.vorjahr|k0 }} kWh{% endif %}</div></div>
+ <div class="kpi"><div class="t">Autarkie Haus {{ jahr }}</div><div class="v">{{ '%.1f'|format(jk.autarkie) }} <small>%</small></div><div class="s">{{ jk.solar|k0 }} von {{ jk.verbrauch|k0 }} kWh aus Solarstrom</div></div>
+ <div class="kpi"><div class="t">Rücklieferung {{ jahr }}</div><div class="v">{{ jk.export|k0 }} <small>kWh</small></div><div class="s">{% if jk.export_chf is not none %}= {{ jk.export_chf|f2 }} CHF{% endif %}{{ ', Tarif teilweise offen' if jk.tarif_offen }}</div></div>
+ <div class="kpi"><div class="t">Wertschöpfung {{ jahr }}</div><div class="v">{{ jk.wert|f2 }} <small>CHF</small></div><div class="s">Rücklieferung, Verkauf Mieter, Eigenverbrauch</div></div>
+</div>
+<div class="card"><h2>Energiefluss pro Monat {{ jahr }}</h2>{{ chart|safe }}
+<p class="muted">kWh. Solar im Haus = selbst verbrauchter Solarstrom aller Zähler; Netzbezug inkl. Standby PV-Anlage. * vorläufig. Klick auf einen Monat zeigt seine Werte darunter.</p></div>
+<h2 id="monat" style="margin:28px 0 12px;scroll-margin-top:12px">{{ titel }}</h2>
 {% if mon.vorlaeufig %}<div class="msg" style="background:var(--soft)">{{ titel }} ist vorläufig{% if mon.ha %}: ab {{ info.von.strftime('%d.%m. %H:%M') if info.von else '' }} aus den Zählerständen in Home Assistant gerechnet
 (Abdeckung {{ '%.0f'|format(info.abdeckung * 100) }} % der Viertelstunden){% else %}: Daten bis {{ (mon.bis - viertel).strftime('%d.%m.%Y') }}{% endif %}. Für die Rechnungen zählen die Primeo-Lastgänge.</div>{% endif %}
 <div class="grid" style="margin-bottom:20px">
@@ -118,8 +127,6 @@ Angezeigt wird nur die Vorschau aus Home Assistant. Prüfe die Dateien unter <a 
  <div class="kpi"><div class="t">Rücklieferung</div><div class="v">{{ mon.export|k0 }} <small>kWh</small></div><div class="s">{% if mon.tarif_offen %}Tarif noch offen{% else %}= {{ mon.export_chf|f2 }} CHF{% endif %}</div></div>
  <div class="kpi"><div class="t">Wertschöpfung</div><div class="v">{{ wert|f2 }} <small>CHF</small></div><div class="s">Rücklieferung, Verkauf Mieter, Eigenverbrauch</div></div>
 </div>
-<div class="card"><h2>Energiefluss pro Monat</h2>{{ chart|safe }}
-<p class="muted">kWh. Solar im Haus = selbst verbrauchter Solarstrom aller Zähler; Netzbezug inkl. Standby PV-Anlage. * vorläufig. Klick auf einen Monat zeigt ihn oben.</p></div>
 <div class="card"><h2>Kontrollen {{ titel }}</h2>
 {% for ok, t, d in kontrollen %}<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #EEF0EC">
 <span class="pill {{ 'ok' if ok == True else 'warn' if ok == False else '' }}" style="min-width:64px;text-align:center">{{ 'stimmt' if ok == True else 'prüfen' if ok == False else 'offen' }}</span>
@@ -133,7 +140,7 @@ Angezeigt wird nur die Vorschau aus Home Assistant. Prüfe die Dateien unter <a 
 <tr><th class="l">Zähler</th><th>Home Assistant kWh</th><th>Primeo kWh</th><th>Differenz</th><th>%</th></tr>
 {% for v in vergleich %}<tr><td class="l">{{ v.zaehler }}</td><td>{{ v.ha|f2 }}</td><td>{{ v.primeo|f2 }}</td><td>{{ v.diff|f2 }}</td><td>{{ '%.1f'|format(v.prozent) if v.prozent is not none else '–' }}</td></tr>{% endfor %}
 </table></div><p class="muted">Zeitraum, in dem beides vorliegt. Zeigt, wie genau die Vorschau ist.</p></div>{% endif %}
-<details class="card"><summary><b>Alle Monate pro Zähler</b></summary><div class="scroll" style="margin-top:12px"><table class="wide">
+<details class="card"><summary><b>Alle Monate {{ jahr }} pro Zähler</b></summary><div class="scroll" style="margin-top:12px"><table class="wide">
 <tr><th>Monat</th>{% for z in zl %}<th>{{ z[1] }} Solar</th><th>Netz HT/NT</th><th>CHF*</th>{% endfor %}</tr>
 {% for m, row in tab %}<tr><td>{{ m }}</td>{% for c in row %}<td>{{ c[0]|f2 }}</td><td>{{ c[1]|f2 }} / {{ c[2]|f2 }}</td><td>{{ c[3]|f2 }}</td>{% endfor %}</tr>{% endfor %}
 </table></div><p class="muted">kWh. * Solar- plus Netzkosten ohne Grundpreis; Allgemein ohne Ladestation, inkl. Standby PV-Anlage.</p></details>
@@ -172,22 +179,43 @@ def index():
     if res is None:
         return S.page("Übersicht", render_template_string(UEBERSICHT, res_ok=False, fehler=b.get("fehler") or ", ".join(d["info"].get("fehlend", []))))
     mon = _memo("monate", lambda: monate(res))
-    perioden = list(mon.index)
-    voll = [p for p in perioden if not mon.loc[p, "vorlaeufig"]]
+    alle = list(mon.index)
+    jahre = sorted({x.year for x in alle}, reverse=True)
+    try:
+        jahr = int(request.args.get("j") or (pd.Period(request.args["m"], "M").year if request.args.get("m") else jahre[0]))
+    except (ValueError, KeyError):
+        jahr = jahre[0]
+    jahr = jahr if jahr in jahre else jahre[0]
+    perioden = [x for x in alle if x.year == jahr]
+    voll = [x for x in perioden if not mon.loc[x, "vorlaeufig"]]
     sel = request.args.get("m") or str((voll or perioden)[-1])
     p = pd.Period(sel, "M") if sel in [str(x) for x in perioden] else (voll or perioden)[-1]
     sel = str(p)
     i = perioden.index(p)
-    vor = mon.iloc[i - 1] if i > 0 else None
+    k = alle.index(p)
+    vor = mon.iloc[k - 1] if k > 0 else None
+    vor_label = _titel(alle[k - 1]) if k > 0 else ""
     w = _memo("w", lambda: core.wertschoepfung(res, cfg))
     wert = w.loc[p, "total_chf"] if p in w.index else None
 
+    # Jahreswerte (bisher)
+    mj = mon.loc[perioden]
+    wj = w[[x.year == jahr for x in w.index]]
+    jk = dict(produktion=float(mj["produktion"].sum()), solar=float(mj["solar"].sum()), verbrauch=float(mj["verbrauch"].sum()),
+              export=float(mj["export"].sum()), tarif_offen=bool(mj["tarif_offen"].any()),
+              export_chf=float(mj["export_chf"].sum()) if mj["export_chf"].notna().any() else None,
+              wert=float(wj["total_chf"].sum()) if len(wj) else 0.0,
+              zeitraum=(f"{_ml(perioden[0])}–{_ml(perioden[-1])} {jahr}" if len(perioden) > 1 else _titel(perioden[0])) + (" (bisher)" if mj["vorlaeufig"].any() or len(perioden) < 12 else ""))
+    jk["autarkie"] = jk["solar"] / jk["verbrauch"] * 100 if jk["verbrauch"] else 0
+    vj = [x for x in alle if x.year == jahr - 1 and x.month in {y.month for y in perioden}]
+    jk["vorjahr"] = float(mon.loc[vj, "produktion"].sum()) if len(vj) == len(perioden) else None
+
     vorl = {j for j, x in enumerate(perioden) if mon.loc[x, "vorlaeufig"]}
-    chart = diagramme.saeulen([_ml(x) + (f" {str(x.year)[2:]}" if x.month == 1 or j == 0 else "") for j, x in enumerate(perioden)],
-                              [("Solar im Haus", diagramme.FARBEN["solar"], list(mon["solar"])),
-                               ("Rücklieferung", diagramme.FARBEN["rueck"], list(mon["export"])),
-                               ("Netzbezug", diagramme.FARBEN["netz"], list(mon["netz"]))],
-                              vorlaeufig=vorl, aktiv=i, links=[f"?m={x}" for x in perioden])
+    chart = diagramme.saeulen([_ml(x) for x in perioden],
+                              [("Solar im Haus", diagramme.FARBEN["solar"], list(mj["solar"])),
+                               ("Rücklieferung", diagramme.FARBEN["rueck"], list(mj["export"])),
+                               ("Netzbezug", diagramme.FARBEN["netz"], list(mj["netz"]))],
+                              vorlaeufig=vorl, aktiv=i, links=[f"?j={jahr}&m={x}#monat" for x in perioden])
 
     # Kontrollen
     rm = res[res["month"] == p]
@@ -293,10 +321,9 @@ def index():
     sums = {k: _memo("s_" + k, lambda k=k: core.zaehler_summen(res, k)) for k, _ in liste}
     tab = [(m.strftime("%m.%Y") + ("*" if mon.loc[m, "vorlaeufig"] else ""), [(sums[k].loc[m, "solar"], sums[k].loc[m, "ht"], sums[k].loc[m, "nt"],
                                      sums[k].loc[m, "solar_chf"] + sums[k].loc[m, "netz_chf"] + sums[k].loc[m, "speicher_chf"] - max(sums[k].loc[m, "bonus_chf"], 0)) for k, _ in liste]) for m in perioden]
-    auswahl = [(str(x), _titel(x) + (" (vorläufig)" if mon.loc[x, "vorlaeufig"] else "")) for x in reversed(perioden)]
     return S.page("Übersicht", render_template_string(
-        UEBERSICHT, res_ok=True, abw=abw, auswahl=auswahl, sel=sel, titel=_titel(p), mon=mon.loc[p], vor=vor,
-        vor_label=_titel(perioden[i - 1]) if i > 0 else "", wert=wert, chart=chart, kontrollen=kontrollen, verbraucher=verbraucher,
+        UEBERSICHT, res_ok=True, abw=abw, jahr=jahr, jahre=jahre, jk=jk, sel=sel, titel=_titel(p), mon=mon.loc[p], vor=vor,
+        vor_label=vor_label, wert=wert, chart=chart, kontrollen=kontrollen, verbraucher=verbraucher,
         info=d["info"], viertel=VIERTEL, primeo_bis=(b["res"].index.max().strftime("%d.%m.%Y") if b.get("ok") else "–"),
         zl=liste, tab=tab, abg=abg, w=w, vorl={x for x in perioden if mon.loc[x, "vorlaeufig"]},
         vergleich=d["vergleich"], primeo_fehler=None if b.get("ok") else b.get("fehler"), pv=_pv_kurz()))

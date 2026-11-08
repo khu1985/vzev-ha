@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.1
+
+- Übersicht: Jahr auswählbar; oben Produktion, Autarkie, Rücklieferung und Wertschöpfung des gewählten Jahres (bisher). Das Diagramm zeigt die Monate dieses Jahres; ein Klick auf einen Monat zeigt darunter seine Kennzahlen, Kontrollen und Verbraucher. Die Monatsauswahl entfällt.
+
 ## 0.10.0
 
 - Energiefluss: neue Startseite unter «Auswertung» mit animiertem Diagramm – PV-Anlage, Netz, Speicher und Haus (Ring = Herkunft des Stroms), darunter die Verbraucher (1. OG, 2. OG, Allgemein, Ladestation, Wärmepumpen). Punkte laufen umso schneller, je mehr Energie fliesst; Werte per Maus oder Tippen. Zeitraum: heute, gestern, Monat oder Jahr.

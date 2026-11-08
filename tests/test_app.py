@@ -86,6 +86,10 @@ def test_seiten_mit_daten(app):
         assert b'id="warten"' not in r.data, u
     h = c.get("/uebersicht?m=2026-03").get_data(as_text=True)
     assert "Ladestation = Summe der Ladevorgänge" in h and "12.00 kWh verteilt" in h
+    h = c.get("/uebersicht?j=2026").get_data(as_text=True)
+    assert "Produktion 2026" in h and "Wertschöpfung 2026" in h and "Energiefluss pro Monat 2026" in h
+    assert 'href="?j=2026&amp;m=2026-03#monat"' in h and 'name="m"' not in h   # Monat per Klick, keine Monatsauswahl mehr
+    assert 'id="monat"' in h and "April 2026" in h                                # zuletzt vollständiger Monat ist vorgewählt
     assert "Daten importieren" in h and "v" + server.VERSION in h
 
 
