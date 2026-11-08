@@ -223,6 +223,17 @@ class Collector:
                     log.error("Strompreise: %s", e)
                 finally:
                     self.aktiv = None
+            prognose = getattr(self, "prognose", None)
+            if prognose is not None and tick % 4 == 0:
+                self.aktiv = "PV-Prognose abrufen"
+                try:
+                    prognose.abrufen()
+                except Exception as e:
+                    if prognose.fehler != str(e):
+                        log.error("PV-Prognose: %s", e)
+                    prognose.fehler = str(e)
+                finally:
+                    self.aktiv = None
             tick += 1
             now = datetime.now()
             nxt = (now.replace(second=5, microsecond=0) + timedelta(minutes=15 - now.minute % 15))

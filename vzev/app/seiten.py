@@ -675,6 +675,9 @@ ZAEHLER = """<form method="post" action="einstellungen?tab=zaehler"><div class="
 <p class="muted">Über die Messpunkt-Nummer erkennt die App beim Import, welche Datei zu welchem Zähler gehört.</p></div>
 <div class="card"><h2>Zähler in Home Assistant</h2>{{ t_ha|safe }}
 <p class="muted">Energie-Sensoren in kWh (total_increasing). Der Datensammler speichert sie alle 15 Minuten.</p></div>
+<div class="card"><h2>PV-Prognose (Solcast)</h2><table class="form"><tr><td class="l">Sensoren</td><td class="l">
+<input name="solcast" value="{{ solcast }}" style="width:100%;max-width:520px" placeholder="leer = automatisch finden"></td></tr></table>
+<p class="muted">Leer lassen: Die App nimmt alle Sensoren mit Halbstunden-Prognose («detailedForecast»). Sonst Sensoren mit Komma getrennt, z. B. Prognose heute und morgen.</p></div>
 <p><button class="primary">Speichern</button></p></form>"""
 
 PREISKARTE = """<div class="card"><h2>Dynamische Strompreise</h2>
@@ -753,6 +756,9 @@ def einstellungen_formulare(tab):
                     raise ValueError("Jeder Zähler braucht genau eine Messpunkt-Nummer")
                 ha = dict(cfg.get("homeassistant") or {})
                 ha["zaehler"] = {r["z"]: r["e"] for r in lesen("ha", F_HA) if r["z"] and r["e"]}
+                sc = [x.strip() for x in (request.form.get("solcast") or "").split(",") if x.strip()]
+                if sc or ha.get("solcast"):
+                    ha["solcast"] = sc
                 abschnitt_speichern("messpunkte", {r["mp"]: r["z"] for r in mp})
                 abschnitt_speichern("homeassistant", ha)
             elif tab == "batterie":
@@ -791,7 +797,8 @@ def einstellungen_formulare(tab):
                                       r=cfg.get("rechnungen") or {"zahlungsfrist_tage": 30, "nummer": "{jahr}-Q{quartal}-{einheit}"})
     elif tab == "zaehler":
         body = render_template_string(ZAEHLER, t_mp=editor("mp", F_MP, [dict(mp=k, z=v) for k, v in (cfg.get("messpunkte") or {}).items()]),
-                                      t_ha=editor("ha", F_HA, [dict(z=k, e=v) for k, v in ((cfg.get("homeassistant") or {}).get("zaehler") or {}).items()]))
+                                      t_ha=editor("ha", F_HA, [dict(z=k, e=v) for k, v in ((cfg.get("homeassistant") or {}).get("zaehler") or {}).items()]),
+                                      solcast=", ".join((cfg.get("homeassistant") or {}).get("solcast") or []))
     else:
         body = render_template_string(REGELN, r=cfg.get("regeln") or {}) + render_template_string(
             BATTERIE_REGELN, sp=core.speicher_regeln(cfg), dy=core.dyn_regeln(cfg))

@@ -162,3 +162,91 @@ def balken_h(zeilen, einheit):
                '.hb-w{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}.hb-n{grid-column:2 / 4}'
                '@media (max-width:759px){.hb{grid-template-columns:1fr auto}.hb-s{grid-column:1 / 3;grid-row:2}.hb-n{grid-column:1 / 3}}</style>')
     return "".join(out)
+
+
+def prognose_tag(pv, gemessen=(), verbrauch=(), preis=(), fenster=(), hoehe=280, jetzt=None):
+    """Ein Tag in kW (links) und Rp./kWh (rechts).
+    pv = [(minute, minuten, kw50, kw10, kw90)] Prognose mit Bandbreite; gemessen/verbrauch = [(minute, kw)];
+    preis = [(minute, rp)] als Treppe; fenster = [(von_minute, bis_minute)] als grüne Fläche; jetzt = Minute."""
+    if not pv and not gemessen:
+        return '<p class="muted">Für diesen Tag gibt es noch keine Prognose.</p>'
+    kw_max = max([p[4] for p in pv] + [w for _, w in gemessen] + [w for _, w in verbrauch] + [0.5])
+    ticks = _ticks(kw_max * 1.08)
+    hi = ticks[-1]
+    rp_max = max([w for _, w in preis] + [1])
+    rticks = _ticks(rp_max * 1.08)
+    rhi = rticks[-1]
+    links, rechts, unten, oben, breite = 52, 52 if preis else 14, 26, 24, 1000
+    pw, ph = breite - links - rechts, hoehe - unten - oben
+    x = lambda m: links + m / 1440 * pw
+    y = lambda v: oben + ph - v / hi * ph
+    yr = lambda v: oben + ph - v / rhi * ph
+    t = [f'<svg class="chart" viewBox="0 0 {breite} {hoehe}" role="img" aria-label="PV-Prognose" style="width:100%;min-width:560px;height:auto">']
+    for a, b in fenster:
+        t.append(f'<rect x="{x(a):.1f}" y="{oben}" width="{x(b) - x(a):.1f}" height="{ph}" fill="{FARBEN["rueck"]}" opacity="0.12"/>')
+    for v in ticks:
+        t.append(f'<line x1="{links}" x2="{breite - rechts}" y1="{y(v):.1f}" y2="{y(v):.1f}" class="grid"/>'
+                 f'<text x="{links - 8}" y="{y(v) + 4:.1f}" text-anchor="end" class="ax">{_zahl(v, 1 if hi < 5 else 0)}</text>')
+    if preis:
+        for v in rticks:
+            t.append(f'<text x="{breite - rechts + 8}" y="{yr(v) + 4:.1f}" class="ax">{_zahl(v)}</text>')
+    t.append(f'<text x="{links - 8}" y="11" text-anchor="end" class="ax" style="font-size:10px">kW</text>')
+    if preis:
+        t.append(f'<text x="{breite - rechts + 8}" y="11" class="ax" style="font-size:10px">Rp./kWh</text>')
+    for h in range(0, 25, 3):
+        t.append(f'<text x="{x(h * 60):.1f}" y="{hoehe - 8}" text-anchor="middle" class="ax">{h:02d}</text>')
+    if pv:  # Bandbreite P10–P90 und Mittel als gestrichelte Linie (Wert gilt für die Periode, Punkt in der Mitte)
+        mitte = [(m + d / 2, k50, k10, k90) for m, d, k50, k10, k90 in pv]
+        oben_ = " ".join(f"{x(m):.1f},{y(k90):.1f}" for m, _, _, k90 in mitte)
+        unten_ = " ".join(f"{x(m):.1f},{y(k10):.1f}" for m, _, k10, _ in reversed(mitte))
+        t.append(f'<polygon points="{oben_} {unten_}" fill="{FARBEN["solar"]}" opacity="0.18"/>')
+        t.append(f'<polyline points="{" ".join(f"{x(m):.1f},{y(k):.1f}" for m, k, _, _ in mitte)}" fill="none" '
+                 f'stroke="{FARBEN["solar"]}" stroke-width="2" stroke-dasharray="6 4"/>')
+    if verbrauch:
+        t.append(f'<polyline points="{" ".join(f"{x(m + 7.5):.1f},{y(k):.1f}" for m, k in verbrauch)}" fill="none" '
+                 f'stroke="{FARBEN["netz"]}" stroke-width="1.6" opacity="0.85"/>')
+    if gemessen:
+        t.append(f'<polyline points="{" ".join(f"{x(m + 7.5):.1f},{y(k):.1f}" for m, k in gemessen)}" fill="none" '
+                 f'stroke="{FARBEN["solar"]}" stroke-width="2.4" stroke-linejoin="round"/>')
+    if preis:
+        d = ""
+        for i, (m, v) in enumerate(preis):
+            m2 = preis[i + 1][0] if i + 1 < len(preis) else m + 15
+            d += (f"M{x(m):.1f},{yr(v):.1f}" if i == 0 else f" V{yr(v):.1f}") + f" H{x(m2):.1f}"
+        t.append(f'<path d="{d}" fill="none" stroke="{FARBEN["uebrige"]}" stroke-width="1.6" stroke-linejoin="round"/>')
+    if jetzt is not None:
+        t.append(f'<line x1="{x(jetzt):.1f}" x2="{x(jetzt):.1f}" y1="{oben}" y2="{oben + ph}" stroke="#16201C" stroke-width="1" stroke-dasharray="2 3"/>')
+    # Tooltip pro Viertelstunde mit allen Werten
+    pvq = {}
+    for m, d, k50, k10, k90 in pv:
+        for q in range(int(m), int(m + d), 15):
+            pvq[q] = (k50, k10, k90)
+    gq, vq, pq = dict(gemessen), dict(verbrauch), {}
+    for i, (m, v) in enumerate(preis):
+        m2 = preis[i + 1][0] if i + 1 < len(preis) else m + 15
+        for q in range(int(m), int(m2), 15):
+            pq[q] = v
+    for q in range(0, 1440, 15):
+        zeilen = [f"{q // 60:02d}:{q % 60:02d}"]
+        if q in pvq:
+            k50, k10, k90 = pvq[q]
+            zeilen.append(f"Prognose: {_zahl(k50, 2)} kW ({_zahl(k10, 2)}–{_zahl(k90, 2)})")
+        if q in gq:
+            zeilen.append(f"Gemessen: {_zahl(gq[q], 2)} kW")
+        if q in vq:
+            zeilen.append(f"Üblicher Verbrauch: {_zahl(vq[q], 2)} kW")
+        if q in pq:
+            zeilen.append(f"Strompreis: {_zahl(pq[q], 1)} Rp./kWh")
+        if len(zeilen) > 1:
+            t.append(f'<rect class="hit" x="{x(q):.1f}" y="{oben}" width="{x(q + 15) - x(q):.1f}" height="{ph}" data-tip="{escape(chr(10).join(zeilen))}"/>')
+    t.append("</svg>")
+    lg = [(FARBEN["solar"], "PV-Prognose (Band 10–90 %)", "dash")] if pv else []
+    lg += [(FARBEN["solar"], "PV gemessen", "")] if gemessen else []
+    lg += [(FARBEN["netz"], "Üblicher Verbrauch Haus", "")] if verbrauch else []
+    lg += [(FARBEN["uebrige"], "Dynamischer Strompreis (rechts)", "")] if preis else []
+    lg += [(FARBEN["rueck"], "Günstig aus dem Netz laden", "flaeche")] if fenster else []
+    legende = "".join(
+        f'<span class="lg"><i style="background:{f};{"opacity:.35;" if art == "flaeche" else ""}'
+        f'{"background:repeating-linear-gradient(90deg," + f + " 0 4px,transparent 4px 6px);" if art == "dash" else ""}"></i>{escape(n)}</span>'
+        for f, n, art in lg)
+    return f'<div class="legende">{legende}</div><div class="scroll">{"".join(t)}</div>'

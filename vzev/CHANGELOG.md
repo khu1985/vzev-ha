@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.0
+
+- PV-Prognose: neue Seite «Prognose» unter «Anlage» mit der Solcast-Prognose für heute, morgen und die folgenden Tage (Bandbreite 10–90 %), gemessenem PV-Ertrag, üblichem Verbrauch des Hauses und – sobald vorhanden – dem dynamischen Strompreis im gleichen Diagramm.
+- Günstig aus dem Netz laden: Zeitfenster, in denen der Strom günstig ist und die Sonne den Verbrauch nicht deckt (nur Anzeige, keine Steuerung).
+- Trefferquote: Die App speichert die Prognose vom Vortag und vergleicht sie mit dem gemessenen PV-Ertrag (Abweichung, Tage im Band).
+- Solcast-Sensoren werden automatisch gefunden; feste Auswahl unter Einstellungen → Zähler. Abruf stündlich, auch «Jetzt abrufen».
+- Übersicht: Link mit der PV-Prognose für heute und morgen.
+
 ## 0.7.0
 
 - Speicher ab 2027: Lädt die Batterie aus dem Netz (Netzbezug am Zähler der PV-Anlage über dem Standby), bezahlt das der Betreiber; im Allgemeinstrom bleibt nur der Standby. Wird dieser Netzstrom später im Haus verbraucht, steht er auf der Rechnung als eigene Spalte «Speicher NT» zum vZEV-Preis und nicht als Solarstrom.
