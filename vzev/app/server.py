@@ -300,6 +300,10 @@ form.inline{display:inline}
 @keyframes dreh{to{transform:rotate(360deg)}}
 button[disabled]{opacity:.75;cursor:progress}
 @media (max-width:759px){ .bg.an{font-size:11px;padding:2px 8px;order:5;flex-basis:100%;justify-content:center}.bg:not(.an){display:none}.top{flex-wrap:wrap}}
+
+body.laedt main{opacity:.55;transition:opacity .2s ease .15s;pointer-events:none}
+body.laedt::before{content:"";position:fixed;top:0;left:0;height:3px;width:100%;background:linear-gradient(90deg,transparent,var(--amber),transparent);background-size:40% 100%;background-repeat:no-repeat;animation:balken 1s linear infinite;z-index:20}
+@keyframes balken{from{background-position:-40% 0}to{background-position:140% 0}}
 </style></head><body>
 <div class="app"><aside class="side" id="side"><div class="top"><span class="brand">☀ vZEV {{ anlage }}</span><span class="ver" title="Version der App">v{{ version }}</span><span id="bg" class="bg" role="status" aria-live="polite"></span>
 <button id="menu" type="button" aria-expanded="false" aria-controls="nav" onclick="var s=document.getElementById('side');var o=s.classList.toggle('offen');this.setAttribute('aria-expanded',o);this.textContent=o?'Schliessen':'Menü'">Menü</button></div>
@@ -311,6 +315,7 @@ button[disabled]{opacity:.75;cursor:progress}
  var el=document.getElementById('bg'),warten=document.getElementById('warten');
  function zeit(s){return s<60?Math.round(s)+' s':Math.round(s/60)+' min'}
  function poll(){fetch('status',{credentials:'same-origin',cache:'no-store'}).then(function(r){return r.json()}).then(function(s){
+  if(document.body.classList.contains('laedt')){setTimeout(poll,1500);return}
   var t=[];if(s.rechnen.aktiv)t.push('Berechnung läuft ('+zeit(s.rechnen.seit)+')');else if(s.rechnen.veraltet)t.push('Berechnung startet');
   if(s.sammler.aktiv)t.push(s.sammler.aktiv);
   if(t.length){el.className='bg an';el.innerHTML='<span class="spin"></span>'+t.join(' · ')}
@@ -319,9 +324,17 @@ button[disabled]{opacity:.75;cursor:progress}
   if(warten&&s.rechnen.aktiv){var w=document.getElementById('wartezeit');if(w)w.textContent=zeit(s.rechnen.seit)}
   setTimeout(poll,(t.length||warten)?1500:15000)}).catch(function(){setTimeout(poll,15000)})}
  poll();
- document.addEventListener('submit',function(e){var f=e.target;if(e.defaultPrevented||f.method.toLowerCase()!=='post'||f.id==='up')return;
-  var b=e.submitter||f.querySelector('button');if(!b)return;setTimeout(function(){b.disabled=true;b.innerHTML='<span class="spin"></span> '+(f.dataset.busy||'läuft …')},0);
-  el.className='bg an';el.innerHTML='<span class="spin"></span>'+(f.dataset.busy||'wird ausgeführt …')});
+ function laden(t){el.className='bg an';el.innerHTML='<span class="spin"></span>'+(t||'Seite wird geladen …');document.body.classList.add('laedt')}
+ document.addEventListener('submit',function(e){var f=e.target;if(e.defaultPrevented||f.id==='up')return;
+  if(f.method.toLowerCase()!=='post'){laden(f.dataset.busy);return}
+  var b=e.submitter||f.querySelector('button');if(b)setTimeout(function(){b.disabled=true;b.innerHTML='<span class="spin"></span> '+(f.dataset.busy||'läuft …')},0);
+  laden(f.dataset.busy||'wird ausgeführt …')});
+ /* Formulare, die per JavaScript abgeschickt werden (z. B. Monatsauswahl), lösen kein submit-Ereignis aus */
+ var abschicken=HTMLFormElement.prototype.submit;HTMLFormElement.prototype.submit=function(){if(this.id!=='up')laden(this.dataset.busy);return abschicken.call(this)};
+ document.addEventListener('click',function(e){if(e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey)return;
+  var a=e.target.closest&&e.target.closest('a');if(!a)return;var h=a.getAttribute('href')||a.getAttribute('xlink:href')||'';
+  if(!h||h.charAt(0)==='#'||a.hasAttribute('download')||a.getAttribute('target')||/[.]pdf|^https?:|^mailto:|datei|herunterladen/i.test(h))return;laden()});
+ window.addEventListener('pageshow',function(){document.body.classList.remove('laedt')});
 })();
 </script><script>if(innerWidth<760)document.querySelectorAll('.scroll').forEach(function(d){if(d.querySelector('svg.chart'))d.scrollLeft=d.scrollWidth});
 document.querySelectorAll('table').forEach(function(t){var h=null;t.querySelectorAll('tr').forEach(function(r){var th=r.querySelectorAll(':scope>th');if(th.length){h=Array.from(th).map(function(x){return x.textContent.trim()});return}

@@ -52,8 +52,16 @@ def daten():
                     vgl = vorschau.vergleich(res_k, res_p)
             except Exception:
                 S.log.exception("Vergleich Home Assistant / Primeo fehlgeschlagen")
-        _vcache.update(key=key, res=res, info=info, vergleich=vgl)
+        _vcache.update(key=key, res=res, info=info, vergleich=vgl, memo={})
     return dict(b=b, cfg=cfg, res=_vcache["res"], info=_vcache["info"], vergleich=_vcache["vergleich"])
+
+
+def _memo(name, fn):
+    """Zwischenspeicher für Monatswerte: Monatswechsel und Reiterwechsel rechnen nicht alles neu."""
+    m = _vcache.setdefault("memo", {})
+    if name not in m:
+        m[name] = fn()
+    return m[name]
 
 
 def monate(res):
@@ -157,7 +165,7 @@ def index():
     res, cfg, b = d["res"], d["cfg"], d["b"]
     if res is None:
         return S.page("Übersicht", render_template_string(UEBERSICHT, res_ok=False, fehler=b.get("fehler") or ", ".join(d["info"].get("fehlend", []))))
-    mon = monate(res)
+    mon = _memo("monate", lambda: monate(res))
     perioden = list(mon.index)
     voll = [p for p in perioden if not mon.loc[p, "vorlaeufig"]]
     sel = request.args.get("m") or str((voll or perioden)[-1])
@@ -165,7 +173,7 @@ def index():
     sel = str(p)
     i = perioden.index(p)
     vor = mon.iloc[i - 1] if i > 0 else None
-    w = core.wertschoepfung(res, cfg)
+    w = _memo("w", lambda: core.wertschoepfung(res, cfg))
     wert = w.loc[p, "total_chf"] if p in w.index else None
 
     vorl = {j for j, x in enumerate(perioden) if mon.loc[x, "vorlaeufig"]}
@@ -178,7 +186,7 @@ def index():
     # Kontrollen
     rm = res[res["month"] == p]
     kontrollen = []
-    abg = core.abgleich(b["res"], b["cfg"]) if b.get("ok") else None
+    abg = _memo("abg", lambda: core.abgleich(b["res"], b["cfg"])) if b.get("ok") else None
     if abg is not None:
         def in_monat(pos_von, pos_bis):
             return pd.Timestamp(pos_von) <= p.end_time and pd.Timestamp(pos_bis) >= p.start_time
@@ -232,7 +240,7 @@ def index():
             partei, betrag, hinw = "Betreiber", None, f"Ersparnis {r.ersparnis_chf:.2f} CHF ggü. Netz"
         verbraucher.append(dict(k=k, label=label, partei=partei, solar=r.solar, ht=r.ht, nt=r.nt, autarkie=aut, betrag=betrag, hinweis=hinw))
 
-    sums = {k: core.zaehler_summen(res, k) for k, _ in ZL}
+    sums = {k: _memo("s_" + k, lambda k=k: core.zaehler_summen(res, k)) for k, _ in ZL}
     tab = [(m.strftime("%m.%Y") + ("*" if mon.loc[m, "vorlaeufig"] else ""), [(sums[k].loc[m, "solar"], sums[k].loc[m, "ht"], sums[k].loc[m, "nt"],
                                      sums[k].loc[m, "solar_chf"] + sums[k].loc[m, "netz_chf"]) for k, _ in ZL]) for m in perioden]
     auswahl = [(str(x), _titel(x) + (" (vorläufig)" if mon.loc[x, "vorlaeufig"] else "")) for x in reversed(perioden)]
@@ -278,8 +286,8 @@ def verlauf():
     if res is None:
         return S.page("Verlauf", render_template_string(VERLAUF, ok=False, zl=ZL, z=z, fehler=d["b"].get("fehler")))
     import invoices
-    mon = monate(res)
-    s = core.zaehler_summen(res, z)
+    mon = _memo("monate", lambda: monate(res))
+    s = _memo("s_" + z, lambda: core.zaehler_summen(res, z))
     occ = res["occ_1OG"].groupby(res["month"]).mean()
     a = seiten.abschluss_laden()
     zeilen, gruppe_alt = [], None

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.10
+
+- Statusanzeige «Seite wird geladen …» mit Ladebalken oben bei jedem Seitenwechsel: Monat wählen, Klick ins Diagramm, Reiter im Verlauf und in den Einstellungen, Navigation, Filter im Protokoll und Datensammler. Der Inhalt wird bis zum Laden abgeblendet.
+- Monats- und Reiterwechsel schneller: Monatswerte, Wertschöpfung und Abgleich werden zwischengespeichert, bis sich Daten oder Einstellungen ändern.
+
 ## 0.3.9
 
 - Handy: Versionsnummer wieder in der Kopfzeile neben dem Namen. Der Name wird bei sehr schmalen Bildschirmen gekürzt, damit «Menü» in derselben Zeile bleibt; die Statusanzeige erscheint darunter.
