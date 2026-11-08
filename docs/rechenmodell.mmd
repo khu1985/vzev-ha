@@ -1,7 +1,8 @@
 flowchart TD
     A["Lastgänge pro Viertelstunde<br/>1. OG, 2. OG, Allgemein, Produktion, Netzbezug PV-Anlage"] --> B
     LS["Wallbox-Ladevorgänge<br/>Start, Ende, kWh"] --> B
-    B["Ladestation herausrechnen<br/>Energie jedes Ladevorgangs auf die Viertelstunden verteilen,<br/>in denen der Allgemeinzähler über der Grundlast liegt"] --> C
+    B["Ladestation herausrechnen<br/>Energie jedes Ladevorgangs auf die Viertelstunden verteilen,<br/>in denen der Allgemeinzähler über der Grundlast liegt"] --> WP
+    WP["Wärmepumpen herausrechnen<br/>Zählerstände aus Home Assistant pro Viertelstunde"] --> C
     C["Netzbezug PV-Anlage aufteilen<br/>bis Standby-Grenze: Allgemeinstrom · darüber: Netzladung Speicher (Betreiber)"] --> D
     D["Solaranteil = min(Produktion ÷ Verbrauch aller Zähler, 1)<br/>gleicher Anteil für jeden Zähler"] --> S
     S["Speicher NT: Anlagenstrom stammt zuerst aus dem Netzvorrat<br/>(Netzladung × Wirkungsgrad), Rest ist Solarstrom"] --> E

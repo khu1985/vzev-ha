@@ -12,7 +12,7 @@ import vorschau
 
 S = None
 VIERTEL = pd.Timedelta(minutes=15)
-ZL = [("1OG", "1. OG"), ("2OG", "2. OG"), ("AllgC", "Allgemein"), ("EV", "Ladestation")]
+ZL = core.ZL
 _vcache = {}
 
 
@@ -64,11 +64,20 @@ def _memo(name, fn):
     return m[name]
 
 
+def _mit_wp(cfg):
+    return bool((cfg.get("homeassistant") or {}).get("waermepumpen"))
+
+
+def zl(cfg):
+    """Zählerliste; «Wärmepumpen» nur, wenn sie eingerichtet sind."""
+    return [x for x in ZL if x[0] != "WP" or _mit_wp(cfg)]
+
+
 def monate(res):
     """Monatswerte für Diagramm und Kennzahlen."""
     g = res["month"]
-    solar = res[["S_1OG", "S_2OG", "S_AllgC", "S_EV"]].sum(axis=1)
-    netz = res[["N_1OG", "N_2OG", "N_AllgC", "N_EV"]].sum(axis=1)
+    solar = res[[f"S_{k}" for k in core.ZAEHLER]].sum(axis=1)
+    netz = res[[f"{a}_{k}" for k in core.ZAEHLER for a in ("N", "P")]].sum(axis=1)  # Netzstrom inkl. Speicher NT
     m = pd.DataFrame({
         "produktion": res["Prod"].groupby(g).sum(), "export": res["Export"].groupby(g).sum(),
         "solar": solar.groupby(g).sum(), "netz": netz.groupby(g).sum(),
@@ -211,7 +220,7 @@ def index():
         kontrollen.append((ab > 0.95, "Zählerstände aus Home Assistant vollständig", f"{ab * 100:.0f} % der Viertelstunden haben Werte aller Zähler"))
     kontrollen.append((not mon.loc[p, "tarif_offen"], "Rückliefertarif vorhanden", "in «Tarife» erfasst" if not mon.loc[p, "tarif_offen"] else "In «Tarife» ergänzen, sobald Primeo ihn publiziert"))
     # Solarpreis höchstens 80 % des Standardprodukts für die gleiche Strommenge (Pauschale nach EnV)
-    sol = rm[["S_1OG", "S_2OG", "S_AllgC"]].sum(axis=1)
+    sol = rm[["S_1OG", "S_2OG", "S_AllgC", "S_WP"]].sum(axis=1)
     if sol.sum() > 0:
         std = float((sol * rm["price"]).sum() / sol.sum())
         sp = float((sol * rm["solarprice"]).sum() / sol.sum())
@@ -219,12 +228,21 @@ def index():
                            f"Solarpreis {sp * 100:.2f} Rp., Grenze {0.8 * std * 100:.2f} Rp. (80 % von {std * 100:.2f} Rp., "
                            "gewichtet nach HT/NT des Solarverbrauchs)"))
     if rm["bonus_zeit"].any():
-        netz = rm[["N_1OG", "N_2OG", "N_AllgC"]].sum(axis=1) > 0
+        netz = rm[["N_1OG", "N_2OG", "N_AllgC", "N_WP"]].sum(axis=1) > 0
         fehlt = int((netz & rm["dynprice"].isna()).sum())
-        bonus = float(rm[["B_1OG", "B_2OG", "B_AllgC"]].sum().sum())
+        bonus = float(rm[["B_1OG", "B_2OG", "B_AllgC", "B_WP"]].sum().sum())
         kontrollen.append((fehlt == 0, "Dynamische Preise vollständig",
                            (f"Bonus für Mieter und Allgemeinstrom CHF {bonus:.2f}" if not fehlt else
                             f"{fehlt} Viertelstunden mit Netzbezug ohne Preis – Bonus dort 0; Preise unter «Tarife» abrufen")))
+    if _mit_wp(cfg):
+        gem, abz = float(rm["WP_gemessen"].sum()), float(rm["WP"].sum())
+        vq = rm["WP_gemessen"] > 0
+        if gem <= 0:
+            kontrollen.append((False, "Wärmepumpen erfasst", "keine Werte in diesem Monat – Sensoren unter «Datensammler» prüfen; ihr Verbrauch bleibt im Allgemeinstrom"))
+        else:
+            kontrollen.append((abs(gem - abz) <= max(0.5, 0.02 * gem), "Wärmepumpen aus dem Allgemeinstrom herausgerechnet",
+                               f"{abz:.1f} von {gem:.1f} kWh gemessen" + (f", erfasst ab {rm.index[vq].min():%d.%m. %H:%M}" if rm.index[vq].min() > rm.index.min() + pd.Timedelta(days=1) else "")
+                               + ("" if abs(gem - abz) <= max(0.5, 0.02 * gem) else " – der Rest übersteigt den Allgemeinzähler (Zeitversatz oder falscher Sensor?)")))
     if rm["Laden"].sum() > 0.01:
         kontrollen.append((None, "Speicher aus dem Netz geladen",
                            f"{rm['Laden'].sum():.2f} kWh Netzladung (Kosten Betreiber), davon im Haus als Speicher NT verbraucht: "
@@ -261,20 +279,26 @@ def index():
         elif k == "2OG":
             partei, betrag, hinw = "Betreiber", None, "Eigenverbrauch"
         elif k == "AllgC":
-            partei, betrag, hinw = "ohne Ladestation, Gesamtrechnung", r.solar_chf + r.netz_chf + r.speicher_chf - max(r.bonus_chf, 0) + gp, "für Nebenkostenabrechnung"
+            partei, betrag, hinw = ("ohne Ladestation" + (" und Wärmepumpen" if _mit_wp(cfg) else "") + ", Gesamtrechnung",
+                                    r.solar_chf + r.netz_chf + r.speicher_chf - max(r.bonus_chf, 0) + gp, "für Nebenkostenabrechnung")
+        elif k == "WP":
+            if not _mit_wp(cfg) and tot < 0.01:
+                continue
+            partei, betrag, hinw = "Heizung und Warmwasser, Gesamtrechnung", r.solar_chf + r.netz_chf + r.speicher_chf - max(r.bonus_chf, 0), "für Heiz- und Nebenkostenabrechnung"
         else:
             partei, betrag, hinw = "Betreiber", None, f"Ersparnis {r.ersparnis_chf:.2f} CHF ggü. Netz"
         verbraucher.append(dict(k=k, label=label, partei=partei, solar=r.solar, ht=r.ht, nt=r.nt, autarkie=aut, betrag=betrag, hinweis=hinw))
 
-    sums = {k: _memo("s_" + k, lambda k=k: core.zaehler_summen(res, k)) for k, _ in ZL}
+    liste = zl(cfg)
+    sums = {k: _memo("s_" + k, lambda k=k: core.zaehler_summen(res, k)) for k, _ in liste}
     tab = [(m.strftime("%m.%Y") + ("*" if mon.loc[m, "vorlaeufig"] else ""), [(sums[k].loc[m, "solar"], sums[k].loc[m, "ht"], sums[k].loc[m, "nt"],
-                                     sums[k].loc[m, "solar_chf"] + sums[k].loc[m, "netz_chf"] + sums[k].loc[m, "speicher_chf"] - max(sums[k].loc[m, "bonus_chf"], 0)) for k, _ in ZL]) for m in perioden]
+                                     sums[k].loc[m, "solar_chf"] + sums[k].loc[m, "netz_chf"] + sums[k].loc[m, "speicher_chf"] - max(sums[k].loc[m, "bonus_chf"], 0)) for k, _ in liste]) for m in perioden]
     auswahl = [(str(x), _titel(x) + (" (vorläufig)" if mon.loc[x, "vorlaeufig"] else "")) for x in reversed(perioden)]
     return S.page("Übersicht", render_template_string(
         UEBERSICHT, res_ok=True, abw=abw, auswahl=auswahl, sel=sel, titel=_titel(p), mon=mon.loc[p], vor=vor,
         vor_label=_titel(perioden[i - 1]) if i > 0 else "", wert=wert, chart=chart, kontrollen=kontrollen, verbraucher=verbraucher,
         info=d["info"], viertel=VIERTEL, primeo_bis=(b["res"].index.max().strftime("%d.%m.%Y") if b.get("ok") else "–"),
-        zl=ZL, tab=tab, abg=abg, w=w, vorl={x for x in perioden if mon.loc[x, "vorlaeufig"]},
+        zl=liste, tab=tab, abg=abg, w=w, vorl={x for x in perioden if mon.loc[x, "vorlaeufig"]},
         vergleich=d["vergleich"], primeo_fehler=None if b.get("ok") else b.get("fehler"), pv=_pv_kurz()))
 
 
@@ -318,7 +342,7 @@ def verlauf():
     d = daten()
     res, cfg = d["res"], d["cfg"]
     if res is None:
-        return S.page("Verlauf", render_template_string(VERLAUF, ok=False, zl=ZL, z=z, fehler=d["b"].get("fehler")))
+        return S.page("Verlauf", render_template_string(VERLAUF, ok=False, zl=zl(S.config()), z=z, fehler=d["b"].get("fehler")))
     import invoices
     mon = _memo("monate", lambda: monate(res))
     s = _memo("s_" + z, lambda: core.zaehler_summen(res, z))
@@ -346,7 +370,7 @@ def verlauf():
     chart = diagramme.saeulen([_ml(p) for p in perioden],
                               [("Solar", diagramme.FARBEN["solar"], list(s["solar"])), ("Netz", diagramme.FARBEN["netz"], list(s["ht"] + s["nt"]))],
                               vorlaeufig=vorl, hoehe=220, summe="Verbrauch gesamt")
-    return S.page("Verlauf", render_template_string(VERLAUF, ok=True, zl=ZL, z=z, zeilen=zeilen, tot=tot, chart=chart, gp=z in ("1OG", "AllgC")))
+    return S.page("Verlauf", render_template_string(VERLAUF, ok=True, zl=zl(cfg), z=z, zeilen=zeilen, tot=tot, chart=chart, gp=z in ("1OG", "AllgC")))
 
 
 # =============================================================================

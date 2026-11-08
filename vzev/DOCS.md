@@ -9,7 +9,7 @@ und getrennt ausgewiesenem Netzstrom aus dem Batteriespeicher.
 ## Erste Schritte
 
 1. **Einstellungen → Betreiber und Rechnungen:** Name, Adresse, Bank und IBAN (erscheinen auf den Rechnungen und im QR-Einzahlungsschein), vZEV-Start, Zahlungsfrist.
-2. **Einstellungen → Zähler:** die fünf Primeo-Messpunkte (1. OG, 2. OG, Allgemein, Netzbezug PV-Anlage, Produktion) und die Energie-Sensoren in Home Assistant.
+2. **Einstellungen → Zähler:** die fünf Primeo-Messpunkte (1. OG, 2. OG, Allgemein, Netzbezug PV-Anlage, Produktion), die Energie-Sensoren in Home Assistant und – falls vorhanden – die Wärmepumpen am Allgemeinzähler.
 3. **Tarife:** Solarpreis, Netzstrom HT/NT, Rücklieferung und Grundpreis, jeweils mit «Gültig ab». Neue Preise (z. B. ab 01.01.2027) als neue Zeile eintragen, die alten bleiben für frühere Monate gültig.
 4. **Mieter:** Mietverhältnisse mit Von/Bis.
 5. **Daten importieren:** Lastgänge aller Zähler aus dem Primeo-Kundenportal (.xlsx) und den Wallbox-Export (.csv) hochladen.
@@ -71,6 +71,15 @@ Die App holt die Viertelstundenpreise über die Primeo-Schnittstelle (Standard: 
 **Speicher (ab 2027):** Netzbezug am Zähler der PV-Anlage über der Standby-Grenze ist Laden der Batterie aus dem Netz und geht auf den Betreiber. Strom, der aus diesem Vorrat später im Haus verbraucht wird (zuerst geladen, zuerst verbraucht, abzüglich Wirkungsgrad), erscheint als «Speicher NT» zum vZEV-Preis und nicht als Solarstrom.
 
 **80-%-Grenze:** Die Übersicht prüft pro Monat, ob der Solarpreis höchstens 80 % des Standardprodukts beträgt (gewichtet nach HT/NT des Solarverbrauchs). Voraussetzung: Solar- und Netztarife auf der gleichen Basis (inkl. MWST).
+
+## Wärmepumpen
+
+Wärmepumpen für Heizung und Warmwasser, die am Allgemeinzähler hängen, werden unter **Einstellungen → Zähler → Wärmepumpen** mit ihrem Energie-Sensor eingetragen (Zählerstand in kWh oder Wh, z. B. Shelly-Energie oder Stromverbrauch der Wärmepumpe). Schätzt die Wärmepumpe ihren Stromverbrauch nur, gleicht ein **Faktor** die Abweichung aus.
+
+- Der Verbrauch wird pro Viertelstunde aus dem Allgemeinstrom herausgerechnet und bekommt den gleichen Solaranteil wie alle Zähler.
+- Pro Quartal entsteht eine zusätzliche Gesamtrechnung **Heizung und Warmwasser**, in der Jahresabrechnung ein eigenes PDF für die Heiz- und Nebenkostenabrechnung.
+- Gemessen wird ab dem Tag, an dem der Datensammler die Sensoren speichert; davor bleibt der Verbrauch im Allgemeinstrom. Kurze Lücken (bis 4 Stunden) werden gleichmässig verteilt.
+- Die Übersicht prüft, ob die Werte vollständig ankommen.
 
 ## PV-Prognose
 

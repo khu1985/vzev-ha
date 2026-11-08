@@ -150,11 +150,11 @@ def zusatz_hinweise(cfg, rows):
     return out
 
 
-def render_jahr(path, cfg, rows, jahr, von, bis, vorlaeufig):
-    """Jahresaufstellung Allgemeinstrom für die Nebenkostenabrechnung."""
+def render_jahr(path, cfg, rows, jahr, von, bis, vorlaeufig, titel="Allgemeinstrom", hinweis=None):
+    """Jahresaufstellung für die Nebenkostenabrechnung (Allgemeinstrom oder Heizung und Warmwasser)."""
     W, H = A4
     c = canvas.Canvas(str(path), pagesize=A4)
-    c.setTitle(f"Allgemeinstrom {jahr}")
+    c.setTitle(f"{titel} {jahr}")
     b = cfg["betreiber"]
     L, R = 20 * mm, W - 20 * mm
     y = H - 20 * mm
@@ -176,15 +176,16 @@ def render_jahr(path, cfg, rows, jahr, von, bis, vorlaeufig):
         c.drawString(L + 24 * mm, y - 20 * mm - i * 4.6 * mm, v)
     ty = y - 40 * mm
     c.setFont("Helvetica-Bold", 15)
-    c.drawString(L, ty, f"Allgemeinstrom {jahr} · Aufstellung für die Nebenkostenabrechnung" if not vorlaeufig
-                 else f"Allgemeinstrom {jahr} · Aufstellung (vorläufig)")
+    c.drawString(L, ty, f"{titel} {jahr} · Aufstellung für die Nebenkostenabrechnung" if not vorlaeufig
+                 else f"{titel} {jahr} · Aufstellung (vorläufig)")
     hy = ty - 10 * mm
     yy, total = tabelle(c, L, R, hy, rows)
     ny = yy - 9 * mm
     c.setFont("Helvetica", 7)
     c.setFillColor(MUTED)
-    notes = tarif_hinweise(cfg, von, bis) + zusatz_hinweise(cfg, rows) + [
-        "Ohne Ladestation (separat erfasst); inkl. Standby-Netzbezug der PV-Anlage. Grundlage: Primeo-Lastgänge in 15-Minuten-Auflösung."]
+    notes = tarif_hinweise(cfg, von, bis) + zusatz_hinweise(cfg, rows) + [hinweis or (
+        "Ohne Ladestation" + (" und Wärmepumpen" if (cfg.get("homeassistant") or {}).get("waermepumpen") else "")
+        + " (separat erfasst); inkl. Standby-Netzbezug der PV-Anlage. Grundlage: Primeo-Lastgänge in 15-Minuten-Auflösung.")]
     if vorlaeufig:
         notes.append("Vorläufig: Nicht alle Monate des Zeitraums sind abgeschlossen oder es fehlen noch Lastgänge.")
     for i, n in enumerate(notes):
@@ -202,7 +203,7 @@ def render_jahr(path, cfg, rows, jahr, von, bis, vorlaeufig):
     return total
 
 
-def lines_for(res, cfg, zaehler, von, bis):
+def lines_for(res, cfg, zaehler, von, bis, grundpreis_ja=True):
     """Monatszeilen für einen Zähler zwischen von und bis (inkl.), Grundpreis anteilig nach Tagen."""
     mask = (res.index >= pd.Timestamp(von)) & (res.index < pd.Timestamp(bis) + pd.Timedelta(days=1))
     s = core.zaehler_summen(res, zaehler, mask)
@@ -211,7 +212,7 @@ def lines_for(res, cfg, zaehler, von, bis):
         m0 = max(per.start_time.date(), von)
         m1 = min(per.end_time.date(), bis)
         days, dim = (m1 - m0).days + 1, calendar.monthrange(per.year, per.month)[1]
-        gp = round(grundpreis(cfg, m0) * days / dim, 2)
+        gp = round(grundpreis(cfg, m0) * days / dim, 2) if grundpreis_ja else 0.0  # Wärmepumpen: kein eigener Primeo-Zähler
         solar_chf, netz_chf, speicher_chf = round(r.solar_chf, 2), round(r.netz_chf, 2), round(r.speicher_chf, 2)
         bonus = max(round(r.bonus_chf, 2), 0.0)  # der Mieter hat nie einen Nachteil
         total_kwh = r.solar + r.ht + r.nt + r.speicher
@@ -221,7 +222,7 @@ def lines_for(res, cfg, zaehler, von, bis):
             speicher=r.speicher, speicher_chf=speicher_chf, bonus=bonus, dyn_fehlt=int(r.dyn_fehlt),
             total=round(solar_chf + netz_chf + speicher_chf + gp - bonus, 2),
             autarkie=100 * r.solar / total_kwh if total_kwh else 100.0,
-            letzte=r.letzte_viertelstunde, monatsende=per.end_time.floor("15min"),
+            letzte=r.letzte_viertelstunde, monatsende=per.end_time.floor("15min"), periode=per,
         ))
     return rows
 
@@ -240,7 +241,15 @@ def invoices_for_quarter(res, cfg, year, q):
                         vorlaeufig=data_end < bis))
     rows = lines_for(res, cfg, "AllgC", qs, qe)
     out.append(dict(art="allgemein", partei=None, einheit="ALLG", von=qs, bis=qe, rows=rows, vorlaeufig=data_end < qe))
+    rows = lines_for(res, cfg, "WP", qs, qe, grundpreis_ja=False)
+    if sum(r["solar"] + r["ht"] + r["nt"] + r["speicher"] for r in rows) > 0.01:
+        out.append(dict(art="allgemein", partei=None, einheit="WP", von=qs, bis=qe, rows=rows, vorlaeufig=data_end < qe))
     return out
+
+
+# Gesamtrechnungen für die Nebenkostenabrechnung: Einheit → (Titel, Dateiname)
+GESAMT = {"ALLG": ("Allgemeinstrom vZEV · Gesamtrechnung", "Allgemeinstrom"),
+          "WP": ("Heizung und Warmwasser · Gesamtrechnung", "Waermepumpen")}
 
 
 # --- Grafik -----------------------------------------------------------------
@@ -407,7 +416,7 @@ def render(path, cfg, inv, nummer, rechnungsdatum, quartal_label):
     ty = H - 82 * mm
     c.setFont("Helvetica-Bold", 15)
     c.setFillColor(INK)
-    title = "Stromabrechnung vZEV" if wohnung else "Allgemeinstrom vZEV · Gesamtrechnung"
+    title = "Stromabrechnung vZEV" if wohnung else GESAMT[inv["einheit"]][0]
     c.drawString(L, ty, f"{title} · {quartal_label}" + (" (vorläufig)" if inv["vorlaeufig"] else ""))
 
     # Tabelle
@@ -417,8 +426,10 @@ def render(path, cfg, inv, nummer, rechnungsdatum, quartal_label):
     c.setFont("Helvetica", 7)
     c.setFillColor(MUTED)
     notes = tarif_hinweise(cfg, inv["von"], inv["bis"]) + zusatz_hinweise(cfg, rows)
-    if not wohnung:
-        notes.append("Ohne Ladestation (separat erfasst); inkl. Standby-Netzbezug der PV-Anlage. Zur Übernahme in die Nebenkostenabrechnung.")
+    if inv["einheit"] == "ALLG":
+        notes.append("Ohne Ladestation und Wärmepumpen (separat erfasst); inkl. Standby-Netzbezug der PV-Anlage. Zur Übernahme in die Nebenkostenabrechnung.")
+    elif inv["einheit"] == "WP":
+        notes.append("Wärmepumpe Heizung und Warmwasser (Unterzähler am Allgemeinzähler, aus Home Assistant). Zur Übernahme in die Heiz- und Nebenkostenabrechnung.")
     for i, n in enumerate(notes):
         c.drawString(L, ny - i * 3.6 * mm, n)
 
@@ -462,8 +473,9 @@ def render(path, cfg, inv, nummer, rechnungsdatum, quartal_label):
     return total
 
 
-def main(datadir, year, q, outdir, rdate=None, config=None):
-    cfg, res, files, lade, ev = core.run(datadir, config)
+def main(datadir, year, q, outdir, rdate=None, config=None, ergebnis=None):
+    """ergebnis = (cfg, res) aus der App; ohne wird neu gerechnet (Kommandozeile, ohne dynamische Preise/Wärmepumpen)."""
+    cfg, res = ergebnis if ergebnis else core.run(datadir, config)[:2]
     rechnungsdatum = date.fromisoformat(rdate) if rdate else date.today()
     outdir = Path(outdir)
     outdir.mkdir(parents=True, exist_ok=True)
@@ -471,7 +483,7 @@ def main(datadir, year, q, outdir, rdate=None, config=None):
     made = []
     for inv in invoices_for_quarter(res, cfg, year, q):
         nummer = cfg["rechnungen"]["nummer"].format(jahr=year, quartal=q, einheit=inv["einheit"])
-        name = inv["partei"]["name"].split(" ")[-1] if inv["partei"] else "Allgemeinstrom"
+        name = inv["partei"]["name"].split(" ")[-1] if inv["partei"] else GESAMT[inv["einheit"]][1]
         path = outdir / f"Rechnung_{nummer}_{name}.pdf"
         total = render(path, cfg, inv, nummer, rechnungsdatum, label)
         made.append((path.name, total, [(r["monat"], r["total"]) for r in inv["rows"]]))

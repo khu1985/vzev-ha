@@ -212,7 +212,8 @@ def distribute_ev(df, lade, baseline):
     return ev
 
 
-ZAEHLER = ["1OG", "2OG", "AllgC", "EV"]
+ZAEHLER = ["1OG", "2OG", "AllgC", "EV", "WP"]
+ZL = [("1OG", "1. OG"), ("2OG", "2. OG"), ("AllgC", "Allgemein"), ("EV", "Ladestation"), ("WP", "Wärmepumpen")]
 SPEICHER_STANDARD = {"speicher_ab": "2027-01-01", "pva_standby_max_kwh": 0.05, "speicher_wirkungsgrad": 0.9}
 DYN_STANDARD = {"bonus": True, "bonus_ab": "2027-01-01", "konzession_prozent": 4.1, "mwst_prozent": 8.1}
 
@@ -243,9 +244,11 @@ def speicher_fifo(laden, intern, eta):
     return out
 
 
-def compute(df, lade, cfg, ev=None, dyn=None):
+def compute(df, lade, cfg, ev=None, dyn=None, wp=None):
     """ev: gemessene Ladestation pro Viertelstunde (Vorschau aus Home Assistant); sonst aus den Ladevorgängen verteilt.
     dyn: dynamische Preise pro Viertelstunde (Spalten integrated, grid_usage in CHF/kWh exkl. MWST) für den Bonus.
+    wp: Wärmepumpen (Heizung, Warmwasser) am Allgemeinzähler in kWh pro Viertelstunde aus Home Assistant; wo Werte
+    fehlen, bleibt ihr Verbrauch im Allgemeinstrom.
 
     Ab «speicher_ab»: Netzbezug am Zähler der PV-Anlage über «pva_standby_max_kwh» pro Viertelstunde ist Laden des
     Speichers aus dem Netz (Kosten Betreiber, Spalte «Laden»); nur der Standby geht in den Allgemeinstrom. Strom, der
@@ -255,8 +258,11 @@ def compute(df, lade, cfg, ev=None, dyn=None):
     if ev is None:
         ev = distribute_ev(df, lade, rules["ladestation_grundlast_kwh"])
     df["EV"] = np.minimum(ev, df["Allg"])
-    df["AllgC"] = df["Allg"] - df["EV"]
-    cons = df["1OG"] + df["2OG"] + df["AllgC"] + df["EV"]
+    wp = pd.Series(0.0, index=df.index) if wp is None else wp.reindex(df.index).fillna(0.0).clip(lower=0)
+    df["WP_gemessen"] = wp
+    df["WP"] = np.minimum(wp, df["Allg"] - df["EV"])
+    df["AllgC"] = df["Allg"] - df["EV"] - df["WP"]
+    cons = df["1OG"] + df["2OG"] + df["AllgC"] + df["EV"] + df["WP"]
     ratio = np.where(cons > 0, np.minimum(df["Prod"] / cons.replace(0, np.nan), 1.0), 0.0)
     sp = speicher_regeln(cfg)
     ab = df.index >= pd.Timestamp(str(sp["speicher_ab"]))
@@ -323,10 +329,11 @@ def zaehler_summen(res, k, mask=None):
 def wertschoepfung(res, cfg):
     share = cfg["regeln"]["allgemein_mieteranteil"]
     occ = res["occ_1OG"].astype(float)
-    mieter_kwh = res["S_1OG"] * occ + res["S_AllgC"] * share * occ
-    eigen_kwh = res["S_2OG"] + res["S_EV"] + res["S_1OG"] * (1 - occ) + res["S_AllgC"] * (1 - share * occ)
-    sp_mieter = res["P_1OG"] * occ + res["P_AllgC"] * share * occ
-    sp_eigen = res["P_2OG"] + res["P_EV"] + res["P_1OG"] * (1 - occ) + res["P_AllgC"] * (1 - share * occ)
+    neben = lambda a: res[f"{a}_AllgC"] + res[f"{a}_WP"]  # Allgemeinstrom und Wärmepumpen: Nebenkosten des ganzen Hauses
+    mieter_kwh = res["S_1OG"] * occ + neben("S") * share * occ
+    eigen_kwh = res["S_2OG"] + res["S_EV"] + res["S_1OG"] * (1 - occ) + neben("S") * (1 - share * occ)
+    sp_mieter = res["P_1OG"] * occ + neben("P") * share * occ
+    sp_eigen = res["P_2OG"] + res["P_EV"] + res["P_1OG"] * (1 - occ) + neben("P") * (1 - share * occ)
     ladepreis = res["dynprice"].fillna(res["price"])
     g = res["month"]
     out = pd.DataFrame({
@@ -351,7 +358,7 @@ def wertschoepfung(res, cfg):
 
 
 def abgleich(res, cfg):
-    netz = res[["N_1OG", "N_2OG", "N_AllgC", "N_EV", "Laden"]].sum(axis=1)
+    netz = res[["N_1OG", "N_2OG", "N_AllgC", "N_EV", "N_WP", "Laden"]].sum(axis=1)
     rows = []
     end = lambda d: pd.Timestamp(d) + pd.Timedelta(days=1)
     for r in cfg["primeo_rechnungen"]:
@@ -367,10 +374,10 @@ def abgleich(res, cfg):
     return out
 
 
-def run(datadir, config=None, cache_dir=None, dyn=None):
+def run(datadir, config=None, cache_dir=None, dyn=None, wp=None):
     cfg = load_config(config)
     df, lade, files = load(datadir, cfg, cache_dir)
-    res = compute(df, lade, cfg, dyn=dyn)
+    res = compute(df, lade, cfg, dyn=dyn, wp=wp(cfg) if callable(wp) else wp)
     ev_check = abs(res["EV"].sum() - lade["kwh"].sum())
     return cfg, res, files, lade, ev_check
 

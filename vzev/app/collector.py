@@ -69,6 +69,7 @@ class Collector:
         ids = list((ha.get("zaehler") or {}).values())
         ids += [v for k, v in (ha.get("solis") or {}).items() if v and v.startswith("sensor.")]
         ids += [v for v in (ha.get("kia") or {}).values() if v]
+        ids += [w["entity"] for w in (ha.get("waermepumpen") or []) if isinstance(w, dict) and w.get("entity")]
         return sorted(set(ids))
 
     def read_now(self):
@@ -112,6 +113,25 @@ class Collector:
             log.info("Datensammler: erster Abruf, %d von %d Entitäten gespeichert", len(rows), len(self.entities()))
         self.last_run = ts
         return len(rows)
+
+    def energie_sensoren(self):
+        """Energie-Sensoren aus Home Assistant zur Auswahl (kWh/Wh), zwischengespeichert für 10 Minuten."""
+        if getattr(self, "_es_zeit", None) and time.time() - self._es_zeit < 600:
+            return self._es
+        base, token = self._ha()
+        out = []
+        if token:
+            try:
+                r = requests.get(f"{base}/states", headers={"Authorization": f"Bearer {token}"}, timeout=15)
+                r.raise_for_status()
+                for s in r.json():
+                    a = s.get("attributes") or {}
+                    if s["entity_id"].startswith("sensor.") and (a.get("device_class") == "energy" or a.get("unit_of_measurement") in ("kWh", "Wh")):
+                        out.append((s["entity_id"], a.get("friendly_name") or s["entity_id"], s.get("state"), a.get("unit_of_measurement") or ""))
+            except Exception as e:
+                log.warning("Energie-Sensoren nicht abrufbar: %s", e)
+        self._es, self._es_zeit = sorted(out), time.time()
+        return self._es
 
     # --- evcc ----------------------------------------------------------
     def fetch_evcc(self):
@@ -184,6 +204,9 @@ class Collector:
             for k, v in (ha.get(gruppe) or {}).items():
                 if v:
                     zweck.setdefault(v, f"{gruppe} · {k}")
+        for w in ha.get("waermepumpen") or []:
+            if isinstance(w, dict) and w.get("entity"):
+                zweck.setdefault(w["entity"], f"wärmepumpe · {w.get('name') or ''}")
         zeilen = []
         for e in self.entities():
             anzahl, zeit, wert = per.get(e, (0, None, None))
@@ -191,7 +214,7 @@ class Collector:
             zeilen.append(dict(entity=e, zweck=zweck.get(e, ""), name=name, einheit=einheit or "", anzahl=anzahl,
                                zeit=zeit, wert=wert, zustand=zustand, geprueft=geprueft,
                                ok=zustand is not None and wert is not None and zustand not in ("unavailable", "unknown")))
-        reihenfolge = {"zaehler": 0, "solis": 1, "kia": 2}
+        reihenfolge = {"zaehler": 0, "wärmepumpe": 1, "solis": 2, "kia": 3}
         zeilen.sort(key=lambda z: (reihenfolge.get(z["zweck"].split(" · ")[0], 3), z["zweck"], z["entity"]))
         return {"anzahl": n, "erster": first, "letzter": last, "zeilen": zeilen, "evcc_sessions": ns,
                 "evcc_status": self.evcc_status, "fehler": self.last_error}

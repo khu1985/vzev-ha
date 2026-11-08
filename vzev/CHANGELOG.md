@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.0
+
+- Wärmepumpen: Heizung und Warmwasser als Unterzähler am Allgemeinzähler (Energie-Sensoren aus Home Assistant, Auswahlliste unter Einstellungen → Zähler, Korrekturfaktor für geschätzte Werte). Ihr Verbrauch wird pro Viertelstunde aus dem Allgemeinstrom herausgerechnet, mit eigenem Solaranteil.
+- Quartal: zusätzliche Gesamtrechnung «Heizung und Warmwasser» für die Heiz- und Nebenkostenabrechnung, sobald Werte vorliegen.
+- Jahresabrechnung: Abschnitt und PDF «Heizung und Warmwasser» mit kWh je Wärmepumpe, Excel-Blatt.
+- Übersicht und Verlauf: Wärmepumpen als eigener Verbraucher; Kontrolle, ob ihre Werte vollständig ankommen.
+- Korrektur: Rechnungen werden jetzt aus derselben Berechnung wie in der App erstellt (inkl. Bonus aus dem dynamischen Tarif ab 2027 – bisher hätte er im PDF gefehlt).
+- Korrektur: Netzstrom aus dem Speicher zählt in Übersicht und Jahresabrechnung zum Netzbezug.
+
 ## 0.8.0
 
 - PV-Prognose: neue Seite «Prognose» unter «Anlage» mit der Solcast-Prognose für heute, morgen und die folgenden Tage (Bandbreite 10–90 %), gemessenem PV-Ertrag, üblichem Verbrauch des Hauses und – sobald vorhanden – dem dynamischen Strompreis im gleichen Diagramm.

@@ -35,7 +35,7 @@ def _meta(datei):
     teile = stamm.split("_", 2)
     nummer = teile[1] if len(teile) > 1 else stamm
     name = teile[2] if len(teile) > 2 else ""
-    art = "allgemein" if name == "Allgemeinstrom" or nummer.endswith("-ALLG") else "wohnung"
+    art = "allgemein" if name in ("Allgemeinstrom", "Waermepumpen") or nummer.endswith(("-ALLG", "-WP")) else "wohnung"
     return nummer, name, art
 
 

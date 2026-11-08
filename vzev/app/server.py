@@ -142,6 +142,16 @@ def files_key():
     return tuple((p.name, p.stat().st_mtime) for p in fs) + ((CFG.name, CFG.stat().st_mtime), preise.stand(collector._db))
 
 
+def wp_reihe(cfg):
+    """Wärmepumpen am Allgemeinzähler (kWh pro Viertelstunde) aus den gesammelten Zählerständen, sonst None."""
+    try:
+        import vorschau
+        return vorschau.unterzaehler(collector._db, cfg)
+    except Exception:
+        log.exception("Wärmepumpen-Zähler nicht lesbar")
+        return None
+
+
 def dyn_preise():
     """Dynamische Preise ab Beginn des Bonus (für die Berechnung), sonst None."""
     try:
@@ -175,7 +185,7 @@ def berechnung(grund="Seitenaufruf"):
         t0 = time.time()
         RECHNEN.update(aktiv=True, start=t0, grund=grund)
         try:
-            cfg, res, files, lade, ev = core.run(PRIMEO, CFG, DATA / ".cache", dyn=dyn_preise())
+            cfg, res, files, lade, ev = core.run(PRIMEO, CFG, DATA / ".cache", dyn=dyn_preise(), wp=wp_reihe)
             _cache.update(key=key, ok=True, cfg=cfg, res=res, files=files, ev=ev, fehler=None)
         except BaseException as e:  # SystemExit bei fehlenden Dateien
             _cache.update(key=key, ok=False, fehler=str(e) or traceback.format_exc(limit=1))
@@ -596,7 +606,11 @@ def rechnungen():
             shutil.move(str(ziel), alt)
             seiten.korrektur(f"{j}-Q{q}", "Rechnungen neu erstellt (alte Fassung unter rechnungen/_alt)", grund)
         try:
-            made = invoices.main(PRIMEO, j, q, RECHNUNGEN / f"{j}-Q{q}", request.form.get("datum") or None, CFG)
+            b = berechnung("Rechnungen")  # gleiche Rechnung wie in der App (inkl. dynamische Preise und Wärmepumpen)
+            if not b.get("ok"):
+                raise ValueError(b.get("fehler") or "keine Berechnung möglich")
+            made = invoices.main(PRIMEO, j, q, RECHNUNGEN / f"{j}-Q{q}", request.form.get("datum") or None, CFG,
+                                 ergebnis=(b["cfg"], b["res"]))
             rd = request.form.get("datum") or None
             zahlungen.registrieren(f"{j}-Q{q}", made, date.fromisoformat(rd) if rd else None, config())
             txt = ", ".join(f"{n} (CHF {t:.2f})" for n, t, _ in made)
