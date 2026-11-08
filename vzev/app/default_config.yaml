@@ -1,0 +1,95 @@
+# vZEV – Konfiguration (Vorlage). Werte in [Klammern] ersetzen.
+# Alle Tarife gelten ab dem angegebenen Datum bis zum nächsten Eintrag.
+
+betreiber:
+  name: "[Vorname Name]"
+  strasse: "[Strasse]"
+  hausnr: "[Nr]"
+  plz: "[PLZ]"
+  ort: "[Ort]"
+  bank: "[Bank]"
+  iban: "[IBAN]"
+
+vzev_start: 2026-03-01
+
+# Dateien im Datenordner, erkannt über die Messpunkt-Nummer
+messpunkte:
+  "[Messpunkt 1]": 1OG
+  "[Messpunkt 2]": 2OG
+  "[Messpunkt 3]": Allg
+  "[Messpunkt 4]": PVA    # Netzbezug PV-Anlage (Standby)
+  "[Messpunkt 5]": Prod   # Produktion PV-Anlage
+
+tarife:
+  solar:              # interner vZEV-Preis, CHF/kWh
+    - {ab: 2026-03-01, chf: 0.238}
+  netz:               # Primeo Standard / Basis inkl. Abgaben, Konzession, MWST, CHF/kWh
+    - {ab: 2026-01-01, ht: 0.348484, nt: 0.279897}
+  ruecklieferung:     # CHF/kWh inkl. HKN
+    - {ab: 2026-01-01, chf: 0.10266}
+    - {ab: 2026-04-01, chf: 0.060}
+    - {ab: 2026-05-01, chf: 0.065}
+    - {ab: 2026-07-01, chf: 0.0904}
+    - {ab: 2026-10-01, chf: null}   # Q4: Primeo publiziert im Januar 2027
+  grundpreis_zaehler: # CHF pro Zähler und Monat: (6.00 + 4 × 4.00) × 1.041 × 1.081 / 3
+    - {ab: 2026-03-01, chf: 8.25}
+
+mietverhaeltnisse:
+  - {einheit: 1OG, name: "[Mieter]", von: 2026-01-01, bis: null,
+     strasse: "[Strasse]", hausnr: "[Nr]", plz: "[PLZ]", ort: "[Ort]"}
+
+regeln:
+  pva_standby_auf: Allg            # Netzbezug PV-Anlage geht auf den Allgemeinstrom
+  allgemein_rechnung: gesamt       # Gesamtrechnung für die Nebenkostenabrechnung
+  allgemein_mieteranteil: 0.5      # nur für die Wertschöpfung: 50 % gelten als verkauft
+  ladestation_grundlast_kwh: 0.02  # pro 15 Min, für die Verteilung der Ladevorgänge
+
+manuell:
+  ruecklieferung_vor_start: []
+  uebrige_ertraege: []
+
+primeo_rechnungen: []           # [{nr, von, bis, netz_ht, netz_nt, ruecklieferung: [[von, bis, kWh]]}]
+
+rechnungen:
+  zahlungsfrist_tage: 30
+  nummer: "{jahr}-Q{quartal}-{einheit}"
+
+# Home Assistant: Zählerstände (total_increasing) werden alle 15 Minuten gespeichert.
+# Rechnungsgrundlage bleiben die Primeo-Lastgänge; HA dient für Vorschau, Kontrolle und Ladestation.
+homeassistant:
+  url: http://homeassistant.local:8123
+  token: null                      # im Add-on nicht nötig; sonst langlebiger Token, von dir eingetragen
+  zaehler:                         # kWh, total_increasing
+    1OG: sensor.whatwatt_go_energy_in_1
+    2OG: sensor.whatwatt_go_energy_in
+    Allg: sensor.whatwatt_go_energy_in_0
+    ladestation: sensor.goe_502704_eto
+  leistung:                        # W, für Live-Anzeige
+    1OG: sensor.whatwatt_go_power_in_1
+    2OG: sensor.whatwatt_go_power_in
+    Allg: sensor.whatwatt_go_power_in_0
+    ladestation: sensor.goe_502704_nrg_11
+    pv_dc: [sensor.solis_inverter_<seriennr>_solis_dc_power_pv1, sensor.solis_inverter_<seriennr>_solis_dc_power_pv2]
+    batterie: sensor.solis_inverter_<seriennr>_solis_battery_power
+  solis:
+    pv_heute: sensor.solis_inverter_<seriennr>_solis_energy_today
+    batterie_geladen_heute: sensor.solis_inverter_<seriennr>_solis_daily_energy_charged
+    batterie_entladen_heute: sensor.solis_inverter_<seriennr>_solis_daily_energy_discharged
+    batterie_soc: sensor.solis_inverter_<seriennr>_solis_remaining_battery_capacity
+    netz_bezug_heute: sensor.solis_inverter_<seriennr>_solis_daily_grid_energy_purchased
+    netz_einspeisung_heute: sensor.solis_inverter_<seriennr>_solis_daily_on_grid_energy
+    speichermodus: select.solis_energy_storage_control_switch
+    zwangsladung_soc: number.solis_force_charge_soc
+  kia:
+    km: sensor.ev3_odometer_2
+    akku_prozent: sensor.ev3_ev_battery_level_3
+    akku_kapazitaet_kj: sensor.ev3_ev_battery_capacity_2
+    verbrauch_30d_wh_km: sensor.ev3_average_energy_consumption_2
+  solcast:
+    prognose_heute: sensor.solcast_pv_forecast_prognose_heute
+    prognose_morgen: sensor.solcast_pv_forecast_prognose_morgen
+  strompreis_dynamisch: null       # ab 2027, Primeo Web-API
+
+evcc:                              # läuft als Home-Assistant-App; Ladevorgänge über die REST-API
+  url: http://homeassistant.local:7070   # Standardport von evcc, bei Bedarf anpassen
+  sessions: /api/sessions
