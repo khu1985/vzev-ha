@@ -41,6 +41,9 @@ class Collector:
         self.last_run = None
         self.last_error = None
         self.evcc_status = "noch nicht abgefragt"
+        self.aktiv = None          # was gerade im Hintergrund läuft (für die Statusanzeige)
+        self.naechster = None      # nächster Abruf der Zählerstände
+        self.evcc_naechster = None
         self._init_db()
 
     # --- Speicher ------------------------------------------------------
@@ -69,6 +72,13 @@ class Collector:
         return sorted(set(ids))
 
     def read_now(self):
+        self.aktiv = "Zählerstände abrufen"
+        try:
+            return self._read_now()
+        finally:
+            self.aktiv = None
+
+    def _read_now(self):
         base, token = self._ha()
         if not token:
             raise RuntimeError("Kein Zugang zu Home Assistant (läuft die App im HA?)")
@@ -105,6 +115,13 @@ class Collector:
 
     # --- evcc ----------------------------------------------------------
     def fetch_evcc(self):
+        self.aktiv = "evcc-Ladevorgänge abrufen"
+        try:
+            return self._fetch_evcc()
+        finally:
+            self.aktiv = None
+
+    def _fetch_evcc(self):
         ev = self.get_config().get("evcc") or {}
         if not ev.get("url"):
             self.evcc_status = "nicht konfiguriert"
@@ -200,7 +217,11 @@ class Collector:
             tick += 1
             now = datetime.now()
             nxt = (now.replace(second=5, microsecond=0) + timedelta(minutes=15 - now.minute % 15))
-            time.sleep(max(30, (nxt - now).total_seconds()))
+            if (nxt - now).total_seconds() < 30:
+                nxt = now + timedelta(seconds=30)
+            self.naechster = nxt
+            self.evcc_naechster = nxt + timedelta(minutes=15 * ((4 - tick % 4) % 4))
+            time.sleep((nxt - now).total_seconds())
 
     def start(self):
         threading.Thread(target=self.loop, daemon=True).start()

@@ -114,9 +114,18 @@ def files_key():
 
 
 _rechnen = threading.Lock()
+RECHNEN = {"aktiv": False, "start": None, "ende": None, "dauer": None, "grund": "", "fehler": None}
 
 
-def berechnung():
+def veraltet():
+    """True, wenn es Dateien gibt und die gespeicherte Berechnung nicht mehr zu Dateien/Einstellungen passt."""
+    try:
+        return any(p.is_file() for p in PRIMEO.iterdir()) and _cache.get("key") != files_key()
+    except OSError:
+        return False
+
+
+def berechnung(grund="Seitenaufruf"):
     key = files_key()
     if _cache.get("key") == key:
         return _cache
@@ -125,6 +134,7 @@ def berechnung():
         if _cache.get("key") == key:
             return _cache
         t0 = time.time()
+        RECHNEN.update(aktiv=True, start=t0, grund=grund)
         try:
             cfg, res, files, lade, ev = core.run(PRIMEO, CFG, DATA / ".cache")
             _cache.update(key=key, ok=True, cfg=cfg, res=res, files=files, ev=ev, fehler=None)
@@ -134,16 +144,18 @@ def berechnung():
         else:
             if time.time() - t0 > 5:
                 log.info("Berechnung neu erstellt in %.0f s", time.time() - t0)
+        finally:
+            RECHNEN.update(aktiv=False, ende=time.time(), dauer=time.time() - t0, fehler=_cache.get("fehler"))
     return _cache
 
 
-def im_hintergrund_rechnen():
+def im_hintergrund_rechnen(grund="Hintergrund"):
     """Nach Start oder Upload schon rechnen, damit die nächste Seite nicht warten muss."""
     def lauf():
         try:
             if any(p.is_file() for p in PRIMEO.iterdir()):
                 liste()  # Dateiinfos für «Daten importieren»
-                berechnung()
+                berechnung(grund)
         except Exception:
             log.exception("Berechnung im Hintergrund fehlgeschlagen")
     threading.Thread(target=lauf, daemon=True).start()
@@ -281,13 +293,37 @@ form.inline{display:inline}
  form.datum,td.akt form{justify-content:flex-end}
  main input:not([type=checkbox]):not([type=file]),main select,main textarea{max-width:100%}
  main input[name=grund]{width:100%!important}
-}</style></head><body>
-<div class="app"><aside class="side" id="side"><div class="top"><span class="brand">☀ vZEV {{ anlage }}</span><span class="ver" title="Version der App">v{{ version }}</span>
+}
+.bg{font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.bg.an{color:var(--warn);background:var(--warnbg);padding:3px 10px;border-radius:999px;font-weight:600}
+.spin{width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;display:inline-block;animation:dreh .8s linear infinite;flex-shrink:0}
+@keyframes dreh{to{transform:rotate(360deg)}}
+button[disabled]{opacity:.75;cursor:progress}
+@media (max-width:759px){ .bg.an{font-size:11px;padding:2px 8px}.bg:not(.an){display:none}.top{flex-wrap:wrap}}
+</style></head><body>
+<div class="app"><aside class="side" id="side"><div class="top"><span class="brand">☀ vZEV {{ anlage }}</span><span class="ver" title="Version der App">v{{ version }}</span><span id="bg" class="bg" role="status" aria-live="polite"></span>
 <button id="menu" type="button" aria-expanded="false" aria-controls="nav" onclick="var s=document.getElementById('side');var o=s.classList.toggle('offen');this.setAttribute('aria-expanded',o);this.textContent=o?'Schliessen':'Menü'">Menü</button></div>
 <nav id="nav">{% for gruppe, eintraege in navigation %}<div class="grp"><span class="gl">{{ gruppe }}</span>{% for href, label in eintraege %}
 <a href="{{ href }}" class="{{ 'on' if label == title else '' }}"{% if label == title %} aria-current="page"{% endif %}>{{ label }}{% if label == 'Protokoll' and nfehler %} <span class="pill warn">{{ nfehler }}</span>{% endif %}</a>{% endfor %}</div>{% endfor %}</nav></aside>
 <script>(function(){var a=document.querySelector('nav a.on');if(a&&innerWidth<1200&&innerWidth>=760)a.scrollIntoView({block:'nearest',inline:'center'})})()</script>
-<main><h1>{{ title }}</h1>{% if msg %}<div class="msg {{ msgclass or 'ok' }}">{{ msg }}</div>{% endif %}{{ body|safe }}</main></div><script>if(innerWidth<760)document.querySelectorAll('.scroll').forEach(function(d){if(d.querySelector('svg.chart'))d.scrollLeft=d.scrollWidth});
+<main><h1>{{ title }}</h1>{% if msg %}<div class="msg {{ msgclass or 'ok' }}">{{ msg }}</div>{% endif %}{{ body|safe }}</main></div><script>
+(function(){
+ var el=document.getElementById('bg'),warten=document.getElementById('warten');
+ function zeit(s){return s<60?Math.round(s)+' s':Math.round(s/60)+' min'}
+ function poll(){fetch('status',{credentials:'same-origin',cache:'no-store'}).then(function(r){return r.json()}).then(function(s){
+  var t=[];if(s.rechnen.aktiv)t.push('Berechnung läuft ('+zeit(s.rechnen.seit)+')');else if(s.rechnen.veraltet)t.push('Berechnung startet');
+  if(s.sammler.aktiv)t.push(s.sammler.aktiv);
+  if(t.length){el.className='bg an';el.innerHTML='<span class="spin"></span>'+t.join(' · ')}
+  else{el.className='bg';el.textContent='● bereit'+(s.rechnen.letzte?' · gerechnet '+s.rechnen.letzte:'');el.title=s.sammler.naechster?'Nächster Abruf Zählerstände '+s.sammler.naechster:''}
+  if(warten&&!s.rechnen.aktiv&&!s.rechnen.veraltet){location.reload();return}
+  if(warten&&s.rechnen.aktiv){var w=document.getElementById('wartezeit');if(w)w.textContent=zeit(s.rechnen.seit)}
+  setTimeout(poll,(t.length||warten)?1500:15000)}).catch(function(){setTimeout(poll,15000)})}
+ poll();
+ document.addEventListener('submit',function(e){var f=e.target;if(e.defaultPrevented||f.method.toLowerCase()!=='post'||f.id==='up')return;
+  var b=e.submitter||f.querySelector('button');if(!b)return;setTimeout(function(){b.disabled=true;b.innerHTML='<span class="spin"></span> '+(f.dataset.busy||'läuft …')},0);
+  el.className='bg an';el.innerHTML='<span class="spin"></span>'+(f.dataset.busy||'wird ausgeführt …')});
+})();
+</script><script>if(innerWidth<760)document.querySelectorAll('.scroll').forEach(function(d){if(d.querySelector('svg.chart'))d.scrollLeft=d.scrollWidth});
 document.querySelectorAll('table').forEach(function(t){var h=null;t.querySelectorAll('tr').forEach(function(r){var th=r.querySelectorAll(':scope>th');if(th.length){h=Array.from(th).map(function(x){return x.textContent.trim()});return}
 if(!h)return;var i=0;r.querySelectorAll(':scope>td').forEach(function(td){var n=td.colSpan||1;if(n==1&&h[i]&&!td.hasAttribute('data-label'))td.setAttribute('data-label',h[i]);i+=n})})})</script></body></html>"""
 
@@ -388,7 +424,7 @@ def hochladen():
             teile.append(f"{fs.filename}: Fehler {e}")
             fehler = True
     msg = "; ".join(teile)
-    im_hintergrund_rechnen()
+    im_hintergrund_rechnen("neue Datei")
     if request.headers.get("X-Requested-With") == "fetch":
         return {"ok": not fehler, "msg": msg}
     return redirect("import?" + ("c=warn&" if fehler else "") + "msg=" + msg)
@@ -400,7 +436,7 @@ def ersetzen():
     if alt.exists():
         shutil.move(str(alt), PRIMEO / "_entfernt" / f"{datetime.now():%Y%m%d%H%M%S}_{alt.name}")
     neu, _ = speichern(request.files["datei"])
-    im_hintergrund_rechnen()
+    im_hintergrund_rechnen("Datei ersetzt")
     return redirect(f"import?msg={alt.name} ersetzt durch {neu['name']}")
 
 
@@ -409,14 +445,14 @@ def entfernen():
     p = PRIMEO / secure_filename(request.form["name"])
     if p.exists():
         shutil.move(str(p), PRIMEO / "_entfernt" / f"{datetime.now():%Y%m%d%H%M%S}_{p.name}")
-    im_hintergrund_rechnen()
+    im_hintergrund_rechnen("Datei entfernt")
     return redirect(f"import?msg={p.name} entfernt")
 
 
 # --- Rechnungen ---------------------------------------------------------------
 RECH = """
 <div class="card"><h2>Quartalsrechnungen erstellen</h2>
-<form method="post" action="rechnungen">Jahr <input name="jahr" type="number" value="{{ jahr }}" style="width:90px">
+<form method="post" action="rechnungen" data-busy="Rechnungen werden erstellt …">Jahr <input name="jahr" type="number" value="{{ jahr }}" style="width:90px">
 Quartal <select name="quartal">{% for q in [1,2,3,4] %}<option {{ 'selected' if q == quartal }}>{{ q }}</option>{% endfor %}</select>
 Rechnungsdatum <input name="datum" type="date" value="{{ heute }}">
 {% if korr %}<br><br>Begründung der Korrektur <input name="grund" style="width:420px" required placeholder="z. B. Lastgang Primeo korrigiert">{% endif %}
@@ -471,9 +507,9 @@ def datei():
 # --- Datensammler -------------------------------------------------------------
 SAMMLER = """
 <div class="card"><h2>Zählerstände aus Home Assistant</h2>
-<p>{{ s.anzahl }} Werte gespeichert{% if s.erster %}, von {{ s.erster.replace('T',' ') }} bis {{ s.letzter.replace('T',' ') }}{% endif %}. Abruf alle 15 Minuten.</p>
+<p>{{ s.anzahl }} Werte gespeichert{% if s.erster %}, von {{ s.erster.replace('T',' ') }} bis {{ s.letzter.replace('T',' ') }}{% endif %}. Abruf alle 15 Minuten{% if naechster %}, nächster um {{ naechster }}{% endif %}.</p>
 {% if s.fehler %}<div class="msg warn">{{ s.fehler }}</div>{% endif %}
-<form method="post" action="sammler"><button>Jetzt abrufen</button></form>
+<form method="post" action="sammler" data-busy="Zählerstände und evcc werden abgerufen …"><button>Jetzt abrufen</button></form>
 <div class="scroll" style="margin-top:12px"><table><tr><th class="l">Zweck</th><th class="l">Entität</th><th>Letzter Wert</th><th>Gespeichert um</th><th>Werte</th><th class="l">Status</th></tr>
 {% for z in s.zeilen %}<tr><td class="l">{{ z.zweck }}</td>
 <td class="l">{{ z.name or z.entity }}{% if z.name %}<br><span class="muted">{{ z.entity }}</span>{% endif %}</td>
@@ -482,7 +518,7 @@ SAMMLER = """
 <td class="l">{% if z.zustand is none %}<span class="pill warn">noch nicht abgefragt</span>{% elif z.ok %}<span class="pill ok">liefert Werte</span>{% else %}<span class="pill warn">{{ z.zustand }}</span>{% endif %}</td></tr>
 {% endfor %}</table></div>
 <p class="muted">Letzter Wert = Zählerstand beim letzten Abruf. «unavailable» heisst: Home Assistant hat den Sensor gerade nicht erreicht.</p></div>
-<div class="card"><h2>Ladevorgänge aus evcc</h2><p>{{ s.evcc_status }} · {{ s.evcc_sessions }} Ladevorgänge gespeichert. Abruf stündlich.</p>
+<div class="card"><h2>Ladevorgänge aus evcc</h2><p>{{ s.evcc_status }} · {{ s.evcc_sessions }} Ladevorgänge gespeichert. Abruf stündlich{% if evcc_naechster %}, nächster um {{ evcc_naechster }}{% endif %}.</p>
 {% if monate %}<h2 style="margin-top:16px">Pro Monat</h2><div class="scroll"><table class="wide">
 <tr><th>Monat</th><th>Ladevorgänge</th><th>kWh evcc</th><th>davon Solar kWh</th><th>Solaranteil</th><th>kWh Ladestation laut Abrechnung</th><th>Kosten evcc CHF</th></tr>
 {% for m in monate %}<tr><td>{{ m.monat }}</td><td>{{ m.n }}</td><td>{{ m.kwh|f2 }}</td><td>{{ m.solar_kwh|f2 }}</td><td>{{ '%.0f %%'|format(m.solar_anteil) if m.solar_anteil is not none else '–' }}</td>
@@ -531,7 +567,9 @@ def sammler():
                            preis=sum(l["preis_s"] for l in ls) if any(l["preis"] is not None for l in ls) else None))
     monat = request.args.get("monat", "")
     ladungen = [l for l in alle if not monat or l["monat"] == monat][:300]
-    return page("Datensammler", render_template_string(SAMMLER, s=collector.status(), monate=monate, ladungen=ladungen, monat=monat))
+    return page("Datensammler", render_template_string(SAMMLER, s=collector.status(), monate=monate, ladungen=ladungen, monat=monat,
+                                                           naechster=collector.naechster.strftime("%H:%M") if collector.naechster else None,
+                                                           evcc_naechster=collector.evcc_naechster.strftime("%H:%M") if collector.evcc_naechster else None))
 
 
 # --- Einstellungen ------------------------------------------------------------
@@ -560,6 +598,45 @@ def einstellungen():
         log.info("vzev.yaml direkt bearbeitet")
         return redirect("einstellungen?tab=datei&msg=Gespeichert")
     return page("Einstellungen", render_template_string(seiten.EINST_TABS, tab="datei") + render_template_string(EINST, text=CFG.read_text(encoding="utf-8")))
+
+
+# --- Status und Warteseite ------------------------------------------------------
+BRAUCHT_BERECHNUNG = {"index", "verlauf", "abschluss", "primeo", "sammler", "import_page"}
+
+
+@app.get("/status")
+def status():
+    jetzt = time.time()
+    hm = lambda t: datetime.fromtimestamp(t).strftime("%H:%M") if t else None
+    return {
+        "rechnen": {"aktiv": RECHNEN["aktiv"], "seit": (jetzt - RECHNEN["start"]) if RECHNEN["aktiv"] else 0,
+                    "grund": RECHNEN["grund"], "letzte": hm(RECHNEN["ende"]), "dauer": RECHNEN["dauer"],
+                    "fehler": RECHNEN["fehler"], "veraltet": veraltet()},
+        "sammler": {"aktiv": collector.aktiv, "naechster": collector.naechster.strftime("%H:%M") if collector.naechster else None,
+                    "evcc_naechster": collector.evcc_naechster.strftime("%H:%M") if collector.evcc_naechster else None},
+    }
+
+
+WARTEN = """<div class="card" id="warten" style="text-align:center;padding:40px 20px">
+<div class="spin" style="width:28px;height:28px;border-width:3px;color:var(--amber)"></div>
+<h2 style="margin-top:16px">Berechnung läuft</h2>
+<p class="muted">{{ grund }} – die Primeo-Lastgänge werden neu eingelesen und gerechnet (<span id="wartezeit">0 s</span>).<br>
+Die Seite lädt automatisch, sobald alles fertig ist.</p></div>"""
+
+
+@app.before_request
+def auf_berechnung_warten():
+    """Seiten mit Berechnung blockieren nicht: kurz warten, sonst Warteseite mit Fortschritt zeigen."""
+    if request.method != "GET" or request.endpoint not in BRAUCHT_BERECHNUNG or not veraltet():
+        return None
+    if not _rechnen.locked():
+        im_hintergrund_rechnen("Dateien oder Einstellungen geändert")
+    ende = time.time() + 1.5
+    while time.time() < ende:
+        time.sleep(0.1)
+        if not veraltet() and not _rechnen.locked():
+            return None
+    return page("Bitte warten", render_template_string(WARTEN, grund=RECHNEN.get("grund") or "Neu rechnen"))
 
 
 seiten.register(app, sys.modules[__name__])
@@ -605,5 +682,5 @@ if __name__ == "__main__":
     import logging
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     log.info("App gestartet (Version %s). Daten in %s, %d Dateien im Import", VERSION, DATA, sum(1 for p in PRIMEO.iterdir() if p.is_file()))
-    im_hintergrund_rechnen()
+    im_hintergrund_rechnen("App-Start")
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8099)), threaded=True)

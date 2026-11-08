@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.8
+
+- Statusanzeige oben neben der Version: «Berechnung läuft (12 s)», «Zählerstände abrufen», «evcc-Ladevorgänge abrufen» oder «bereit · gerechnet 13:03». Aktualisiert sich von selbst.
+- Seiten mit Berechnung warten nicht mehr blind: Läuft die Berechnung länger als 1.5 s, erscheint eine Warteseite mit Fortschritt, die automatisch lädt, sobald alles fertig ist.
+- Knöpfe zeigen beim Absenden, dass etwas läuft (z. B. «Rechnungen werden erstellt …», «Zählerstände und evcc werden abgerufen …») und lassen sich nicht doppelt drücken.
+- Datensammler zeigt, wann der nächste Abruf der Zählerstände und von evcc kommt.
+
 ## 0.3.7
 
 - Handy: Werte in den Karten bleiben zusammen und rechtsbündig (z. B. «2'813.600 kWh», Name und Entität im Datensammler).
