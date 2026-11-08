@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.4
+
+- Verlauf: neue Spalte «Verbrauch kWh» (Solar + Netz HT + Netz NT) pro Monat und in der Summe, für alle Zähler. Im Diagramm zeigt der Tooltip zuerst den Verbrauch gesamt, dann Solar und Netz.
+
 ## 0.3.3
 
 - Korrektur: Der Wallbox-Export mit Sekunden («11.05.2026 08:26:31») wurde in Home Assistant nicht gelesen. Die Ladestation war deshalb 0 und blieb im Allgemeinstrom. Das Datum wird jetzt unabhängig von der pandas-Version gelesen.

@@ -23,7 +23,7 @@ def _zahl(x, nachkomma=0):
     return t
 
 
-def saeulen(labels, reihen, einheit="kWh", vorlaeufig=(), hoehe=260, aktiv=None, links=None):
+def saeulen(labels, reihen, einheit="kWh", vorlaeufig=(), hoehe=260, aktiv=None, links=None, summe=None):
     """Gestapelte Säulen. reihen = [(name, farbe, werte)], vorlaeufig = Indizes, die heller und mit * erscheinen."""
     n = len(labels)
     if not n:
@@ -58,6 +58,8 @@ def saeulen(labels, reihen, einheit="kWh", vorlaeufig=(), hoehe=260, aktiv=None,
             else:
                 teile.append(f'<rect x="{x:.1f}" y="{y0 - h:.1f}" width="{saeule:.1f}" height="{h:.1f}" fill="{farbe}"{op}/>')
             basis += v
+        if summe:  # z. B. «Verbrauch gesamt»
+            tip.append(f"{summe}: {_zahl(sum((w[i] or 0) for _, _, w in reihen), 1)} {einheit}")
         for name, _, w in reihen:
             tip.append(f"{name}: {_zahl(w[i] or 0, 1)} {einheit}")
         cls = "hit on" if aktiv == i else "hit"

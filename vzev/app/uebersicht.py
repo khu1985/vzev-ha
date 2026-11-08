@@ -256,14 +256,14 @@ VERLAUF = diagramme.STIL + """
  <div class="kpi"><div>Autarkie</div><div>{{ '%.1f'|format(tot.autarkie) }} <small>%</small></div></div>
  <div class="kpi"><div>{{ 'Ersparnis ggü. Netz' if z == 'EV' else 'Eigenverbrauch' if z == '2OG' else 'Verrechnet' }}</div><div>{{ tot.betrag|f2 }} <small>CHF</small></div></div>
 </div>
-<div class="card"><h2>Pro Monat</h2>{{ chart|safe }}<p class="muted">kWh. * vorläufig.</p></div>
+<div class="card"><h2>Verbrauch pro Monat</h2>{{ chart|safe }}<p class="muted">kWh, Säulenhöhe = Verbrauch gesamt (Solar + Netz). * vorläufig.</p></div>
 <div class="card"><div class="scroll"><table>
-<tr><th class="l">Monat</th><th>Solar kWh</th><th>Netz HT</th><th>Netz NT</th><th>Solar CHF</th><th>Netz CHF</th>{% if gp %}<th>Grundpreis*</th>{% endif %}<th>Total CHF</th><th>Autarkie</th><th class="l">Status</th></tr>
-{% for r in zeilen %}{% if r.gruppe %}<tr><td class="l" colspan="10" style="background:var(--bg);font-weight:600">{{ r.gruppe }}</td></tr>{% endif %}
-<tr><td class="l">{{ r.label }}</td><td>{{ r.solar|f2 }}</td><td>{{ r.ht|f2 }}</td><td>{{ r.nt|f2 }}</td><td>{{ r.solar_chf|f2 }}</td><td>{{ r.netz_chf|f2 }}</td>
+<tr><th class="l">Monat</th><th>Verbrauch kWh</th><th>Solar kWh</th><th>Netz HT</th><th>Netz NT</th><th>Solar CHF</th><th>Netz CHF</th>{% if gp %}<th>Grundpreis*</th>{% endif %}<th>Total CHF</th><th>Autarkie</th><th class="l">Status</th></tr>
+{% for r in zeilen %}{% if r.gruppe %}<tr><td class="l" colspan="11" style="background:var(--bg);font-weight:600">{{ r.gruppe }}</td></tr>{% endif %}
+<tr><td class="l">{{ r.label }}</td><td><b>{{ r.verbrauch|f2 }}</b></td><td>{{ r.solar|f2 }}</td><td>{{ r.ht|f2 }}</td><td>{{ r.nt|f2 }}</td><td>{{ r.solar_chf|f2 }}</td><td>{{ r.netz_chf|f2 }}</td>
 {% if gp %}<td>{{ r.gp|f2 }}</td>{% endif %}<td><b>{{ r.total|f2 }}</b></td><td>{{ '%.1f %%'|format(r.autarkie) if r.autarkie is not none else '–' }}</td>
 <td class="l"><span class="pill {{ 'ok' if r.status == 'abgeschlossen' else 'warn' if r.status == 'vorläufig' else '' }}">{{ r.status }}</span></td></tr>{% endfor %}
-<tr class="sum"><td class="l">Summe</td><td>{{ tot.solar|f2 }}</td><td>{{ tot.ht|f2 }}</td><td>{{ tot.nt|f2 }}</td><td>{{ tot.solar_chf|f2 }}</td><td>{{ tot.netz_chf|f2 }}</td>{% if gp %}<td>{{ tot.gp|f2 }}</td>{% endif %}<td>{{ tot.total|f2 }}</td><td>{{ '%.1f %%'|format(tot.autarkie) }}</td><td></td></tr>
+<tr class="sum"><td class="l">Summe</td><td>{{ tot.verbrauch|f2 }}</td><td>{{ tot.solar|f2 }}</td><td>{{ tot.ht|f2 }}</td><td>{{ tot.nt|f2 }}</td><td>{{ tot.solar_chf|f2 }}</td><td>{{ tot.netz_chf|f2 }}</td>{% if gp %}<td>{{ tot.gp|f2 }}</td>{% endif %}<td>{{ tot.total|f2 }}</td><td>{{ '%.1f %%'|format(tot.autarkie) }}</td><td></td></tr>
 </table></div>{% if gp %}<p class="muted">* Grundpreis Netznutzung anteilig, Messtarif, Konzessionsabgabe{{ ', beim 1. OG anteilig zur Mietdauer' if z == '1OG' }}.</p>{% endif %}
 {% if z == 'EV' %}<p class="muted">Total = was der Solarstrom zum Netztarif gekostet hätte (Ersparnis); Netz CHF = tatsächliche Netzkosten der Ladestation.</p>{% endif %}</div>
 {% endif %}"""
@@ -292,7 +292,7 @@ def verlauf():
         status = "abgeschlossen" if str(p) in a["monate"] else ("vorläufig" if mon.loc[p, "vorlaeufig"] else "offen")
         gruppe = _parteien(cfg, p) if z == "1OG" else None
         zeilen.append(dict(gruppe=gruppe if gruppe != gruppe_alt else None, label=_titel(p) + ("*" if mon.loc[p, "vorlaeufig"] else ""),
-                           solar=r.solar, ht=r.ht, nt=r.nt, solar_chf=r.solar_chf, netz_chf=r.netz_chf, gp=gp, total=total,
+                           verbrauch=tot, solar=r.solar, ht=r.ht, nt=r.nt, solar_chf=r.solar_chf, netz_chf=r.netz_chf, gp=gp, total=total,
                            autarkie=r.solar / tot * 100 if tot else None, status=status))
         gruppe_alt = gruppe
     tot = {k: sum(x[k] for x in zeilen) for k in ("solar", "ht", "nt", "solar_chf", "netz_chf", "gp", "total")}
@@ -303,7 +303,7 @@ def verlauf():
     vorl = {j for j, p in enumerate(perioden) if mon.loc[p, "vorlaeufig"]}
     chart = diagramme.saeulen([_ml(p) for p in perioden],
                               [("Solar", diagramme.FARBEN["solar"], list(s["solar"])), ("Netz", diagramme.FARBEN["netz"], list(s["ht"] + s["nt"]))],
-                              vorlaeufig=vorl, hoehe=220)
+                              vorlaeufig=vorl, hoehe=220, summe="Verbrauch gesamt")
     return S.page("Verlauf", render_template_string(VERLAUF, ok=True, zl=ZL, z=z, zeilen=zeilen, tot=tot, chart=chart, gp=z in ("1OG", "AllgC")))
 
 
