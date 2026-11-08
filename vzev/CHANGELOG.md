@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.6
+
+- Eigenes AppArmor-Profil: Die App darf nur noch in ihren Datenordner (/config), /data, /tmp und /run schreiben. Hebt die Sicherheitsbewertung in Home Assistant von 7 auf 8.
+
 ## 0.3.5
 
 - Handy: Tabellen werden zu Karten mit Beschriftung pro Wert (Import, Abschluss, Verbraucher, Abgleich, Datensammler, Rechnungen, Protokoll).

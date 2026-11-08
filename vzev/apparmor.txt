@@ -1,0 +1,29 @@
+#include <tunables/global>
+
+# AppArmor-Profil der vZEV-App (Name = slug).
+# Lesen und Ausführen im Container ist erlaubt; geschrieben werden darf nur dort,
+# wo die App Daten ablegt (/config), Optionen liest (/data) oder Laufzeitdateien braucht.
+profile vzev flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  capability,
+  network,
+  signal,
+  unix,
+
+  # Programme, Bibliotheken, App-Code: lesen und ausführen
+  /** rix,
+
+  # Schreiben nur hier
+  /config/** rwk,
+  /config/ rw,
+  /data/** rwk,
+  /tmp/** rwk,
+  /tmp/ rw,
+  /run/** rwk,
+  /var/run/** rwk,
+  /dev/** rw,
+  owner /proc/** rw,
+  /proc/** r,
+  /sys/** r,
+}
