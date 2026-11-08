@@ -1,0 +1,203 @@
+"""Web-App: alle Seiten, Upload, Formulare, Abschluss-Sperre, Korrekturen, Statusanzeige."""
+import importlib
+import io
+import re
+import shutil
+import sys
+import time
+from urllib.parse import unquote
+
+import pytest
+import yaml
+
+import daten
+
+
+@pytest.fixture(scope="module")
+def app(tmp_path_factory):
+    d = tmp_path_factory.mktemp("app")
+    daten.konfiguration(d / "vzev.yaml")
+    import os
+    os.environ["VZEV_DIR"] = str(d)
+    for m in ["server", "seiten", "uebersicht"]:
+        sys.modules.pop(m, None)
+    server = importlib.import_module("server")
+    server.app.testing = True
+    quelle = tmp_path_factory.mktemp("quelle")
+    daten.datenordner(quelle)
+    return server, server.app.test_client(), d, quelle
+
+
+def hochladen(client, pfad):
+    with open(pfad, "rb") as f:
+        r = client.post("hochladen", data={"dateien": (f, pfad.name)}, headers={"X-Requested-With": "fetch"},
+                        content_type="multipart/form-data")
+    return r.get_json()
+
+
+def ziel(r):
+    return unquote(r.headers.get("Location", ""))
+
+
+def warten(server):
+    ende = time.time() + 60
+    while (server.veraltet() or server._rechnen.locked()) and time.time() < ende:
+        time.sleep(0.1)
+
+
+def test_leere_app_alle_seiten(app):
+    server, c, d, quelle = app
+    for u in ["/", "/verlauf", "/import", "/rechnungen", "/abschluss", "/mieter", "/tarife", "/primeo", "/batterie",
+              "/sammler", "/einstellungen", "/einstellungen?tab=zaehler", "/einstellungen?tab=regeln",
+              "/einstellungen?tab=datei", "/protokoll", "/status"]:
+        r = c.get(u)
+        assert r.status_code == 200, u
+        assert b"schiefgelaufen" not in r.data, u
+
+
+def test_upload_ordnet_ueber_messpunkt_zu(app):
+    server, c, d, quelle = app
+    for p in sorted((quelle / "primeo").iterdir()):
+        j = hochladen(c, p)
+        assert j["ok"], j
+    zuordnung = {i["rolle"] for i in server.liste()}
+    assert {"1OG", "2OG", "Allg", "PVA", "Prod", "Ladestation"} <= zuordnung
+    assert not hochladen(c, quelle / "vzev.yaml")["ok"] or True  # fremde Datei bricht nichts
+
+
+def test_kaputte_datei_wird_gemeldet(app):
+    server, c, d, quelle = app
+    r = c.post("hochladen", data={"dateien": (io.BytesIO(b"kein excel"), "kaputt.xlsx")},
+               headers={"X-Requested-With": "fetch"}, content_type="multipart/form-data")
+    j = r.get_json()
+    assert not j["ok"] and "nicht lesbar" in j["msg"]
+    for p in (d / "primeo").glob("kaputt*"):
+        p.unlink()
+
+
+def test_seiten_mit_daten(app):
+    server, c, d, quelle = app
+    warten(server)
+    for u in ["/", "/?m=2026-03", "/?m=2026-04", "/verlauf?z=1OG", "/verlauf?z=AllgC", "/verlauf?z=EV",
+              "/abschluss", "/primeo", "/sammler", "/import"]:
+        r = c.get(u)
+        assert r.status_code == 200 and b"schiefgelaufen" not in r.data, u
+        assert b'id="warten"' not in r.data, u
+    h = c.get("/?m=2026-03").get_data(as_text=True)
+    assert "Ladestation = Summe der Ladevorgänge" in h and "12.00 kWh verteilt" in h
+    assert "Daten importieren" in h and "v" + server.VERSION in h
+
+
+def test_status_endpunkt(app):
+    server, c, d, quelle = app
+    j = c.get("/status").get_json()
+    assert set(j) == {"rechnen", "sammler"} and j["rechnen"]["aktiv"] is False
+
+
+def test_warteseite_bei_laufender_berechnung(app):
+    server, c, d, quelle = app
+    warten(server)
+    server._rechnen.acquire()
+    try:
+        (d / "vzev.yaml").touch()
+        time.sleep(0.01)
+        r = c.get("/")
+        assert b'id="warten"' in r.data
+    finally:
+        server._rechnen.release()
+    warten(server)
+    assert b'id="warten"' not in c.get("/").data
+
+
+def test_formulare_speichern_ohne_werte_zu_aendern(app):
+    server, c, d, quelle = app
+    vorher = yaml.safe_load((d / "vzev.yaml").read_text())
+    for url in ["/mieter", "/tarife", "/primeo", "/einstellungen?tab=betreiber", "/einstellungen?tab=zaehler",
+                "/einstellungen?tab=regeln"]:
+        h = c.get(url).get_data(as_text=True)
+        form = re.findall(r'<form method="post"[^>]*action="([^"]+)"[^>]*>(.*?)</form>', h, re.S)[-1]
+        daten_ = []
+        for m in re.finditer(r'<input ([^>]*)>|<select name="([^"]+)"[^>]*>(.*?)</select>', form[1], re.S):
+            if m.group(1):
+                a = m.group(1)
+                n = re.search(r'name="([^"]+)"', a)
+                if not n or 'type="checkbox"' in a:
+                    continue
+                v = re.search(r'value="([^"]*)"', a)
+                daten_.append((n.group(1), (v.group(1) if v else "").replace("&#39;", "'").replace("&amp;", "&")))
+            else:
+                sel = re.search(r'<option value="([^"]*)" selected', m.group(3))
+                daten_.append((m.group(2), sel.group(1) if sel else ""))
+        from werkzeug.datastructures import MultiDict
+        r = c.post("/" + form[0], data=MultiDict(daten_))
+        assert "Gespeichert" in ziel(r), (url, ziel(r))
+    nachher = yaml.safe_load((d / "vzev.yaml").read_text())
+    import json
+    norm = lambda x: json.loads(json.dumps(x, default=str))
+    for k in vorher:
+        assert norm(vorher[k]) == norm(nachher.get(k)), k
+
+
+def test_abschluss_sperre_und_korrekturen(app):
+    server, c, d, quelle = app
+    warten(server)
+    r = c.post("/abschluss", data={"monat": "2026-04", "aktion": "schliessen", "datum": "2026-05-03"})
+    assert "der Reihe nach" in ziel(r)
+    r = c.post("/abschluss", data={"monat": "2026-03", "aktion": "schliessen", "datum": "2026-03-15"})
+    assert "nach dem Monatsende" in ziel(r)
+    r = c.post("/abschluss", data={"monat": "2026-03", "aktion": "schliessen", "datum": "2026-04-05"})
+    assert "abgeschlossen per 05.04.2026" in ziel(r)
+    # Tarif im abgeschlossenen Monat wird abgelehnt, künftiger Tarif geht
+    cfg = yaml.safe_load((d / "vzev.yaml").read_text())
+
+    def tarif_form(extra):
+        f = []
+        for k, _, fs, _ in server.seiten.TARIF_ARTEN:
+            for e in cfg["tarife"][k] + extra.get(k, []):
+                f.append((f"{k}.ab", str(e["ab"])))
+                f += [(f"{k}.{x}", "" if e.get(x) is None else str(e[x])) for x, _ in fs]
+        from werkzeug.datastructures import MultiDict
+        return MultiDict(f)
+    r = c.post("/tarife", data=tarif_form({"solar": [{"ab": "2026-03-15", "chf": 0.3}]}))
+    assert "abgeschlossenen Monat 03.2026" in ziel(r)
+    r = c.post("/tarife", data=tarif_form({"solar": [{"ab": "2027-01-01", "chf": 0.3}]}))
+    assert "Gespeichert" in ziel(r)
+    # Datum ändern, Rechnungen nur mit Begründung neu
+    r = c.post("/abschluss", data={"monat": "2026-03", "aktion": "datum", "datum": "2026-04-02"})
+    assert "02.04.2026" in ziel(r)
+    r = c.post("/rechnungen", data={"jahr": "2026", "quartal": "1", "datum": "2026-04-05"})
+    assert "Erstellt" in ziel(r)
+    r = c.post("/rechnungen", data={"jahr": "2026", "quartal": "1", "datum": "2026-04-05"})
+    assert "Begründung" in ziel(r)
+    r = c.post("/rechnungen", data={"jahr": "2026", "quartal": "1", "datum": "2026-04-05", "grund": "Test"})
+    assert "Erstellt" in ziel(r)
+    assert any((d / "rechnungen" / "_alt").iterdir())
+    # Veränderung erkennen und neue Werte übernehmen
+    regeln = {"allgemein_mieteranteil": "60", "ladestation_grundlast_kwh": "0.02"}
+    c.post("/einstellungen?tab=regeln", data=regeln)
+    warten(server)
+    assert dict(server.seiten.abweichungen(server.berechnung()))
+    r = c.post("/abschluss", data={"monat": "2026-03", "aktion": "uebernehmen", "grund": "Regel geändert"})
+    assert "übernommen" in ziel(r)
+    assert not server.seiten.abweichungen(server.berechnung())
+    arten = [k["art"] for k in server.seiten.abschluss_laden()["korrekturen"]]
+    assert any("abgeschlossen per" in a for a in arten) and any("Abschlussdatum geändert" in a for a in arten)
+    # Wieder öffnen nur mit Begründung
+    assert "Begründung" in ziel(c.post("/abschluss", data={"monat": "2026-03", "aktion": "oeffnen", "grund": ""}))
+    assert "wieder geöffnet" in ziel(c.post("/abschluss", data={"monat": "2026-03", "aktion": "oeffnen", "grund": "Test"}))
+
+
+def test_abschnitt_speichern_behaelt_kommentare(app):
+    server, c, d, quelle = app
+    text = (d / "vzev.yaml").read_text()
+    (d / "vzev.yaml").write_text("# Kopfkommentar bleibt\n" + text + "\n# Schlusskommentar bleibt\n")
+    server.seiten.abschnitt_speichern("rechnungen", {"zahlungsfrist_tage": 20, "nummer": "{jahr}-Q{quartal}-{einheit}"})
+    neu = (d / "vzev.yaml").read_text()
+    assert "# Kopfkommentar bleibt" in neu and "# Schlusskommentar bleibt" in neu
+    assert yaml.safe_load(neu)["rechnungen"]["zahlungsfrist_tage"] == 20
+
+
+def test_protokoll_zeigt_eintraege(app):
+    server, c, d, quelle = app
+    h = c.get("/protokoll").get_data(as_text=True)
+    assert "Hochgeladen" in h

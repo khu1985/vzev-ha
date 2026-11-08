@@ -49,14 +49,18 @@ def abschnitt_speichern(name, wert, kommentar=None):
     if start is None:
         zeilen += [""] + neu
     else:
-        ende = next((i for i in range(start + 1, len(zeilen)) if zeilen[i][:1] not in ("", " ", "#")), len(zeilen))
+        # nächster Abschnitt = nächste Zeile, die mit einem Schlüssel beginnt (Listen dürfen auch ganz links stehen)
+        ende = next((i for i in range(start + 1, len(zeilen)) if zeilen[i][:1] not in ("", " ", "\t", "#", "-")), len(zeilen))
         while ende > start + 1 and (zeilen[ende - 1].startswith("#") or not zeilen[ende - 1].strip()):
             ende -= 1  # Kommentare direkt vor dem nächsten Abschnitt gehören zu diesem
         if kommentar and start > 0 and zeilen[start - 1].startswith("#"):
             start -= 1
         zeilen[start:ende] = neu + ([""] if ende < len(zeilen) else [])
     ergebnis = "\n".join(zeilen) + "\n"
-    geprueft = yaml.safe_load(ergebnis)
+    try:
+        geprueft = yaml.safe_load(ergebnis)
+    except yaml.YAMLError as e:
+        raise ValueError(f"Speichern hätte vzev.yaml unlesbar gemacht – abgebrochen ({e.problem})")
     if _norm(geprueft.get(name)) != _norm(wert):
         raise ValueError("Speichern hätte die Datei verändert – abgebrochen")
     shutil.copy(S.CFG, S.CFG.with_suffix(".yaml.bak"))

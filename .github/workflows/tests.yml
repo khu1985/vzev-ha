@@ -1,0 +1,54 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  home-assistant:
+    # Gleiche Basis und gleiche Paketversionen wie die App im Home Assistant (Debian bookworm, apt)
+    name: Wie im Home Assistant (Debian-Pakete)
+    runs-on: ubuntu-latest
+    container: ghcr.io/home-assistant/amd64-base-debian:bookworm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pakete aus dem Dockerfile installieren
+        run: |
+          PAKETE=$(grep -o 'python3[a-z0-9-]*' vzev/Dockerfile | sort -u | tr '\n' ' ')
+          echo "Pakete: $PAKETE"
+          apt-get update
+          apt-get install -y --no-install-recommends $PAKETE python3-pytest
+          python3 -c "import pandas, numpy, openpyxl, reportlab, matplotlib, flask; print('pandas', pandas.__version__, 'numpy', numpy.__version__)"
+      - name: Tests
+        env:
+          MPLCONFIGDIR: /tmp/matplotlib
+        run: python3 -m pytest tests -q
+
+  aktuell:
+    # Neueste Versionen: zeigt früh, wenn ein künftiges Update der Pakete etwas bricht
+    name: Neueste Paketversionen
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pandas openpyxl pyyaml reportlab matplotlib flask requests pytest
+      - run: python -m pytest tests -q
+
+  image:
+    name: App-Image bauen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Docker-Image wie im Home Assistant bauen
+        run: docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base-debian:bookworm -t vzev-test vzev
+      - name: App startet und antwortet
+        run: |
+          mkdir -p /tmp/vzev && cp tests/../vzev/app/default_config.yaml /tmp/vzev/vzev.yaml
+          docker run -d --name vzev -p 8099:8099 -v /tmp/vzev:/config --entrypoint python3 -e VZEV_DIR=/config -w /app vzev-test server.py
+          for i in $(seq 1 30); do curl -sf http://localhost:8099/status && break; sleep 2; done
+          curl -sf http://localhost:8099/ | grep -q "vZEV"
+          docker logs vzev | tail -20

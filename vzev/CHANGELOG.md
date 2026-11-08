@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.12
+
+- Automatische Tests (44 Fälle) für Rechenkern, Rechnungen, Vorschau und Web-App; GitHub prüft jede Änderung im gleichen Debian-Image wie Home Assistant.
+- Korrektur (von den Tests gefunden): Formulare konnten vzev.yaml beschädigen, wenn Listen in der Datei ganz links ohne Einrückung stehen. Ausserdem bricht das Speichern jetzt mit einer Meldung ab, statt eine unlesbare Datei zu schreiben.
+
 ## 0.3.11
 
 - Handy, Lesbarkeit: Kennzahlen zweispaltig, grössere Abstände zwischen den Einträgen der Karten, erste Zeile jeder Karte hervorgehoben, Hinweistexte etwas grösser, mehr Zeilenabstand.

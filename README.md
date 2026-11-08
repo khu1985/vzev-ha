@@ -179,6 +179,20 @@ flowchart LR
 
 Alles liegt im Konfigurationsordner der App und ist im Home-Assistant-Backup enthalten.
 
+## Tests
+
+`tests/` prüft Rechenkern, Rechnungen, Vorschau und Web-App mit erfundenen Daten (keine echten Messpunkte oder Namen).
+Die Werte sind so gewählt, dass sich die Ergebnisse von Hand nachrechnen lassen, z. B. Energieerhaltung pro Viertelstunde,
+Ladestation vollständig verteilt, Grundpreis nach Miettagen, Sperre abgeschlossener Monate.
+
+GitHub führt die Tests bei jeder Änderung aus (`.github/workflows/tests.yml`):
+
+- **Wie im Home Assistant:** im gleichen Debian-Basisimage mit den gleichen Paketversionen wie die App (dort läuft z. B. eine ältere pandas-Version)
+- **Neueste Paketversionen:** zeigt früh, wenn künftige Versionen etwas brechen
+- **App-Image bauen:** baut das Docker-Image wie Home Assistant und prüft, dass die App startet
+
+Lokal: `python3 -m pytest tests`
+
 ## Änderungen
 
 Siehe [vzev/CHANGELOG.md](vzev/CHANGELOG.md).
