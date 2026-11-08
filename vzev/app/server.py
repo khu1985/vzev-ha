@@ -286,12 +286,19 @@ app.jinja_env.filters["d"] = lambda t: "" if t is None else pd.Timestamp(t).strf
 
 # --- Layout -------------------------------------------------------------------
 BASE = """<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>vZEV · {{ title }}</title><style>
-:root{--ink:#16201C;--muted:#5B6660;--line:#E2E5E1;--bg:#F6F7F5;--amber:#E8A21B;--soft:#FDF3DF;--ok:#23603A;--okbg:#E3F1E8;--warn:#8A4307;--warnbg:#FCEBD9;--blue:#3B5B8C}
+<title>vZEV · {{ title }}</title>
+<script>(function(){var t='auto';try{t=localStorage.getItem('vzev-theme')||'auto'}catch(e){}
+var d=t==='dark'||(t==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.setAttribute('data-theme',d?'dark':'light');
+document.documentElement.setAttribute('data-wahl',t)})();</script><style>
+:root{--ink:#16201C;--muted:#5B6660;--line:#E2E5E1;--bg:#F6F7F5;--amber:#E8A21B;--soft:#FDF3DF;--ok:#23603A;--okbg:#E3F1E8;--warn:#8A4307;--warnbg:#FCEBD9;--blue:#3B5B8C;
+ --card:#fff;--line2:#EEF0EC;--rand:#D3D8D2;--nav:#3F4A44;--auf:#fff;--link:#1D5FB4;color-scheme:light}
+html[data-theme=dark]{--ink:#E6EBE8;--muted:#9AA6A0;--line:#2C3531;--bg:#111614;--amber:#E8A21B;--soft:#3A2F15;--ok:#86D6A6;--okbg:#173527;--warn:#F2B47C;--warnbg:#3D2816;--blue:#8FB0E0;
+ --card:#1A211E;--line2:#232B27;--rand:#3A4440;--nav:#C8D0CB;--auf:#111614;--link:#8DB8F2;color-scheme:dark}
+a{color:var(--link)}nav a,.btn{color:var(--nav)}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
 main{max-width:1180px;margin:0 auto;padding:24px;min-width:0;width:100%}
-.side{background:#fff}.top{display:flex;align-items:center;gap:10px}.brand{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}.ver{color:var(--muted);font-size:12px;font-weight:500}
-nav a{color:#3F4A44;text-decoration:none;padding:8px 10px;border-radius:8px;font-weight:500;white-space:nowrap}nav a.on{background:var(--soft);color:var(--ink)}nav a:hover{background:var(--bg)}
+.side{background:var(--card)}.top{display:flex;align-items:center;gap:10px}.brand{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}.ver{color:var(--muted);font-size:12px;font-weight:500}
+nav a{color:var(--nav);text-decoration:none;padding:8px 10px;border-radius:8px;font-weight:500;white-space:nowrap}nav a.on{background:var(--soft);color:var(--ink)}nav a:hover{background:var(--bg)}
 nav .gl{display:none;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
 #menu{display:none;min-height:40px;margin-left:auto;flex-shrink:0}
 @media (min-width:1200px){.app{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
@@ -304,18 +311,27 @@ nav .gl{display:none;font-size:11px;text-transform:uppercase;letter-spacing:.06e
  .side{padding:10px 16px}.side.offen nav{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;padding:8px 0 12px;max-height:calc(100vh - 70px);overflow-y:auto}
  .side.offen nav .grp{display:block;border:0;margin:0;padding:0}.side.offen nav .gl{display:block;margin:10px 10px 2px}.side.offen nav a{display:block}
  main{padding:16px}h1{font-size:22px}.card{padding:16px}}
-h1{font-size:26px;margin:4px 0 16px}h2{font-size:16px;margin:0 0 12px}.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:20px}
+h1{font-size:26px;margin:4px 0 16px}h2{font-size:16px;margin:0 0 12px}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:20px}
 .scroll{overflow-x:auto}table{border-collapse:collapse;width:100%}th{font-size:12px;color:var(--muted);text-align:right;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
-td{padding:9px 10px;border-bottom:1px solid #EEF0EC;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}th:first-child,td:first-child,.l{text-align:left}
+td{padding:9px 10px;border-bottom:1px solid var(--line2);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}th:first-child,td:first-child,.l{text-align:left}
 .sum td{font-weight:700;background:var(--bg)}.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600}
 .ok{background:var(--okbg);color:var(--ok)}.warn{background:var(--warnbg);color:var(--warn)}.muted{color:var(--muted);font-size:12px}
-button,.btn{min-height:40px;padding:0 16px;border:1px solid #D3D8D2;border-radius:8px;background:#fff;font:inherit;font-weight:600;cursor:pointer;color:var(--ink);text-decoration:none;display:inline-flex;align-items:center}
-.primary{background:var(--ink);color:#fff;border-color:var(--ink)}.danger{color:var(--warn);border-color:#E8C9B0}
-input,select,textarea{font:inherit;padding:8px 10px;border:1px solid #D3D8D2;border-radius:8px}textarea{width:100%;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+button,.btn{min-height:40px;padding:0 16px;border:1px solid var(--rand);border-radius:8px;background:var(--card);font:inherit;font-weight:600;cursor:pointer;color:var(--ink);text-decoration:none;display:inline-flex;align-items:center}
+.primary{background:var(--ink);color:var(--auf);border-color:var(--ink)}.danger{color:var(--warn);border-color:#E8C9B0}
+input,select,textarea{font:inherit;padding:8px 10px;border:1px solid var(--rand);border-radius:8px;background:var(--card);color:var(--ink)}textarea{width:100%;font-family:ui-monospace,Menlo,monospace;font-size:12px}
 .msg{padding:12px 16px;border-radius:10px;margin-bottom:16px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
-.kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px}.kpi div:first-child{color:var(--muted);font-size:13px}.kpi div:last-child{font-size:22px;font-weight:600;margin-top:4px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}.kpi div:first-child{color:var(--muted);font-size:13px}.kpi div:last-child{font-size:22px;font-weight:600;margin-top:4px}
 .kpi .v{font-size:24px;font-weight:600;margin-top:4px}.kpi .v small{font-size:13px;font-weight:500;color:var(--muted)}.kpi div.s{font-size:12px;font-weight:400;color:var(--muted);margin-top:4px}
 form.inline{display:inline}
+html[data-theme=dark] .chart .grid{stroke:var(--line)}html[data-theme=dark] .chart .ax{fill:var(--muted)}html[data-theme=dark] .chart .ax.b{fill:var(--ink)}
+html[data-theme=dark] .chart .hit:hover,html[data-theme=dark] .chart .hit.on{fill:rgba(255,255,255,.06)}
+html[data-theme=dark] svg circle[fill="#fff"]{fill:var(--card)}html[data-theme=dark] svg [stroke="#fff"]{stroke:var(--card)}
+html[data-theme=dark] svg text[fill="#16201C"]{fill:var(--ink)}html[data-theme=dark] svg text[fill="#5B6660"],html[data-theme=dark] .fluss .kt{fill:var(--muted)}
+html[data-theme=dark] svg [stroke="#16201C"]{stroke:var(--ink)}html[data-theme=dark] svg [stroke="#C9CEC8"]{stroke:#4A5550}
+html[data-theme=dark] .hb-s{background:var(--line2)!important}html[data-theme=dark] .legende{color:var(--nav)}
+html[data-theme=dark] img.pdfvorschau{filter:none}
+html[data-theme=dark] #tip{background:#2A332F;border:1px solid #3A4440}html[data-theme=dark] .neu-hinweis{border:1px solid #3A4440}
+#thema{min-height:30px;padding:0 10px;font-size:12px;font-weight:600;border-radius:999px}
 /* Tabellen auf dem Handy: Zeilen als Karten mit Beschriftung, breite Monatstabellen scrollen mit fester erster Spalte */
 @media (max-width:759px){
  .scroll>table:not(.wide),table.form{min-width:0}
@@ -335,7 +351,7 @@ form.inline{display:inline}
  table.edit input,table.edit select,table.form input,table.form select{width:100%!important;min-width:0}
  table.form tr{padding:8px 0}table.form td{display:block!important;text-align:left;padding:2px 0}
  table.form td:first-child{color:var(--muted);font-size:13px}
- table.wide th:first-child,table.wide td:first-child{position:sticky;left:0;background:#fff;z-index:1}
+ table.wide th:first-child,table.wide td:first-child{position:sticky;left:0;background:var(--card);z-index:1}
  td.akt{min-width:0!important}
  table.edit td label{display:inline-flex;align-items:center;gap:6px;justify-self:start}
  .chart .ax{font-size:19px!important}
@@ -377,12 +393,12 @@ form#up{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 }
 
 a.ver{text-decoration:none}a.ver:hover{text-decoration:underline;color:var(--ink)}
-.neu-hinweis{position:fixed;right:16px;bottom:16px;max-width:420px;background:var(--ink);color:#fff;padding:12px 40px 12px 16px;border-radius:12px;font-size:13px;line-height:1.45;z-index:30;box-shadow:0 6px 24px rgba(0,0,0,.18)}
+.neu-hinweis{position:fixed;right:16px;bottom:16px;max-width:420px;background:#16201C;color:#fff;padding:12px 40px 12px 16px;border-radius:12px;font-size:13px;line-height:1.45;z-index:30;box-shadow:0 6px 24px rgba(0,0,0,.18)}
 .neu-hinweis a{color:#FFD58A}.neu-hinweis button{position:absolute;top:6px;right:6px;min-height:28px;padding:0 8px;background:transparent;border:0;color:#fff;font-size:18px}
 @media (max-width:759px){.neu-hinweis{left:12px;right:12px;bottom:12px;max-width:none}}
 .changelog h2{margin-top:20px}.changelog h2:first-child{margin-top:0}.changelog li{margin:4px 0;line-height:1.5}
 </style></head><body>
-<div class="app"><aside class="side" id="side"><div class="top"><span class="brand">☀ vZEV {{ anlage }}</span><a class="ver" href="neu" title="Was ist neu in dieser Version">v{{ version }}</a><span id="bg" class="bg" role="status" aria-live="polite"></span>
+<div class="app"><aside class="side" id="side"><div class="top"><span class="brand">☀ vZEV {{ anlage }}</span><a class="ver" href="neu" title="Was ist neu in dieser Version">v{{ version }}</a><button id="thema" type="button" title="Darstellung umstellen: Auto (wie das Gerät) → Hell → Dunkel" aria-label="Darstellung umstellen"></button><span id="bg" class="bg" role="status" aria-live="polite"></span>
 <button id="menu" type="button" aria-expanded="false" aria-controls="nav" onclick="var s=document.getElementById('side');var o=s.classList.toggle('offen');this.setAttribute('aria-expanded',o);this.textContent=o?'Schliessen':'Menü'">Menü</button></div>
 <nav id="nav">{% for gruppe, eintraege in navigation %}<div class="grp"><span class="gl">{{ gruppe }}</span>{% for href, label in eintraege %}
 <a href="{{ href }}" class="{{ 'on' if label == title else '' }}"{% if label == title %} aria-current="page"{% endif %}>{{ label }}{% if label == 'Protokoll' and nfehler %} <span class="pill warn">{{ nfehler }}</span>{% endif %}</a>{% endfor %}</div>{% endfor %}</nav></aside>
@@ -417,7 +433,13 @@ a.ver{text-decoration:none}a.ver:hover{text-decoration:underline;color:var(--ink
 })();
 </script><script>if(innerWidth<760)document.querySelectorAll('.scroll').forEach(function(d){if(d.querySelector('svg.chart'))d.scrollLeft=d.scrollWidth});
 document.querySelectorAll('table').forEach(function(t){var h=null;t.querySelectorAll('tr').forEach(function(r){var th=r.querySelectorAll(':scope>th');if(th.length){h=Array.from(th).map(function(x){return x.textContent.trim()});return}
-if(!h)return;var i=0;r.querySelectorAll(':scope>td').forEach(function(td){var n=td.colSpan||1;if(n==1&&h[i]&&!td.hasAttribute('data-label'))td.setAttribute('data-label',h[i]);i+=n})})})</script></body></html>"""
+if(!h)return;var i=0;r.querySelectorAll(':scope>td').forEach(function(td){var n=td.colSpan||1;if(n==1&&h[i]&&!td.hasAttribute('data-label'))td.setAttribute('data-label',h[i]);i+=n})})})</script>
+<script>(function(){var b=document.getElementById('thema');if(!b)return;var h=document.documentElement,folge=['auto','light','dark'],
+txt={auto:'Auto',light:'Hell',dark:'Dunkel'};function zeigen(){b.textContent=txt[h.getAttribute('data-wahl')||'auto']}
+function setzen(t){try{localStorage.setItem('vzev-theme',t)}catch(e){}h.setAttribute('data-wahl',t);
+var d=t==='dark'||(t==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);h.setAttribute('data-theme',d?'dark':'light');zeigen()}
+b.addEventListener('click',function(){var t=h.getAttribute('data-wahl')||'auto';setzen(folge[(folge.indexOf(t)+1)%3])});
+if(window.matchMedia)matchMedia('(prefers-color-scheme: dark)').addEventListener('change',function(){if((h.getAttribute('data-wahl')||'auto')==='auto')setzen('auto')});zeigen()})();</script></body></html>"""
 
 
 def page(title, body, **kw):

@@ -40,7 +40,7 @@ und getrennt ausgewiesenem Netzstrom aus dem Batteriespeicher.
 - **Datensammler:** Zählerstände aus Home Assistant (alle 15 Minuten) mit letztem Wert und Status, evcc-Ladevorgänge im Detail.
 - **Protokoll:** Uploads, Rechnungen, Zahlungen, Korrekturen, Warnungen und Fehler.
 
-Ein Klick auf die **Versionsnummer** zeigt, was neu ist. Daneben zeigt eine **Statusanzeige**, was im Hintergrund läuft (Berechnung, Abruf von Zählerständen, evcc oder Strompreisen). Seiten, die auf eine Berechnung warten, laden von selbst neu.
+Ein Klick auf die **Versionsnummer** zeigt, was neu ist. Der Knopf daneben stellt die Darstellung um: **Auto** (wie das Gerät), **Hell** oder **Dunkel**. Daneben zeigt eine **Statusanzeige**, was im Hintergrund läuft (Berechnung, Abruf von Zählerständen, evcc oder Strompreisen). Seiten, die auf eine Berechnung warten, laden von selbst neu.
 
 ## Monatlicher Ablauf
 

@@ -158,7 +158,7 @@ def balken_h(zeilen, einheit):
         out.append(f'<div class="hb"><div class="hb-l">{escape(label)}</div><div class="hb-s"><i style="width:{breite:.1f}%;background:{farbe}"></i></div>'
                    f'<div class="hb-w">{"–" if w is None else _zahl(w, 3 if w < 1 else 2)} {einheit}</div><div class="hb-n muted">{escape(notiz)}</div></div>')
     out.append('</div><style>.hbalken{display:grid;gap:10px}.hb{display:grid;grid-template-columns:150px 1fr 120px;gap:4px 12px;align-items:center}'
-               '.hb-s{background:#F1F3EF;border-radius:6px;height:14px;overflow:hidden}.hb-s i{display:block;height:100%;border-radius:6px}'
+               '.hb-s{background:var(--line2,#F1F3EF);border-radius:6px;height:14px;overflow:hidden}.hb-s i{display:block;height:100%;border-radius:6px}'
                '.hb-w{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}.hb-n{grid-column:2 / 4}'
                '@media (max-width:759px){.hb{grid-template-columns:1fr auto}.hb-s{grid-column:1 / 3;grid-row:2}.hb-n{grid-column:1 / 3}}</style>')
     return "".join(out)

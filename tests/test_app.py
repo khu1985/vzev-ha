@@ -91,6 +91,7 @@ def test_seiten_mit_daten(app):
     assert 'href="?j=2026&amp;m=2026-03#monat"' in h and 'name="m"' not in h   # Monat per Klick, keine Monatsauswahl mehr
     assert 'id="monat"' in h and "April 2026" in h                                # zuletzt vollständiger Monat ist vorgewählt
     assert "Daten importieren" in h and "v" + server.VERSION in h
+    assert 'id="thema"' in h and "html[data-theme=dark]" in h and "vzev-theme" in h   # Dark Mode mit Umschalter
 
 
 def test_status_endpunkt(app):
