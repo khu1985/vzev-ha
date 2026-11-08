@@ -13,9 +13,10 @@ flowchart TB
         CO["collector.py<br/>Datensammler"]
         C["core.py<br/>Rechenkern"]
         V["vorschau.py<br/>Vorschau"]
-        U["uebersicht.py<br/>Übersicht, Verlauf"]
+        U["uebersicht.py<br/>Übersicht, Verlauf, Wertschöpfung"]
         SE["seiten.py<br/>Stammdaten, Abschluss"]
-        I["invoices.py<br/>PDF + QR"]
+        I["invoices.py, jahr.py<br/>Quartals- und Jahres-PDF, Excel"]
+        PZ["preise.py<br/>dynamische Strompreise"]
     end
 
     subgraph Daten["Konfigurationsordner (im Backup)"]
@@ -31,6 +32,8 @@ flowchart TB
     HA -- "alle 15 Min." --> CO
     E -- stündlich --> CO
     CO --> DB
+    PZ -- "Primeo-Schnittstelle" --> DB
+    DB -- "Preise für den Bonus" --> C
     PR --> C
     Y --> C
     DB --> V

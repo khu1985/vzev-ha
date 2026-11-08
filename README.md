@@ -2,7 +2,7 @@
 
 Abrechnung eines virtuellen Zusammenschlusses zum Eigenverbrauch (vZEV) in der Schweiz:
 Primeo-Lastgänge, Ladestation, Wertschöpfung, Quartalsrechnungen mit QR-Einzahlungsschein, Zahlungseingang,
-Monatsabschluss und dynamische Strompreise. Bedienung siehe [vzev/DOCS.md](vzev/DOCS.md) (in Home Assistant unter «Dokumentation»).
+Monatsabschluss, Jahresabrechnung und dynamische Strompreise (ab 2027 mit Bonus für die Mieter und Batteriespeicher). Bedienung siehe [vzev/DOCS.md](vzev/DOCS.md) (in Home Assistant unter «Dokumentation»).
 
 ## Installation
 
@@ -38,9 +38,10 @@ flowchart TB
         CO["collector.py<br/>Datensammler"]
         C["core.py<br/>Rechenkern"]
         V["vorschau.py<br/>Vorschau"]
-        U["uebersicht.py<br/>Übersicht, Verlauf"]
+        U["uebersicht.py<br/>Übersicht, Verlauf, Wertschöpfung"]
         SE["seiten.py<br/>Stammdaten, Abschluss"]
-        I["invoices.py<br/>PDF + QR"]
+        I["invoices.py, jahr.py<br/>Quartals- und Jahres-PDF, Excel"]
+        PZ["preise.py<br/>dynamische Strompreise"]
     end
 
     subgraph Daten["Konfigurationsordner (im Backup)"]
@@ -56,6 +57,8 @@ flowchart TB
     HA -- "alle 15 Min." --> CO
     E -- stündlich --> CO
     CO --> DB
+    PZ -- "Primeo-Schnittstelle" --> DB
+    DB -- "Preise für den Bonus" --> C
     PR --> C
     Y --> C
     DB --> V
@@ -71,16 +74,17 @@ flowchart TB
 
 | Datei | Aufgabe |
 |---|---|
-| `vzev/app/core.py` | Lastgänge einlesen (Messpunkt aus dem Dateikopf), Ladestation auf Viertelstunden verteilen, Solar/Netz pro Zähler aufteilen, Tarife mit Gültig-ab-Datum, Wertschöpfung, Abgleich mit Primeo-Rechnungen |
+| `vzev/app/core.py` | Lastgänge einlesen (Messpunkt aus dem Dateikopf), Ladestation auf Viertelstunden verteilen, Solar/Netz pro Zähler aufteilen, Netzladung des Speichers und «Speicher NT», Bonus aus dem dynamischen Tarif, Tarife mit Gültig-ab-Datum, Wertschöpfung, Abgleich mit Primeo-Rechnungen |
 | `vzev/app/vorschau.py` | Gleiche Rechnung mit den gesammelten Zählerständen aus Home Assistant für die Zeit nach dem letzten Lastgang |
 | `vzev/app/server.py` | Webserver, Navigation, Statusanzeige, Import, Rechnungen, Datensammler-Seite, Protokoll |
-| `vzev/app/uebersicht.py` | Übersicht mit Kennzahlen, Kontrollen und Diagramm; Verlauf pro Zähler |
-| `vzev/app/seiten.py` | Formulare für Mieter, Tarife, Primeo, Batterie und Einstellungen; Monatsabschluss und Sperre |
-| `vzev/app/invoices.py` | Quartalsrechnungen als PDF: Wohnung mit QR-Einzahlungsschein, Allgemeinstrom als Gesamtrechnung |
+| `vzev/app/uebersicht.py` | Übersicht mit Kennzahlen, Kontrollen (u. a. 80-%-Grenze Solarpreis) und Diagramm; Verlauf pro Zähler; Seite Wertschöpfung |
+| `vzev/app/seiten.py` | Formulare für Mieter, Tarife (inkl. dynamische Strompreise), Primeo, Batterie und Einstellungen (inkl. Speicher und Bonus); Monatsabschluss und Sperre |
+| `vzev/app/invoices.py` | Quartalsrechnungen als PDF: Wohnung mit QR-Einzahlungsschein, Allgemeinstrom als Gesamtrechnung; Spalte «Speicher NT» und Bonus-Zeile, wenn vorhanden |
+| `vzev/app/jahr.py` | Jahresabrechnung: Allgemeinstrom-PDF für die Nebenkostenabrechnung, Mieter, Zähler pro Monat, Excel-Export |
 | `vzev/app/collector.py` | Speichert alle 15 Minuten die Zählerstände aus Home Assistant, stündlich die evcc-Ladevorgänge und stösst den Preisabruf an |
 | `vzev/app/preise.py` | Dynamische Viertelstundenpreise über die Primeo-Schnittstelle abrufen und speichern (Adresse einstellbar) |
 | `vzev/app/zahlungen.py` | Rechnungsregister: Betrag, Fälligkeit, Zahlungen, Status; Übernahme von Zahlungen bei Korrekturen |
-| `vzev/app/diagramme.py` | Säulen- und Verlaufsdiagramme als SVG ohne externe Bibliothek |
+| `vzev/app/diagramme.py` | Säulen-, Linien- und Balkendiagramme als SVG ohne externe Bibliothek |
 | `vzev/app/default_config.yaml` | Vorlage für `vzev.yaml` (ohne persönliche Daten) |
 
 ## Rechenmodell
@@ -96,14 +100,17 @@ flowchart TD
     A["Lastgänge pro Viertelstunde<br/>1. OG, 2. OG, Allgemein, Produktion, Netzbezug PV-Anlage"] --> B
     LS["Wallbox-Ladevorgänge<br/>Start, Ende, kWh"] --> B
     B["Ladestation herausrechnen<br/>Energie jedes Ladevorgangs auf die Viertelstunden verteilen,<br/>in denen der Allgemeinzähler über der Grundlast liegt"] --> C
-    C["Allgemeinstrom = Allgemein − Ladestation + Standby PV-Anlage"] --> D
-    D["Solaranteil = min(Produktion ÷ Verbrauch aller Zähler, 1)<br/>gleicher Anteil für jeden Zähler"] --> E
-    E["Pro Zähler: Solar kWh, Netz HT kWh, Netz NT kWh<br/>Rücklieferung = Produktion − Verbrauch (wenn positiv)"] --> F
+    C["Netzbezug PV-Anlage aufteilen<br/>bis Standby-Grenze: Allgemeinstrom · darüber: Netzladung Speicher (Betreiber)"] --> D
+    D["Solaranteil = min(Produktion ÷ Verbrauch aller Zähler, 1)<br/>gleicher Anteil für jeden Zähler"] --> S
+    S["Speicher NT: Anlagenstrom stammt zuerst aus dem Netzvorrat<br/>(Netzladung × Wirkungsgrad), Rest ist Solarstrom"] --> E
+    E["Pro Zähler: Solar, Speicher NT, Netz HT, Netz NT (kWh)<br/>Rücklieferung = Produktion − Verbrauch (wenn positiv)"] --> F
+    DP[("Dynamische Preise pro Viertelstunde<br/>Primeo-Schnittstelle")] --> BO
+    E --> BO["Bonus = Netzbezug × (Standardtarif − dynamischer Preis)<br/>pro Monat nie negativ"] --> F
     T[("Tarife mit Gültig-ab-Datum<br/>Solar, Netz HT/NT, Rücklieferung, Grundpreis")] --> F
     M[("Mietverhältnisse<br/>von – bis, Leerstand")] --> F
     F["Monatssummen und Beträge"] --> G["Rechnungen<br/>Wohnung pro Mietverhältnis,<br/>Allgemeinstrom gesamt"]
-    F --> H["Wertschöpfung Betreiber<br/>Rücklieferung + Verkauf an Mieter + Eigenverbrauch"]
-    F --> K["Abgleich mit Primeo-Rechnungen<br/>Netzbezug HT/NT, Rücklieferung"]
+    F --> H["Wertschöpfung Betreiber<br/>Rücklieferung + Verkauf an Mieter + Eigenverbrauch<br/>+ Speicher − Netzladung"]
+    F --> K["Abgleich mit Primeo-Rechnungen<br/>Netzbezug HT/NT inkl. Netzladung, Rücklieferung"]
 ```
 
 </details>
@@ -114,6 +121,9 @@ Regeln, die in `vzev.yaml` einstellbar sind:
 - **Leerstand** zählt als Eigenverbrauch des Betreibers; der Grundpreis wird nach Miettagen aufgeteilt.
 - **Ladestation** gehört dem Betreiber; ihr Solarstrom zählt als Eigenverbrauch.
 - **Rücklieferung** ohne bekannten Tarif bleibt offen und wird in der Wertschöpfung nicht geschätzt.
+- **Speicher** (ab einstellbarem Datum, Standard 01.01.2027): Netzbezug am Zähler der PV-Anlage über der Standby-Grenze ist Netzladung und geht auf den Betreiber. Wird dieser Netzstrom später im Haus verbraucht, erscheint er als «Speicher NT» zum vZEV-Preis statt als Solarstrom.
+- **Bonus dynamischer Tarif** (Standard ab 01.01.2027): Die Rechnung bleibt bei HT/NT; der Vorteil gegenüber dem dynamischen Preis pro Viertelstunde wird gutgeschrieben, pro Monat nie negativ.
+- **Solarpreis** als Pauschale höchstens 80 % des Standardprodukts; die Übersicht prüft das pro Monat.
 
 ## Prozess
 
@@ -149,6 +159,7 @@ flowchart TD
     F --> G["Rechnungen: Quartal erstellen<br/>PDF pro Mietverhältnis + Allgemeinstrom"]
     G --> H["Rechnungen versenden<br/>Allgemeinstrom in die Nebenkostenabrechnung"]
     H --> Z["Zahlungseingang erfassen<br/>offen, teilweise, überfällig, bezahlt"]
+    Z -. "Jahresende" .-> J["Jahresabrechnung<br/>Allgemeinstrom-PDF für die Nebenkostenabrechnung, Excel"]
 ```
 
 </details>
@@ -211,7 +222,8 @@ Alles liegt im Konfigurationsordner der App und ist im Home-Assistant-Backup ent
 
 `tests/` prüft Rechenkern, Rechnungen, Vorschau und Web-App mit erfundenen Daten (keine echten Messpunkte oder Namen).
 Die Werte sind so gewählt, dass sich die Ergebnisse von Hand nachrechnen lassen, z. B. Energieerhaltung pro Viertelstunde,
-Ladestation vollständig verteilt, Grundpreis nach Miettagen, Sperre abgeschlossener Monate.
+Ladestation vollständig verteilt, Grundpreis nach Miettagen, Sperre abgeschlossener Monate, Speicher NT (zuerst geladen,
+zuerst verbraucht) und Bonus (nie negativ, ohne Preis kein Bonus).
 
 GitHub führt die Tests bei jeder Änderung aus (`.github/workflows/tests.yml`):
 
@@ -219,7 +231,8 @@ GitHub führt die Tests bei jeder Änderung aus (`.github/workflows/tests.yml`):
 - **Neueste Paketversionen:** zeigt früh, wenn künftige Versionen etwas brechen
 - **App-Image bauen:** baut das Docker-Image wie Home Assistant und prüft, dass die App startet
 
-Lokal: `python3 -m pytest tests`
+Lokal: `python3 -m pytest tests`. Home Assistant nutzt Python 3.11; der Lauf «Wie im Home Assistant» fängt
+Syntax ab, die erst neuere Python-Versionen kennen.
 
 ## Änderungen
 
