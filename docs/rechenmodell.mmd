@@ -1,0 +1,12 @@
+flowchart TD
+    A["Lastgänge pro Viertelstunde<br/>1. OG, 2. OG, Allgemein, Produktion, Netzbezug PV-Anlage"] --> B
+    LS["Wallbox-Ladevorgänge<br/>Start, Ende, kWh"] --> B
+    B["Ladestation herausrechnen<br/>Energie jedes Ladevorgangs auf die Viertelstunden verteilen,<br/>in denen der Allgemeinzähler über der Grundlast liegt"] --> C
+    C["Allgemeinstrom = Allgemein − Ladestation + Standby PV-Anlage"] --> D
+    D["Solaranteil = min(Produktion ÷ Verbrauch aller Zähler, 1)<br/>gleicher Anteil für jeden Zähler"] --> E
+    E["Pro Zähler: Solar kWh, Netz HT kWh, Netz NT kWh<br/>Rücklieferung = Produktion − Verbrauch (wenn positiv)"] --> F
+    T[("Tarife mit Gültig-ab-Datum<br/>Solar, Netz HT/NT, Rücklieferung, Grundpreis")] --> F
+    M[("Mietverhältnisse<br/>von – bis, Leerstand")] --> F
+    F["Monatssummen und Beträge"] --> G["Rechnungen<br/>Wohnung pro Mietverhältnis,<br/>Allgemeinstrom gesamt"]
+    F --> H["Wertschöpfung Betreiber<br/>Rücklieferung + Verkauf an Mieter + Eigenverbrauch"]
+    F --> K["Abgleich mit Primeo-Rechnungen<br/>Netzbezug HT/NT, Rücklieferung"]

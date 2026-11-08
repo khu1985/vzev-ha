@@ -16,52 +16,56 @@ sondern in die Konfiguration der App (Seite «Einstellungen»).
 Die App läuft als Container im Home Assistant und erscheint über Ingress als Seite in der Seitenleiste.
 Sie braucht kein Internet: Alle Daten liegen im Konfigurationsordner der App und sind damit im Home-Assistant-Backup enthalten.
 
+![Architektur](docs/architektur.svg)
+
+<details><summary>Als Mermaid-Diagramm</summary>
+
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph Quellen
-        P["Primeo-Kundenportal<br/>Lastgänge .xlsx (15 Min.)"]
+        direction LR
+        P["Primeo-Kundenportal<br/>Lastgänge .xlsx"]
         W["go-e Wallbox<br/>Ladevorgänge .csv"]
         HA["Home Assistant<br/>whatwatt, go-e, Solis, Kia"]
-        E["evcc<br/>Ladevorgänge (REST)"]
+        E["evcc<br/>Ladevorgänge"]
     end
 
-    subgraph App["vZEV-App (Container, Flask, Ingress)"]
-        S["server.py<br/>Seiten, Import, Rechnungen, Protokoll"]
-        C["core.py<br/>15-Minuten-Aufteilung, Tarife, Wertschöpfung, Abgleich"]
-        V["vorschau.py<br/>Vorschau aus Zählerständen"]
+    subgraph App["vZEV-App (Container im Home Assistant, Ingress)"]
+        direction TB
+        S["server.py<br/>Webserver, Import, Rechnungen, Status"]
+        CO["collector.py<br/>Datensammler"]
+        C["core.py<br/>Rechenkern"]
+        V["vorschau.py<br/>Vorschau"]
         U["uebersicht.py<br/>Übersicht, Verlauf"]
-        SE["seiten.py<br/>Mieter, Tarife, Primeo, Abschluss, Batterie, Einstellungen"]
-        I["invoices.py<br/>PDF mit QR-Einzahlungsschein"]
-        D["diagramme.py<br/>SVG-Diagramme"]
-        CO["collector.py<br/>Datensammler alle 15 Min."]
+        SE["seiten.py<br/>Stammdaten, Abschluss"]
+        I["invoices.py<br/>PDF + QR"]
     end
 
-    subgraph Daten["Konfigurationsordner /addon_configs/…_vzev"]
-        Y[("vzev.yaml<br/>Betreiber, Messpunkte, Tarife,<br/>Mieter, Regeln")]
-        PR[("primeo/<br/>importierte Dateien + Zwischenspeicher")]
-        DB[("messwerte.sqlite<br/>Zählerstände, evcc")]
-        AB[("abschluss.json<br/>festgehaltene Monate, Korrekturen")]
-        R[("rechnungen/<br/>PDFs, _alt/")]
-        L[("vzev.log")]
+    subgraph Daten["Konfigurationsordner (im Backup)"]
+        direction LR
+        Y[("vzev.yaml")]
+        PR[("primeo/")]
+        DB[("messwerte.sqlite")]
+        AB[("abschluss.json")]
+        R[("rechnungen/")]
     end
 
-    P -- Upload --> S
-    W -- Upload --> S
-    S --> PR
-    HA -- Supervisor-API --> CO
-    E -- REST --> CO
+    P & W -- Upload --> S --> PR
+    HA -- "alle 15 Min." --> CO
+    E -- stündlich --> CO
     CO --> DB
     PR --> C
     Y --> C
+    DB --> V
     C --> U
-    DB --> V --> U
+    V --> U
     C --> SE
     SE <--> Y
     SE <--> AB
     C --> I --> R
-    U --> D
-    S --> L
 ```
+
+</details>
 
 | Datei | Aufgabe |
 |---|---|
@@ -79,6 +83,10 @@ flowchart LR
 
 Grundlage sind die Primeo-Lastgänge in 15-Minuten-Auflösung. Jede Viertelstunde wird einzeln gerechnet:
 
+![Rechenmodell](docs/rechenmodell.svg)
+
+<details><summary>Als Mermaid-Diagramm</summary>
+
 ```mermaid
 flowchart TD
     A["Lastgänge pro Viertelstunde<br/>1. OG, 2. OG, Allgemein, Produktion, Netzbezug PV-Anlage"] --> B
@@ -94,6 +102,8 @@ flowchart TD
     F --> K["Abgleich mit Primeo-Rechnungen<br/>Netzbezug HT/NT, Rücklieferung"]
 ```
 
+</details>
+
 Regeln, die in `vzev.yaml` einstellbar sind:
 
 - **Allgemeinstrom** wird als Gesamtrechnung gestellt (Weiterverrechnung in der Nebenkostenabrechnung). Nur für die Wertschöpfung gilt er zu einem einstellbaren Anteil (Standard 50 %) als an die Mieter verkauft.
@@ -105,13 +115,23 @@ Regeln, die in `vzev.yaml` einstellbar sind:
 
 ### Laufend (automatisch)
 
+![Laufende Abläufe](docs/prozess-laufend.svg)
+
+<details><summary>Als Mermaid-Diagramm</summary>
+
 ```mermaid
 flowchart LR
     A["alle 15 Min.<br/>Zählerstände aus Home Assistant speichern"] --> B["stündlich<br/>evcc-Ladevorgänge abrufen"]
     B --> C["Übersicht: laufender Monat<br/>als Vorschau (vorläufig)"]
 ```
 
+</details>
+
 ### Monatlich / quartalsweise (von Hand)
+
+![Monatlicher Ablauf](docs/prozess-monatlich.svg)
+
+<details><summary>Als Mermaid-Diagramm</summary>
 
 ```mermaid
 flowchart TD
@@ -125,7 +145,13 @@ flowchart TD
     G --> H["Rechnungen versenden<br/>Allgemeinstrom in die Nebenkostenabrechnung"]
 ```
 
+</details>
+
 ### Korrekturen
+
+![Korrekturen](docs/korrekturen.svg)
+
+<details><summary>Als Mermaid-Diagramm</summary>
 
 ```mermaid
 flowchart LR
@@ -137,6 +163,8 @@ flowchart LR
     E --> F
     E --> G["Rechnungen des Quartals neu erstellen<br/>nur mit Begründung, alte PDFs unter rechnungen/_alt"]
 ```
+
+</details>
 
 ## Daten und Sicherung
 

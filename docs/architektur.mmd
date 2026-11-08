@@ -1,0 +1,42 @@
+flowchart TB
+    subgraph Quellen
+        direction LR
+        P["Primeo-Kundenportal<br/>Lastgänge .xlsx"]
+        W["go-e Wallbox<br/>Ladevorgänge .csv"]
+        HA["Home Assistant<br/>whatwatt, go-e, Solis, Kia"]
+        E["evcc<br/>Ladevorgänge"]
+    end
+
+    subgraph App["vZEV-App (Container im Home Assistant, Ingress)"]
+        direction TB
+        S["server.py<br/>Webserver, Import, Rechnungen, Status"]
+        CO["collector.py<br/>Datensammler"]
+        C["core.py<br/>Rechenkern"]
+        V["vorschau.py<br/>Vorschau"]
+        U["uebersicht.py<br/>Übersicht, Verlauf"]
+        SE["seiten.py<br/>Stammdaten, Abschluss"]
+        I["invoices.py<br/>PDF + QR"]
+    end
+
+    subgraph Daten["Konfigurationsordner (im Backup)"]
+        direction LR
+        Y[("vzev.yaml")]
+        PR[("primeo/")]
+        DB[("messwerte.sqlite")]
+        AB[("abschluss.json")]
+        R[("rechnungen/")]
+    end
+
+    P & W -- Upload --> S --> PR
+    HA -- "alle 15 Min." --> CO
+    E -- stündlich --> CO
+    CO --> DB
+    PR --> C
+    Y --> C
+    DB --> V
+    C --> U
+    V --> U
+    C --> SE
+    SE <--> Y
+    SE <--> AB
+    C --> I --> R

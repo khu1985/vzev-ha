@@ -1,0 +1,8 @@
+flowchart LR
+    A["Datei ersetzt oder Regel geändert"] --> B{"Betrifft einen<br/>abgeschlossenen Monat?"}
+    B -- nein --> C["wird sofort neu gerechnet"]
+    B -- "ja, Tarif / Mieter / Ertrag" --> D["wird abgelehnt<br/>Monat zuerst mit Begründung wieder öffnen"]
+    B -- "ja, Datei / Regel" --> E["Übersicht und Abschluss melden «verändert»<br/>neue Werte mit Begründung übernehmen"]
+    D --> F["Korrekturen-Liste<br/>Zeit, Monat, Was, Begründung"]
+    E --> F
+    E --> G["Rechnungen des Quartals neu erstellen<br/>nur mit Begründung, alte PDFs unter rechnungen/_alt"]

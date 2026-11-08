@@ -1,0 +1,9 @@
+flowchart TD
+    A["Primeo-Kundenportal: Lastgänge aller 5 Zähler exportieren<br/>go-e: Ladevorgänge exportieren"] --> B["Daten importieren: Dateien hochladen<br/>Zuordnung über die Messpunkt-Nummer, alte Fassung wird ersetzt"]
+    B --> C{"Übersicht: Kontrollen ok?<br/>Lücken, Ladestation, Abgleich"}
+    C -- nein --> B
+    C -- ja --> D["Primeo-Rechnung erfassen (Seite «Primeo»)<br/>Netzbezug HT/NT und Rücklieferung für den Abgleich"]
+    D --> E["Tarife prüfen<br/>Rückliefertarif des Quartals eintragen, sobald publiziert"]
+    E --> F["Abschluss: Monat abschliessen<br/>Werte werden festgehalten und gesperrt"]
+    F --> G["Rechnungen: Quartal erstellen<br/>PDF pro Mietverhältnis + Allgemeinstrom"]
+    G --> H["Rechnungen versenden<br/>Allgemeinstrom in die Nebenkostenabrechnung"]
