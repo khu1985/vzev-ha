@@ -20,6 +20,7 @@ import core
 import invoices
 import seiten
 import uebersicht
+import zahlungen
 from collector import Collector
 
 DATA = Path(os.environ.get("VZEV_DIR", Path(__file__).parent / "data"))
@@ -494,9 +495,36 @@ RECH = """
 {% if korr %}<label class="feld breit">Begründung der Korrektur <input name="grund" style="width:420px" required placeholder="z. B. Lastgang Primeo korrigiert"></label>{% endif %}
 <button class="primary">{{ 'Korrektur erstellen' if korr else 'Erstellen' }}</button></form>
 <p class="muted">Pro Mietverhältnis eine Rechnung für die Wohnung (mit QR-Einzahlungsschein) und eine Gesamtrechnung Allgemeinstrom für die Nebenkostenabrechnung. Ein erneutes Erstellen überschreibt die Dateien dieses Quartals.</p></div>
-<div class="card"><h2>Erstellte Rechnungen</h2><div class="scroll"><table><tr><th class="l">Quartal</th><th class="l">Datei</th><th>Erstellt</th><th></th></tr>
-{% for q, p, t in pdfs %}<tr><td class="l">{{ q }}</td><td class="l">{{ p }}</td><td>{{ t }}</td><td><a class="btn" href="datei?pfad={{ q }}/{{ p }}" target="_blank">Öffnen</a></td></tr>
-{% else %}<tr><td class="l" colspan="4">Noch keine Rechnungen.</td></tr>{% endfor %}</table></div></div>"""
+<div class="card"><h2>Rechnungen und Zahlungen</h2>
+<div class="grid" style="margin-bottom:16px">
+ <div class="kpi"><div class="t">Offen</div><div class="v">{{ z.offen|f2 }} <small>CHF</small></div><div class="s">Wohnungen, noch nicht bezahlt</div></div>
+ <div class="kpi"><div class="t">Überfällig</div><div class="v">{{ z.ueberfaellig|f2 }} <small>CHF</small></div><div class="s">{{ z.n_ueberfaellig }} Rechnung{{ 'en' if z.n_ueberfaellig != 1 }} nach Fälligkeit</div></div>
+</div>
+<div class="scroll"><table>
+<tr><th class="l">Rechnung</th><th class="l">Partei</th><th>Datum</th><th>Fällig</th><th>Betrag</th><th>Bezahlt</th><th>Offen</th><th class="l">Status</th><th class="l">Zahlung</th></tr>
+{% for r in z.zeilen if r.stand != 'ersetzt' %}<tr>
+<td class="l"><a href="datei?pfad={{ r.datei }}" target="_blank">{{ r.nummer }}</a></td>
+<td class="l">{{ r.partei }}</td><td>{{ r.datum|dmy }}</td><td>{{ r.faellig|dmy if r.art != 'allgemein' else '–' }}</td>
+<td><b>{{ r.betrag|f2 if r.betrag is not none else '?' }}</b></td><td>{{ r.bezahlt|f2 if r.art != 'allgemein' else '–' }}</td>
+<td>{{ r.offen|f2 if r.art != 'allgemein' and r.offen is not none else '–' }}</td>
+<td class="l"><span class="pill {{ {'bezahlt':'ok','überzahlt':'warn','überfällig':'warn','teilweise':'warn','intern':'','offen':''}[r.stand] }}">{{ r.stand }}</span>{% if r.nachgetragen %} <span class="muted" title="Vor dem Zahlungsregister erstellt; Betrag aus der aktuellen Berechnung, Datum der Datei">nachgetragen</span>{% endif %}</td>
+<td class="l akt">{% if r.art == 'allgemein' %}<span class="muted">für die Nebenkostenabrechnung</span>{% else %}
+{% for zz in r.zahlungen %}<form class="inline" method="post" action="zahlung_entfernen" onsubmit="return confirm('Zahlung vom {{ zz.datum|dmy }} über CHF {{ zz.betrag|f2 }} entfernen?')">
+<input type="hidden" name="key" value="{{ r.key }}"><input type="hidden" name="index" value="{{ loop.index0 }}">
+<span class="muted">{{ zz.datum|dmy }}: {{ zz.betrag|f2 }}{{ ' · ' ~ zz.notiz if zz.notiz }}</span> <button title="Zahlung entfernen" style="min-height:28px;padding:0 8px">×</button></form><br>{% endfor %}
+{% if r.stand not in ('bezahlt', 'überzahlt') %}<form class="inline zahlung" method="post" action="zahlung" data-busy="Zahlung wird erfasst …">
+<input type="hidden" name="key" value="{{ r.key }}"><input type="date" name="datum" value="{{ heute }}" aria-label="Zahlungsdatum">
+<input name="betrag" value="{{ '%.2f'|format(r.offen) if r.offen else '' }}" inputmode="decimal" style="width:90px" aria-label="Betrag CHF">
+<button>Zahlung erfassen</button></form>{% endif %}{% endif %}</td></tr>
+{% else %}<tr><td class="l" colspan="9">Noch keine Rechnungen.</td></tr>{% endfor %}
+</table></div>
+{% set ersetzt = z.zeilen|selectattr('stand', 'equalto', 'ersetzt')|list %}
+{% if ersetzt %}<details style="margin-top:12px"><summary class="muted">{{ ersetzt|length }} ersetzte Fassung{{ 'en' if ersetzt|length != 1 }}</summary><div class="scroll"><table>
+<tr><th class="l">Rechnung</th><th class="l">Partei</th><th>Datum</th><th>Betrag</th><th>Ersetzt am</th></tr>
+{% for r in ersetzt %}<tr><td class="l">{{ r.nummer }}</td><td class="l">{{ r.partei }}</td><td>{{ r.datum|dmy }}</td><td>{{ r.betrag|f2 if r.betrag is not none else '?' }}</td><td>{{ r.ersetzt_am }}</td></tr>{% endfor %}
+</table></div></details>{% endif %}
+<p class="muted">Bei einer Korrektur übernimmt die neue Rechnung die bereits erfassten Zahlungen. Die alten PDFs liegen unter rechnungen/_alt.</p>
+<style>@media (min-width:760px){form.zahlung{flex-wrap:nowrap!important}td.akt{min-width:370px}}form.zahlung{display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center}form.zahlung input{padding:6px 8px}form.zahlung button{min-height:34px;padding:0 10px}</style></div>"""
 
 
 @app.route("/rechnungen", methods=["GET", "POST"])
@@ -515,21 +543,44 @@ def rechnungen():
             seiten.korrektur(f"{j}-Q{q}", "Rechnungen neu erstellt (alte Fassung unter rechnungen/_alt)", grund)
         try:
             made = invoices.main(PRIMEO, j, q, RECHNUNGEN / f"{j}-Q{q}", request.form.get("datum") or None, CFG)
+            rd = request.form.get("datum") or None
+            zahlungen.registrieren(f"{j}-Q{q}", made, date.fromisoformat(rd) if rd else None, config())
             txt = ", ".join(f"{n} (CHF {t:.2f})" for n, t, _ in made)
             log.info("Rechnungen %s Q%s erstellt: %s", j, q, txt)
             return redirect(f"rechnungen?msg=Erstellt: {txt}")
         except BaseException as e:
             log.exception("Rechnungen %s Q%s fehlgeschlagen", j, q)
             return redirect(f"rechnungen?c=warn&msg=Fehler: {e}")
-    pdfs = sorted(((p.parent.name, p.name, datetime.fromtimestamp(p.stat().st_mtime).strftime("%d.%m.%Y %H:%M"))
-                   for p in RECHNUNGEN.glob("*/*.pdf")), reverse=True)
     t = date.today()
     jahr, quartal = t.year, max(1, (t.month - 1) // 3)
     korr = request.args.get("korr")
     if korr:
         jahr, quartal = (int(x) for x in korr.split("-"))
-    pdfs = [p for p in pdfs if p[0] != "_alt"]
-    return page("Rechnungen", render_template_string(RECH, pdfs=pdfs, jahr=jahr, quartal=quartal, heute=t.isoformat(), korr=korr))
+    return page("Rechnungen", render_template_string(RECH, z=zahlungen.uebersicht(), jahr=jahr, quartal=quartal, heute=t.isoformat(), korr=korr))
+
+
+@app.post("/zahlung")
+def zahlung_erfassen():
+    try:
+        betrag = float(request.form["betrag"].replace("'", "").replace(",", "."))
+        datum = date.fromisoformat(request.form["datum"])
+        if betrag <= 0:
+            raise ValueError("Betrag muss positiv sein")
+        r = zahlungen.zahlung(request.form["key"], datum, betrag, (request.form.get("notiz") or "").strip())
+    except (ValueError, KeyError) as e:
+        return redirect(f"rechnungen?c=warn&msg=Zahlung nicht erfasst: {e}")
+    log.info("Zahlung erfasst: %s, CHF %.2f am %s", r["nummer"], betrag, datum.strftime("%d.%m.%Y"))
+    return redirect(f"rechnungen?msg=Zahlung CHF {betrag:.2f} für {r['nummer']} erfasst")
+
+
+@app.post("/zahlung_entfernen")
+def zahlung_entfernen():
+    try:
+        r, z = zahlungen.zahlung_entfernen(request.form["key"], int(request.form["index"]))
+    except (ValueError, KeyError, IndexError) as e:
+        return redirect(f"rechnungen?c=warn&msg=Nicht entfernt: {e}")
+    log.warning("Zahlung entfernt: %s, CHF %.2f vom %s", r["nummer"], z["betrag"], z["datum"])
+    return redirect(f"rechnungen?msg=Zahlung für {r['nummer']} entfernt")
 
 
 @app.route("/datei")
@@ -677,6 +728,8 @@ def auf_berechnung_warten():
 
 seiten.register(app, sys.modules[__name__])
 uebersicht.register(app, sys.modules[__name__])
+zahlungen.register(app, sys.modules[__name__])
+app.jinja_env.filters["dmy"] = lambda x: "" if not x else f"{str(x)[8:10]}.{str(x)[5:7]}.{str(x)[:4]}"
 
 # --- Protokoll ----------------------------------------------------------------
 PROT = """
