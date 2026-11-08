@@ -53,7 +53,24 @@ def berechnung():
     return _cache
 
 
+_info_cache = {}
+
+
 def datei_info(p, cfg):
+    key = (p.name, p.stat().st_mtime, p.stat().st_size, id(cfg.get("messpunkte")))
+    hit = _info_cache.get(p.name)
+    if hit and hit[0][:3] == key[:3]:
+        info = dict(hit[1])
+        if info["art"] == "Lastgang":
+            info["rolle"] = cfg["messpunkte"].get(info["messpunkt"]) or "unbekannt"
+            info["ok"] = info["rolle"] != "unbekannt"
+        return info
+    info = _datei_info(p, cfg)
+    _info_cache[p.name] = (key, info)
+    return info
+
+
+def _datei_info(p, cfg):
     if p.suffix.lower() == ".xlsx":
         try:
             s, mp, lst = core.read_lastgang(p)
@@ -155,8 +172,29 @@ def index():
 # --- Import -------------------------------------------------------------------
 IMPORT = """
 <div class="card"><h2>Dateien hochladen</h2>
-<form method="post" action="hochladen" enctype="multipart/form-data">
-<input type="file" name="dateien" multiple accept=".xlsx,.csv" required> <button class="primary">Hochladen</button></form>
+<form id="up" method="post" action="hochladen" enctype="multipart/form-data">
+<input id="upfiles" type="file" name="dateien" multiple accept=".xlsx,.csv" required> <button class="primary" id="upbtn">Hochladen</button></form>
+<ul id="upstatus" class="muted" style="padding-left:18px"></ul>
+<script>
+document.getElementById('up').addEventListener('submit', async function (ev) {
+  ev.preventDefault();
+  const files = Array.from(document.getElementById('upfiles').files);
+  const list = document.getElementById('upstatus'); const btn = document.getElementById('upbtn');
+  btn.disabled = true; list.innerHTML = '';
+  let allOk = true;
+  for (const f of files) {
+    const li = document.createElement('li'); li.textContent = f.name + ' … wird hochgeladen'; list.appendChild(li);
+    const fd = new FormData(); fd.append('dateien', f, f.name);
+    try {
+      const r = await fetch('hochladen', {method: 'POST', body: fd, headers: {'X-Requested-With': 'fetch'}, credentials: 'same-origin'});
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json(); li.textContent = j.msg; allOk = allOk && j.ok;
+    } catch (e) { li.textContent = f.name + ': ' + e.message; allOk = false; }
+  }
+  btn.disabled = false;
+  if (allOk) location.href = 'import?msg=' + encodeURIComponent(files.length + ' Datei(en) hochgeladen');
+});
+</script>
 <p class="muted">Primeo-Lastgänge (.xlsx) und Wallbox-Export (.csv). Die Zuordnung erfolgt über die Messpunkt-Nummer. Eine neue Datei für denselben Messpunkt ersetzt die alte automatisch.</p></div>
 <div class="card"><h2>Importierte Dateien</h2><div class="scroll"><table>
 <tr><th class="l">Datei</th><th class="l">Zugeordnet als</th><th class="l">Messpunkt / Inhalt</th><th>Von</th><th>Bis</th><th class="l">Aktionen</th></tr>
@@ -198,11 +236,26 @@ def import_page():
 
 @app.post("/hochladen")
 def hochladen():
-    teile = []
-    for fs in request.files.getlist("dateien"):
-        neu, ersetzt = speichern(fs)
-        teile.append(f"{neu['name']} → {ROLLEN.get(neu['rolle'], neu['rolle'])}" + (f" (ersetzt {', '.join(ersetzt)})" if ersetzt else ""))
-    return redirect("import?msg=" + "; ".join(teile))
+    teile, fehler = [], False
+    dateien = [fs for fs in request.files.getlist("dateien") if fs and fs.filename]
+    if not dateien:
+        app.logger.warning("Upload ohne Dateien (Content-Length %s)", request.content_length)
+        teile.append("Keine Datei empfangen")
+        fehler = True
+    for fs in dateien:
+        try:
+            neu, ersetzt = speichern(fs)
+            teile.append(f"{neu['name']} → {ROLLEN.get(neu['rolle'], neu['rolle'])}" + (f" (ersetzt {', '.join(ersetzt)})" if ersetzt else ""))
+            fehler |= not neu["ok"]
+            app.logger.info("Upload %s -> %s", neu["name"], neu["rolle"])
+        except Exception as e:
+            app.logger.exception("Upload %s fehlgeschlagen", fs.filename)
+            teile.append(f"{fs.filename}: Fehler {e}")
+            fehler = True
+    msg = "; ".join(teile)
+    if request.headers.get("X-Requested-With") == "fetch":
+        return {"ok": not fehler, "msg": msg}
+    return redirect("import?" + ("c=warn&" if fehler else "") + "msg=" + msg)
 
 
 @app.post("/ersetzen")
@@ -309,4 +362,8 @@ def einstellungen():
 if __name__ == "__main__":
     if os.environ.get("SUPERVISOR_TOKEN") or config().get("homeassistant", {}).get("token"):
         collector.start()
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8099)))
+    import logging
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    app.logger.setLevel(logging.INFO)
+    app.logger.info("Daten in %s, %d Dateien im Import", DATA, sum(1 for p in PRIMEO.iterdir() if p.is_file()))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8099)), threaded=True)

@@ -41,16 +41,31 @@ def occupied(index, cfg, einheit):
 
 
 # --- Daten laden ----------------------------------------------------------
+def read_header(path):
+    """Messpunkt und Lieferstelle aus dem Kopf eines Primeo-Lastgangs, ohne die ganze Datei zu laden."""
+    import openpyxl
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    try:
+        ws = wb["Lastgang"]
+        rows = [r for _, r in zip(range(5), ws.iter_rows(values_only=True))]
+    finally:
+        wb.close()
+    cell = lambda r: str(rows[r][2]).strip() if len(rows) > r and len(rows[r]) > 2 and rows[r][2] is not None else ""
+    return cell(3), cell(4)
+
+
 def read_lastgang(path):
-    head = pd.read_excel(path, sheet_name="Lastgang", header=None, nrows=8)
-    messpunkt = str(head.iloc[3, 2]).strip()
+    messpunkt, lieferstelle = read_header(path)
     df = pd.read_excel(path, sheet_name="Lastgang", skiprows=8)
     ts = pd.to_datetime(df["Datum"]).dt.normalize() + pd.to_timedelta(df["Uhrzeit"].astype(str))
     out = pd.DataFrame(
         {"kwh": pd.to_numeric(df["kWh"], errors="coerce").values, "tarif": df["Tarif"].values},
         index=pd.DatetimeIndex(ts.values),
     )
-    return out, messpunkt, str(head.iloc[4, 2])
+    # Lokalzeit: bei der Umstellung auf Winterzeit kommt 02:00–02:45 doppelt vor -> zusammenfassen
+    if out.index.has_duplicates:
+        out = out.groupby(level=0).agg({"kwh": "sum", "tarif": "first"})
+    return out, messpunkt, lieferstelle
 
 
 def load(datadir, cfg):
