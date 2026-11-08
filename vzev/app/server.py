@@ -261,13 +261,15 @@ form.inline{display:inline}
  table:not(.wide) tr:has(>th){display:none}
  table:not(.wide),table:not(.wide) tbody,table:not(.wide) tr,table:not(.wide) td{display:block;width:100%}
  table:not(.wide) tr{border-bottom:1px solid var(--line);padding:8px 0}
- table:not(.wide) td{border:0;padding:4px 0;text-align:right;display:flex;justify-content:space-between;align-items:center;gap:12px;white-space:normal;min-height:0}
- table:not(.wide) td[data-label]::before{content:attr(data-label);color:var(--muted);font-size:13px;font-weight:500;text-align:left;flex-shrink:0;max-width:45%}
- table:not(.wide) td.l{text-align:left}
+ table:not(.wide) td{border:0;padding:5px 0;text-align:right;white-space:normal;min-height:0;overflow-wrap:anywhere}
+ table:not(.wide) td[data-label]::before{content:attr(data-label);float:left;color:var(--muted);font-size:13px;font-weight:500;text-align:left;margin-right:12px;max-width:45%}
+ table:not(.wide) td::after{content:"";display:block;clear:both}
+ table:not(.wide) td.l{text-align:right}
  table:not(.wide) td:empty{display:none}
  table:not(.wide) td>*:not(.pill){max-width:100%}
  table.edit tr{border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:8px}
- table.edit td{display:grid;grid-template-columns:110px 1fr;text-align:left}
+ table.edit td{display:grid;grid-template-columns:110px 1fr;text-align:left;align-items:center}
+ table.edit td::before{float:none!important;margin:0}table.edit td::after{display:none}
  table.edit td::before{max-width:none!important}
  table.edit input,table.edit select,table.form input,table.form select{width:100%!important;min-width:0}
  table.form tr{padding:8px 0}table.form td{display:block!important;text-align:left;padding:2px 0}
@@ -277,6 +279,8 @@ form.inline{display:inline}
  table.edit td label{display:inline-flex;align-items:center;gap:6px;justify-self:start}
  .chart .ax{font-size:19px!important}
  form.datum,td.akt form{justify-content:flex-end}
+ main input:not([type=checkbox]):not([type=file]),main select,main textarea{max-width:100%}
+ main input[name=grund]{width:100%!important}
 }</style></head><body>
 <div class="app"><aside class="side" id="side"><div class="top"><span class="brand">☀ vZEV {{ anlage }}</span><span class="ver" title="Version der App">v{{ version }}</span>
 <button id="menu" type="button" aria-expanded="false" aria-controls="nav" onclick="var s=document.getElementById('side');var o=s.classList.toggle('offen');this.setAttribute('aria-expanded',o);this.textContent=o?'Schliessen':'Menü'">Menü</button></div>

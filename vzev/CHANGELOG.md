@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.7
+
+- Handy: Werte in den Karten bleiben zusammen und rechtsbündig (z. B. «2'813.600 kWh», Name und Entität im Datensammler).
+- Handy: Feld «Begründung der Korrektur» bei Rechnungen ragt nicht mehr über den Rand.
+
 ## 0.3.6
 
 - Eigenes AppArmor-Profil: Die App darf nur noch in ihren Datenordner (/config), /data, /tmp und /run schreiben. Hebt die Sicherheitsbewertung in Home Assistant von 7 auf 8.
