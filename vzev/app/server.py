@@ -104,6 +104,9 @@ def config():
 
 
 collector = Collector(str(DATA / "messwerte.sqlite"), config)
+import preise  # noqa: E402
+preisabruf = preise.Preisabruf(collector._db, config)
+collector.preise = preisabruf
 
 # --- Hilfen -------------------------------------------------------------------
 _cache = {}

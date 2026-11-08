@@ -214,6 +214,15 @@ class Collector:
                     if self.evcc_status != f"Fehler: {e}":
                         log.error("evcc: %s", e)
                     self.evcc_status = f"Fehler: {e}"
+            preise = getattr(self, "preise", None)
+            if preise is not None and (tick % 4 == 0 or 18 <= datetime.now().hour < 21):
+                self.aktiv = "Strompreise abrufen"
+                try:
+                    preise.abrufen()
+                except Exception as e:
+                    log.error("Strompreise: %s", e)
+                finally:
+                    self.aktiv = None
             tick += 1
             now = datetime.now()
             nxt = (now.replace(second=5, microsecond=0) + timedelta(minutes=15 - now.minute % 15))

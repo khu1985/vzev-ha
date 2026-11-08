@@ -82,3 +82,38 @@ STIL = """<style>
 document.addEventListener('mousemove',function(e){var t=document.getElementById('tip');if(!t)return;var d=e.target.getAttribute&&e.target.getAttribute('data-tip');
 if(d){t.textContent=d;t.style.display='block';var x=e.clientX+14,y=e.clientY+14;if(x+t.offsetWidth>innerWidth-8)x=e.clientX-t.offsetWidth-14;t.style.left=x+'px';t.style.top=y+'px'}else t.style.display='none'});
 </script>"""
+
+
+def tagesverlauf(reihen, einheit="Rp./kWh", hoehe=240):
+    """Treppenlinien über einen Tag. reihen = [(name, farbe, [(minute_seit_mitternacht, wert), …])]."""
+    werte = [w for _, _, pkt in reihen for _, w in pkt]
+    if not werte:
+        return '<p class="muted">Noch keine Preise.</p>'
+    lo, hi = min(0, min(werte)), max(werte) * 1.08 or 1
+    ticks = _ticks(hi)
+    hi = ticks[-1]
+    links, rechts, unten, oben, breite = 52, 12, 26, 10, 1000
+    pw, ph = breite - links - rechts, hoehe - unten - oben
+    x = lambda m: links + m / 1440 * pw
+    y = lambda v: oben + ph - (v - lo) / (hi - lo) * ph
+    t = [f'<svg class="chart" viewBox="0 0 {breite} {hoehe}" role="img" aria-label="Preisverlauf" style="width:100%;min-width:560px;height:auto">']
+    for v in ticks:
+        t.append(f'<line x1="{links}" x2="{breite - rechts}" y1="{y(v):.1f}" y2="{y(v):.1f}" class="grid"/>'
+                 f'<text x="{links - 8}" y="{y(v) + 4:.1f}" text-anchor="end" class="ax">{_zahl(v, 0 if hi >= 10 else 1)}</text>')
+    for h in range(0, 25, 3):
+        t.append(f'<text x="{x(h * 60):.1f}" y="{hoehe - 8}" text-anchor="middle" class="ax">{h:02d}</text>')
+    for name, farbe, pkt in reihen:
+        if not pkt:
+            continue
+        d = ""
+        for i, (m, v) in enumerate(pkt):
+            m2 = pkt[i + 1][0] if i + 1 < len(pkt) else m + 15
+            d += (f"M{x(m):.1f},{y(v):.1f}" if i == 0 else f" V{y(v):.1f}") + f" H{x(m2):.1f}"
+        t.append(f'<path d="{d}" fill="none" stroke="{farbe}" stroke-width="2" stroke-linejoin="round"/>')
+        for i, (m, v) in enumerate(pkt):
+            m2 = pkt[i + 1][0] if i + 1 < len(pkt) else m + 15
+            t.append(f'<rect class="hit" x="{x(m):.1f}" y="{oben}" width="{max(1, x(m2) - x(m)):.1f}" height="{ph}" '
+                     f'data-tip="{escape(name)} {m // 60:02d}:{m % 60:02d}&#10;{_zahl(v, 2)} {einheit}"/>')
+    t.append("</svg>")
+    legende = "".join(f'<span class="lg"><i style="background:{f}"></i>{escape(n)}</span>' for n, f, p in reihen if p)
+    return f'<div class="legende">{legende}</div><div class="scroll">{"".join(t)}</div>'

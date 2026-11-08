@@ -227,6 +227,42 @@ def test_zahlungseingang(app):
     assert "Rechnungen und Zahlungen" in h and "2026-Q2-1OG" in h and "ersetzte Fassung" in h
 
 
+def test_strompreise_einstellen_und_abrufen(app):
+    server, c, d, quelle = app
+    from test_preise import antwort
+    import json, threading
+    from datetime import date, timedelta
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from urllib.parse import parse_qs, urlparse
+
+    class H(BaseHTTPRequestHandler):
+        def do_GET(self):
+            q = parse_qs(urlparse(self.path).query)
+            body = json.dumps(antwort(date.fromisoformat(q["start_timestamp"][0][:10]))).encode()
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a):
+            pass
+    srv = HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        url = f"http://127.0.0.1:{srv.server_port}/api/v1/tariffs"
+        assert "nicht gespeichert" in ziel(c.post("/batterie?teil=dynamisch", data={"api_url": "ftp://x"})).lower()
+        heute = date.today()
+        r = c.post("/batterie?teil=dynamisch", data={"api_url": url, "tarif_name": "NetzDynamisch", "tarif_typ": "",
+                                                     "abrufen_ab": (heute - timedelta(days=2)).isoformat(), "aktiv": "1"})
+        assert "Gespeichert" in ziel(r)
+        assert yaml.safe_load((d / "vzev.yaml").read_text())["dynamisch"]["api_url"] == url
+        r = c.post("/preise_abrufen")
+        assert "Viertelstunden" in ziel(r), ziel(r)
+        h = c.get("/batterie").get_data(as_text=True)
+        assert "Dynamische Strompreise" in h and "Heute" in h and "Rp./kWh" in h and url in h
+    finally:
+        srv.shutdown()
+
+
 def test_abschnitt_speichern_behaelt_kommentare(app):
     server, c, d, quelle = app
     text = (d / "vzev.yaml").read_text()
