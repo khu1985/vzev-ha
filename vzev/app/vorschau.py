@@ -86,7 +86,14 @@ def berechnen(db, cfg, ab=None, res_primeo=None):
     df["Prod"] = anlage.clip(lower=0)
     df["PVA"] = (-anlage).clip(lower=0)
     df["tarif"] = _tarif(idx, tarifmuster(res_primeo))
-    res = core.compute(df[["1OG", "2OG", "Allg", "PVA", "Prod", "tarif"]], None, cfg, ev=df["EV"])
+    dyn = None
+    try:
+        import preise
+        r = core.dyn_regeln(cfg)
+        dyn = preise.serie(db, r["bonus_ab"]) if r["bonus"] else None
+    except Exception:
+        pass
+    res = core.compute(df[["1OG", "2OG", "Allg", "PVA", "Prod", "tarif"]], None, cfg, ev=df["EV"], dyn=dyn)
     res["ha_ok"] = vorhanden.values
     return res, info
 

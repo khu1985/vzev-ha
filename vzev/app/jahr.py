@@ -95,10 +95,11 @@ Die Zahlen können sich bis zum Abschluss aller Monate ändern.</div>{% else %}<
  <div class="kpi"><div class="t">Wertschöpfung</div><div class="v">{{ d.k.wert|f2 }} <small>CHF</small></div><div class="s">inkl. manuell erfasster Erträge</div></div>
 </div>
 <div class="card"><h2>Allgemeinstrom {{ d.von.strftime('%d.%m.') }}–{{ d.bis.strftime('%d.%m.%Y') }}</h2><div class="scroll"><table class="wide">
-<tr><th>Monat</th><th>Solar kWh</th><th>Netz HT</th><th>Netz NT</th><th>Solar CHF</th><th>Netz CHF</th><th>Grundpreis</th><th>Total CHF</th></tr>
-{% for r in d.allg %}<tr><td>{{ r.monat }}</td><td>{{ r.solar|f2 }}</td><td>{{ r.ht|f2 }}</td><td>{{ r.nt|f2 }}</td><td>{{ r.solar_chf|f2 }}</td><td>{{ r.netz_chf|f2 }}</td><td>{{ r.grundpreis|f2 }}</td><td><b>{{ r.total|f2 }}</b></td></tr>{% endfor %}
-<tr class="sum"><td>Total</td><td>{{ d.allg|sum(attribute='solar')|f2 }}</td><td>{{ d.allg|sum(attribute='ht')|f2 }}</td><td>{{ d.allg|sum(attribute='nt')|f2 }}</td>
-<td>{{ d.allg|sum(attribute='solar_chf')|f2 }}</td><td>{{ d.allg|sum(attribute='netz_chf')|f2 }}</td><td>{{ d.allg|sum(attribute='grundpreis')|f2 }}</td><td>{{ d.k.allg|f2 }}</td></tr>
+{% set sp = d.allg|sum(attribute='speicher') > 0.0005 %}{% set bo = d.allg|sum(attribute='bonus') > 0 %}
+<tr><th>Monat</th><th>Solar kWh</th><th>Netz HT</th><th>Netz NT</th>{% if sp %}<th>Speicher NT</th>{% endif %}<th>Solar CHF</th><th>Netz CHF</th><th>Grundpreis</th>{% if bo %}<th>Bonus</th>{% endif %}<th>Total CHF</th></tr>
+{% for r in d.allg %}<tr><td>{{ r.monat }}</td><td>{{ r.solar|f2 }}</td><td>{{ r.ht|f2 }}</td><td>{{ r.nt|f2 }}</td>{% if sp %}<td>{{ r.speicher|f2 }}</td>{% endif %}<td>{{ r.solar_chf|f2 }}</td><td>{{ (r.netz_chf + r.speicher_chf)|f2 }}</td><td>{{ r.grundpreis|f2 }}</td>{% if bo %}<td>–{{ r.bonus|f2 }}</td>{% endif %}<td><b>{{ r.total|f2 }}</b></td></tr>{% endfor %}
+<tr class="sum"><td>Total</td><td>{{ d.allg|sum(attribute='solar')|f2 }}</td><td>{{ d.allg|sum(attribute='ht')|f2 }}</td><td>{{ d.allg|sum(attribute='nt')|f2 }}</td>{% if sp %}<td>{{ d.allg|sum(attribute='speicher')|f2 }}</td>{% endif %}
+<td>{{ d.allg|sum(attribute='solar_chf')|f2 }}</td><td>{{ (d.allg|sum(attribute='netz_chf') + d.allg|sum(attribute='speicher_chf'))|f2 }}</td><td>{{ d.allg|sum(attribute='grundpreis')|f2 }}</td>{% if bo %}<td>–{{ d.allg|sum(attribute='bonus')|f2 }}</td>{% endif %}<td>{{ d.k.allg|f2 }}</td></tr>
 </table></div><p class="muted">Ohne Ladestation, inkl. Standby der PV-Anlage. Das PDF fasst diese Tabelle für die Nebenkostenabrechnung zusammen.</p></div>
 <div class="card"><h2>Mieter {{ jahr }}</h2><div class="scroll"><table>
 <tr><th class="l">Mieter</th><th class="l">Zeitraum</th><th>Verbrauch kWh</th><th>davon Solar</th><th>Berechnet CHF</th><th>In Rechnung gestellt</th><th>Bezahlt</th><th class="l">Rechnungen</th></tr>
@@ -163,7 +164,8 @@ def excel():
             ("Rücklieferung CHF", None if k["export_chf"] is None else round(k["export_chf"], 2)),
             ("Wertschöpfung CHF", round(k["wert"], 2))], columns=["Kennzahl", "Wert"]),
         "Allgemeinstrom": pd.DataFrame([{"Monat": r["monat"], "Solar kWh": r["solar"], "Netz HT kWh": r["ht"], "Netz NT kWh": r["nt"],
-                                         "Solar CHF": r["solar_chf"], "Netz CHF": r["netz_chf"], "Grundpreis CHF": r["grundpreis"],
+                                         "Speicher NT kWh": r["speicher"], "Solar CHF": r["solar_chf"], "Netz CHF": r["netz_chf"],
+                                         "Speicher CHF": r["speicher_chf"], "Grundpreis CHF": r["grundpreis"], "Bonus CHF": -r["bonus"],
                                          "Total CHF": r["total"]} for r in d["allg"]]),
         "Mieter": pd.DataFrame([{"Mieter": m["name"], "Einheit": m["einheit"], "Von": m["von"], "Bis": m["bis"], "Verbrauch kWh": m["kwh"],
                                  "Solar kWh": m["solar"], "Berechnet CHF": m["betrag"], "In Rechnung gestellt CHF": m["gestellt"],
@@ -175,7 +177,8 @@ def excel():
             z = d["monate"].get(p, {}).get(kk)
             if z is not None:
                 zeilen.append({"Monat": p.strftime("%m.%Y"), "Zähler": label, "Solar kWh": z.solar, "Netz HT kWh": z.ht, "Netz NT kWh": z.nt,
-                               "Solar CHF": z.solar_chf, "Netz CHF": z.netz_chf})
+                               "Speicher NT kWh": z.speicher, "Solar CHF": z.solar_chf, "Netz CHF": z.netz_chf,
+                               "Speicher CHF": z.speicher_chf, "Bonus CHF": -z.bonus_chf})
     blaetter["Zähler pro Monat"] = pd.DataFrame(zeilen)
     w = d["w"].copy()
     w.index = [p.strftime("%m.%Y") for p in w.index]

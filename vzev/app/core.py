@@ -212,8 +212,44 @@ def distribute_ev(df, lade, baseline):
     return ev
 
 
-def compute(df, lade, cfg, ev=None):
-    """ev: gemessene Ladestation pro Viertelstunde (Vorschau aus Home Assistant); sonst aus den Ladevorgängen verteilt."""
+ZAEHLER = ["1OG", "2OG", "AllgC", "EV"]
+SPEICHER_STANDARD = {"speicher_ab": "2027-01-01", "pva_standby_max_kwh": 0.05, "speicher_wirkungsgrad": 0.9}
+DYN_STANDARD = {"bonus": True, "bonus_ab": "2027-01-01", "konzession_prozent": 4.1, "mwst_prozent": 8.1}
+
+
+def speicher_regeln(cfg):
+    r = dict(SPEICHER_STANDARD)
+    r.update({k: v for k, v in (cfg.get("regeln") or {}).items() if k in SPEICHER_STANDARD and v not in (None, "")})
+    return r
+
+
+def dyn_regeln(cfg):
+    r = dict(DYN_STANDARD)
+    r.update({k: v for k, v in (cfg.get("dynamisch") or {}).items() if k in DYN_STANDARD and v not in (None, "")})
+    return r
+
+
+def speicher_fifo(laden, intern, eta):
+    """Netzstrom im Speicher: Netzladung (× Wirkungsgrad) kommt in einen Vorrat; was danach aus der Anlage im Haus
+    verbraucht wird, stammt zuerst aus diesem Vorrat (first in, first out). Gibt die kWh pro Viertelstunde zurück."""
+    out = np.zeros(len(laden))
+    vorrat = 0.0
+    for i, (l, v) in enumerate(zip(laden, intern)):
+        vorrat += l * eta
+        if vorrat > 0 and v > 0:
+            x = min(vorrat, v)
+            out[i] = x
+            vorrat -= x
+    return out
+
+
+def compute(df, lade, cfg, ev=None, dyn=None):
+    """ev: gemessene Ladestation pro Viertelstunde (Vorschau aus Home Assistant); sonst aus den Ladevorgängen verteilt.
+    dyn: dynamische Preise pro Viertelstunde (Spalten integrated, grid_usage in CHF/kWh exkl. MWST) für den Bonus.
+
+    Ab «speicher_ab»: Netzbezug am Zähler der PV-Anlage über «pva_standby_max_kwh» pro Viertelstunde ist Laden des
+    Speichers aus dem Netz (Kosten Betreiber, Spalte «Laden»); nur der Standby geht in den Allgemeinstrom. Strom, der
+    später aus diesem Vorrat im Haus verbraucht wird, ist «Netzstrom aus Speicher» (P_…) statt Solarstrom (S_…)."""
     df = df.copy()
     rules, tar = cfg["regeln"], cfg["tarife"]
     if ev is None:
@@ -222,19 +258,45 @@ def compute(df, lade, cfg, ev=None):
     df["AllgC"] = df["Allg"] - df["EV"]
     cons = df["1OG"] + df["2OG"] + df["AllgC"] + df["EV"]
     ratio = np.where(cons > 0, np.minimum(df["Prod"] / cons.replace(0, np.nan), 1.0), 0.0)
-    for k in ["1OG", "2OG", "AllgC", "EV"]:
-        df[f"S_{k}"] = df[k] * ratio
-        df[f"N_{k}"] = df[k] - df[f"S_{k}"]
-    df["N_AllgC"] += df["PVA"]
+    sp = speicher_regeln(cfg)
+    ab = df.index >= pd.Timestamp(str(sp["speicher_ab"]))
+    standby = np.where(ab, np.minimum(df["PVA"], float(sp["pva_standby_max_kwh"])), df["PVA"])
+    df["Laden"] = df["PVA"] - standby
+    intern = np.minimum(df["Prod"], cons)
+    speicher = speicher_fifo(df["Laden"].to_numpy(), intern.to_numpy(), float(sp["speicher_wirkungsgrad"]))
+    anteil = np.where(intern > 0, speicher / intern.replace(0, np.nan), 0.0)
+    for k in ZAEHLER:
+        s = df[k] * ratio
+        df[f"P_{k}"] = s * anteil
+        df[f"S_{k}"] = s - df[f"P_{k}"]
+        df[f"N_{k}"] = df[k] - s
+    df["N_AllgC"] += standby
     df["Export"] = np.maximum(df["Prod"] - cons, 0)
     ht = tariff_series(df.index, tar["netz"], "ht")
     nt = tariff_series(df.index, tar["netz"], "nt")
     df["price"] = np.where(df["tarif"] == "HT", ht, nt)
     df["solarprice"] = tariff_series(df.index, tar["solar"], "chf")
+    df["speicherprice"] = tariff_series(df.index, tar.get("speicher") or tar["solar"], "chf")
     df["exprice"] = tariff_series(df.index, tar["ruecklieferung"], "chf")
     df["occ_1OG"] = occupied(df.index, cfg, "1OG")
     df["month"] = df.index.to_period("M")
+    dynamisch(df, cfg, dyn)
     return df
+
+
+def dynamisch(df, cfg, dyn):
+    """Bonus aus dem dynamischen Tarif: pro Viertelstunde Standardtarif HT/NT minus dynamischer Preis
+    (integrated + Konzessionsabgabe auf die Netznutzung, plus MWST), mal Netzbezug. Ohne Preis kein Bonus."""
+    r = dyn_regeln(cfg)
+    df["dynprice"] = np.nan
+    if dyn is not None and len(dyn) and "integrated" in dyn:
+        d = dyn.reindex(df.index)
+        netz = d["grid_usage"].fillna(0.0) if "grid_usage" in d else 0.0
+        df["dynprice"] = (d["integrated"] + float(r["konzession_prozent"]) / 100 * netz) * (1 + float(r["mwst_prozent"]) / 100)
+    df["bonus_zeit"] = bool(r["bonus"]) & (df.index >= pd.Timestamp(str(r["bonus_ab"])))
+    vorteil = (df["price"] - df["dynprice"]).where(df["bonus_zeit"]).fillna(0.0)
+    for k in ZAEHLER:
+        df[f"B_{k}"] = df[f"N_{k}"] * vorteil
 
 
 def zaehler_summen(res, k, mask=None):
@@ -249,6 +311,10 @@ def zaehler_summen(res, k, mask=None):
         "nt": nt.groupby(g).sum(),
         "solar_chf": (r[f"S_{k}"] * r["solarprice"]).groupby(g).sum(),
         "netz_chf": (r[f"N_{k}"] * r["price"]).groupby(g).sum(),
+        "speicher": r[f"P_{k}"].groupby(g).sum(),
+        "speicher_chf": (r[f"P_{k}"] * r["speicherprice"]).groupby(g).sum(),
+        "bonus_chf": r[f"B_{k}"].groupby(g).sum(),
+        "dyn_fehlt": (r["bonus_zeit"] & r["dynprice"].isna() & (r[f"N_{k}"] > 0)).groupby(g).sum(),
         "ersparnis_chf": (r[f"S_{k}"] * r["price"]).groupby(g).sum(),
         "letzte_viertelstunde": r.index.to_series().groupby(g).max(),
     })
@@ -259,6 +325,9 @@ def wertschoepfung(res, cfg):
     occ = res["occ_1OG"].astype(float)
     mieter_kwh = res["S_1OG"] * occ + res["S_AllgC"] * share * occ
     eigen_kwh = res["S_2OG"] + res["S_EV"] + res["S_1OG"] * (1 - occ) + res["S_AllgC"] * (1 - share * occ)
+    sp_mieter = res["P_1OG"] * occ + res["P_AllgC"] * share * occ
+    sp_eigen = res["P_2OG"] + res["P_EV"] + res["P_1OG"] * (1 - occ) + res["P_AllgC"] * (1 - share * occ)
+    ladepreis = res["dynprice"].fillna(res["price"])
     g = res["month"]
     out = pd.DataFrame({
         "export_kwh": res["Export"].groupby(g).sum(),
@@ -267,6 +336,9 @@ def wertschoepfung(res, cfg):
         "mieter_chf": (mieter_kwh * res["solarprice"]).groupby(g).sum(),
         "eigen_kwh": eigen_kwh.groupby(g).sum(),
         "eigen_chf": (eigen_kwh * res["price"]).groupby(g).sum(),
+        # Speicher: Verkauf/Eigennutzung von Netzstrom aus dem Speicher minus Kosten der Netzladung
+        "speicher_chf": (sp_mieter * res["speicherprice"] + sp_eigen * res["price"] - res["Laden"] * ladepreis).groupby(g).sum(),
+        "laden_kwh": res["Laden"].groupby(g).sum(),
     })
     man = cfg.get("manuell", {})
     ex = pd.Series({pd.Period(str(e["monat"]), "M"): e["chf"] for e in man.get("ruecklieferung_vor_start", [])}, dtype=float)
@@ -274,12 +346,12 @@ def wertschoepfung(res, cfg):
     out = out.reindex(out.index.union(ex.index).union(ue.index))
     out.loc[ex.index, "export_chf"] = ex
     out["uebrige_chf"] = ue.reindex(out.index).fillna(0)
-    out["total_chf"] = out[["export_chf", "mieter_chf", "eigen_chf", "uebrige_chf"]].sum(axis=1, min_count=1)
+    out["total_chf"] = out[["export_chf", "mieter_chf", "eigen_chf", "uebrige_chf", "speicher_chf"]].sum(axis=1, min_count=1)
     return out
 
 
 def abgleich(res, cfg):
-    netz = res[["N_1OG", "N_2OG", "N_AllgC", "N_EV"]].sum(axis=1)
+    netz = res[["N_1OG", "N_2OG", "N_AllgC", "N_EV", "Laden"]].sum(axis=1)
     rows = []
     end = lambda d: pd.Timestamp(d) + pd.Timedelta(days=1)
     for r in cfg["primeo_rechnungen"]:
@@ -295,10 +367,10 @@ def abgleich(res, cfg):
     return out
 
 
-def run(datadir, config=None, cache_dir=None):
+def run(datadir, config=None, cache_dir=None, dyn=None):
     cfg = load_config(config)
     df, lade, files = load(datadir, cfg, cache_dir)
-    res = compute(df, lade, cfg)
+    res = compute(df, lade, cfg, dyn=dyn)
     ev_check = abs(res["EV"].sum() - lade["kwh"].sum())
     return cfg, res, files, lade, ev_check
 

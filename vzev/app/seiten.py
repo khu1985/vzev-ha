@@ -184,7 +184,7 @@ def monatswerte(b):
         d = {}
         for k, _ in ZL:
             r = sums[k].loc[m]
-            d[k] = {"solar": round(r.solar, 3), "ht": round(r.ht, 3), "nt": round(r.nt, 3), "chf": round(r.solar_chf + r.netz_chf, 2)}
+            d[k] = {"solar": round(r.solar, 3), "ht": round(r.ht, 3), "nt": round(r.nt, 3), "chf": round(r.solar_chf + r.netz_chf + r.speicher_chf - max(r.bonus_chf, 0), 2)}
         wr = w.loc[m] if m in w.index else None
         d["wertschoepfung"] = None if wr is None or pd.isna(wr.total_chf) else round(float(wr.total_chf), 2)
         d["rueck_offen"] = bool(wr is not None and pd.isna(wr.export_chf))
@@ -378,8 +378,9 @@ def tarife():
             ab = _d(request.form.get("abrufen_ab") or "2027-01-01")
         except ValueError:
             return redirect("tarife?c=warn&msg=Nicht gespeichert: ungültiges Datum")
-        neu = {"api_url": url, "tarif_name": (request.form.get("tarif_name") or "NetzDynamisch").strip(),
-               "tarif_typ": request.form.get("tarif_typ") or "", "abrufen_ab": ab, "aktiv": bool(request.form.get("aktiv"))}
+        neu = dict(cfg.get("dynamisch") or {})  # Bonus-Einstellungen behalten
+        neu.update({"api_url": url, "tarif_name": (request.form.get("tarif_name") or "NetzDynamisch").strip(),
+                    "tarif_typ": request.form.get("tarif_typ") or "", "abrufen_ab": ab, "aktiv": bool(request.form.get("aktiv"))})
         abschnitt_speichern("dynamisch", neu, "Dynamische Strompreise – bearbeitet in der App")
         S.log.info("Preis-Schnittstelle gespeichert: %s (%s, %s)", url, neu["tarif_name"], neu["tarif_typ"] or "alle")
         return redirect("tarife?msg=Gespeichert")
@@ -605,7 +606,7 @@ BATTERIE = """
 <td>{{ '%.0f %%'|format(m.entladen / m.geladen * 100) if m.geladen else '–' }}</td><td>{{ m.pv|f2 }}</td><td>{{ m.bezug|f2 }}</td><td>{{ m.einspeisung|f2 }}</td></tr>
 {% else %}<tr><td colspan="8" class="l">Noch keine Daten vom Wechselrichter. Der Datensammler speichert sie alle 15 Minuten.</td></tr>{% endfor %}</table></div>
 <p class="muted">Tageswerte des Solis-Wechselrichters (Höchstwert pro Tag), gesammelt vom Datensammler. Für die Abrechnung zählen weiterhin die Primeo-Lastgänge.</p></div>
-<p class="muted">Dynamische Strompreise: Seite <a href="tarife">Tarife</a>. Regeln für Netzladung und Entladung: <a href="einstellungen?tab=regeln">Einstellungen → Regeln</a>.</p>"""
+<p class="muted">Dynamische Strompreise: Seite <a href="tarife">Tarife</a>. Speicher und Bonus: <a href="einstellungen?tab=regeln">Einstellungen → Regeln</a>.</p>"""
 
 
 def batterie():
@@ -693,14 +694,21 @@ PREISKARTE = """<div class="card"><h2>Dynamische Strompreise</h2>
 </table><p><button class="primary">Speichern</button> <span class="muted">Standard laut Primeo-Merkblatt: https://tarife.primeo-energie.ch/api/v1/tariffs</span></p></form></details></div>
 """
 
-BATTERIE_REGELN = """<form method="post" action="einstellungen?tab=batterie" class="card"><h2>Batterie und dynamischer Tarif</h2>
-<table class="form"><tr><td class="l">Netzladung zahlt</td><td class="l"><select name="netzladung_zahlt">{% for k, v in [('betreiber','Betreiber'),('alle','alle Bezüger anteilig')] %}<option value="{{ k }}" {{ 'selected' if r.netzladung_zahlt == k }}>{{ v }}</option>{% endfor %}</select></td></tr>
-<tr><td class="l">Netzanteil bei Entladung</td><td class="l"><select name="entladung_netzanteil">{% for k, v in [('solarpreis','wie Solarstrom zum vZEV-Preis'),('ladepreis','zum Preis beim Laden'),('offen','noch abzuklären')] %}<option value="{{ k }}" {{ 'selected' if r.entladung_netzanteil == k }}>{{ v }}</option>{% endfor %}</select></td></tr>
-<tr><td class="l">Dynamischer Tarif ab</td><td class="l"><input type="date" name="dynamisch_ab" value="{{ r.dynamisch_ab or '' }}"></td></tr>
-<tr><td class="l">Abgeklärt / Notiz</td><td class="l"><input name="notiz" value="{{ r.notiz or '' }}" style="width:360px"></td></tr></table>
+BATTERIE_REGELN = """<form method="post" action="einstellungen?tab=batterie" class="card"><h2>Speicher und dynamischer Tarif</h2>
+<table class="form">
+<tr><td class="l">Gilt ab</td><td class="l"><input type="date" name="speicher_ab" value="{{ sp.speicher_ab }}"></td></tr>
+<tr><td class="l">Standby PV-Anlage bis</td><td class="l"><input name="pva_standby_max_kwh" value="{{ sp.pva_standby_max_kwh }}" style="width:80px"> kWh pro 15 Min.
+<span class="muted">mehr Netzbezug am Zähler der PV-Anlage = Laden des Speichers aus dem Netz</span></td></tr>
+<tr><td class="l">Wirkungsgrad Speicher</td><td class="l"><input name="speicher_wirkungsgrad" value="{{ (sp.speicher_wirkungsgrad * 100)|round(0)|int }}" style="width:80px"> %</td></tr>
+<tr><td class="l">Bonus dynamischer Tarif</td><td class="l"><label><input type="checkbox" name="bonus" value="1" {{ 'checked' if dy.bonus }}> Vorteil gegenüber HT/NT gutschreiben</label> ab <input type="date" name="bonus_ab" value="{{ dy.bonus_ab }}"></td></tr>
+<tr><td class="l">Konzessionsabgabe</td><td class="l"><input name="konzession_prozent" value="{{ dy.konzession_prozent }}" style="width:80px"> % auf die Netznutzung <span class="muted">(fehlt in den Preisen der Schnittstelle)</span></td></tr>
+<tr><td class="l">MWST</td><td class="l"><input name="mwst_prozent" value="{{ dy.mwst_prozent }}" style="width:80px"> %</td></tr>
+</table>
 <p><button class="primary">Speichern</button></p>
-<p class="muted">Heute lädt die Batterie nur aus PV, deshalb ändert sie an der Abrechnung nichts: Solarstrom aus der Batterie ist Solarstrom. Ab dem dynamischen Tarif kann sie auch aus dem Netz laden;
-dann rechnet die App die Netzladung dem Betreiber zu und verrechnet den Netzanteil bei der Entladung nach der gewählten Regel. Diese Berechnung baue ich ein, sobald die ersten Daten mit Netzladung da sind und die Regel mit Primeo abgeklärt ist.</p></form>"""
+<p class="muted">Laden aus dem Netz bezahlt der Betreiber; nur der Standby bleibt im Allgemeinstrom. Wird dieser Netzstrom später im Haus verbraucht,
+steht er auf der Rechnung als «Speicher NT» zum vZEV-Preis und nicht als Solarstrom (zuerst geladen, zuerst verbraucht).
+Bonus: pro Viertelstunde Standardtarif HT/NT minus dynamischer Preis (integrated + Konzessionsabgabe auf grid_usage, plus MWST), mal Netzbezug;
+pro Monat nie negativ. Grundpreis und Messung sind in beiden Tarifen gleich und zählen nicht.</p></form>"""
 
 REGELN = """<form method="post" action="einstellungen?tab=regeln" class="card"><h2>Regeln der Aufteilung</h2><table class="form">
 <tr><td class="l">Netzbezug PV-Anlage (Standby) geht auf</td><td class="l"><select name="pva_standby_auf">{% for k, v in [('Allg','Allgemeinstrom')] %}<option value="{{ k }}" selected>{{ v }}</option>{% endfor %}</select></td></tr>
@@ -748,9 +756,23 @@ def einstellungen_formulare(tab):
                 abschnitt_speichern("messpunkte", {r["mp"]: r["z"] for r in mp})
                 abschnitt_speichern("homeassistant", ha)
             elif tab == "batterie":
-                neu = {k: (request.form.get(k) or "").strip() or None for k in ("netzladung_zahlt", "entladung_netzanteil", "notiz")}
-                neu["dynamisch_ab"] = _d(request.form.get("dynamisch_ab") or None)
-                abschnitt_speichern("batterie", neu, "Batterie – bearbeitet in der App")
+                f = lambda k: float((request.form.get(k) or "0").replace(",", "."))
+                sp = {"speicher_ab": _d(request.form.get("speicher_ab") or "2027-01-01"),
+                      "pva_standby_max_kwh": f("pva_standby_max_kwh"), "speicher_wirkungsgrad": round(f("speicher_wirkungsgrad") / 100, 4)}
+                if not 0.5 <= sp["speicher_wirkungsgrad"] <= 1 or sp["pva_standby_max_kwh"] < 0:
+                    raise ValueError("Wirkungsgrad zwischen 50 und 100 %, Standby nicht negativ")
+                dy = {"bonus": bool(request.form.get("bonus")), "bonus_ab": _d(request.form.get("bonus_ab") or "2027-01-01"),
+                      "konzession_prozent": f("konzession_prozent"), "mwst_prozent": f("mwst_prozent")}
+
+                def uebernehmen(abschnitt, neu, aktuell, notiz=None):
+                    """Nur schreiben, was sich gegenüber dem wirksamen Wert ändert (Standardwerte bleiben unsichtbar)."""
+                    alt = dict(cfg.get(abschnitt) or {})
+                    geaendert = {k: v for k, v in neu.items() if k in alt or str(v) != str(aktuell[k])}
+                    if any(alt.get(k) != v for k, v in geaendert.items()):
+                        alt.update(geaendert)
+                        abschnitt_speichern(abschnitt, alt, *([notiz] if notiz else []))
+                uebernehmen("regeln", sp, core.speicher_regeln(cfg))
+                uebernehmen("dynamisch", dy, core.dyn_regeln(cfg), "Dynamische Strompreise – bearbeitet in der App")
                 tab = "regeln"
             elif tab == "regeln":
                 r = dict(cfg.get("regeln") or {})
@@ -771,8 +793,8 @@ def einstellungen_formulare(tab):
         body = render_template_string(ZAEHLER, t_mp=editor("mp", F_MP, [dict(mp=k, z=v) for k, v in (cfg.get("messpunkte") or {}).items()]),
                                       t_ha=editor("ha", F_HA, [dict(z=k, e=v) for k, v in ((cfg.get("homeassistant") or {}).get("zaehler") or {}).items()]))
     else:
-        rb = {"netzladung_zahlt": "betreiber", "entladung_netzanteil": "offen", "dynamisch_ab": "2027-01-01", **(cfg.get("batterie") or {})}
-        body = render_template_string(REGELN, r=cfg.get("regeln") or {}) + render_template_string(BATTERIE_REGELN, r=rb)
+        body = render_template_string(REGELN, r=cfg.get("regeln") or {}) + render_template_string(
+            BATTERIE_REGELN, sp=core.speicher_regeln(cfg), dy=core.dyn_regeln(cfg))
     return S.page("Einstellungen", kopf + body)
 
 
