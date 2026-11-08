@@ -136,7 +136,17 @@ _cache = {}
 
 def files_key():
     fs = sorted(p for p in PRIMEO.iterdir() if p.is_file())
-    return tuple((p.name, p.stat().st_mtime) for p in fs) + ((CFG.name, CFG.stat().st_mtime),)
+    return tuple((p.name, p.stat().st_mtime) for p in fs) + ((CFG.name, CFG.stat().st_mtime), preise.stand(collector._db))
+
+
+def dyn_preise():
+    """Dynamische Preise ab Beginn des Bonus (für die Berechnung), sonst None."""
+    try:
+        r = core.dyn_regeln(config())
+        return preise.serie(collector._db, r["bonus_ab"]) if r["bonus"] else None
+    except Exception:
+        log.exception("Dynamische Preise nicht lesbar")
+        return None
 
 
 _rechnen = threading.Lock()
@@ -162,7 +172,7 @@ def berechnung(grund="Seitenaufruf"):
         t0 = time.time()
         RECHNEN.update(aktiv=True, start=t0, grund=grund)
         try:
-            cfg, res, files, lade, ev = core.run(PRIMEO, CFG, DATA / ".cache")
+            cfg, res, files, lade, ev = core.run(PRIMEO, CFG, DATA / ".cache", dyn=dyn_preise())
             _cache.update(key=key, ok=True, cfg=cfg, res=res, files=files, ev=ev, fehler=None)
         except BaseException as e:  # SystemExit bei fehlenden Dateien
             _cache.update(key=key, ok=False, fehler=str(e) or traceback.format_exc(limit=1))

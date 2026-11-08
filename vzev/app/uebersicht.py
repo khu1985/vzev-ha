@@ -209,6 +209,25 @@ def index():
         ab = d["info"].get("abdeckung", 0)
         kontrollen.append((ab > 0.95, "Zählerstände aus Home Assistant vollständig", f"{ab * 100:.0f} % der Viertelstunden haben Werte aller Zähler"))
     kontrollen.append((not mon.loc[p, "tarif_offen"], "Rückliefertarif vorhanden", "in «Tarife» erfasst" if not mon.loc[p, "tarif_offen"] else "In «Tarife» ergänzen, sobald Primeo ihn publiziert"))
+    # Solarpreis höchstens 80 % des Standardprodukts für die gleiche Strommenge (Pauschale nach EnV)
+    sol = rm[["S_1OG", "S_2OG", "S_AllgC"]].sum(axis=1)
+    if sol.sum() > 0:
+        std = float((sol * rm["price"]).sum() / sol.sum())
+        sp = float((sol * rm["solarprice"]).sum() / sol.sum())
+        kontrollen.append((sp <= 0.8 * std + 1e-9, "Solarpreis höchstens 80 % des Standardprodukts",
+                           f"Solarpreis {sp * 100:.2f} Rp., Grenze {0.8 * std * 100:.2f} Rp. (80 % von {std * 100:.2f} Rp., "
+                           "gewichtet nach HT/NT des Solarverbrauchs)"))
+    if rm["bonus_zeit"].any():
+        netz = rm[["N_1OG", "N_2OG", "N_AllgC"]].sum(axis=1) > 0
+        fehlt = int((netz & rm["dynprice"].isna()).sum())
+        bonus = float(rm[["B_1OG", "B_2OG", "B_AllgC"]].sum().sum())
+        kontrollen.append((fehlt == 0, "Dynamische Preise vollständig",
+                           (f"Bonus für Mieter und Allgemeinstrom CHF {bonus:.2f}" if not fehlt else
+                            f"{fehlt} Viertelstunden mit Netzbezug ohne Preis – Bonus dort 0; Preise unter «Tarife» abrufen")))
+    if rm["Laden"].sum() > 0.01:
+        kontrollen.append((None, "Speicher aus dem Netz geladen",
+                           f"{rm['Laden'].sum():.2f} kWh Netzladung (Kosten Betreiber), davon im Haus als Speicher NT verbraucht: "
+                           f"{rm[['P_1OG', 'P_2OG', 'P_AllgC', 'P_EV']].sum().sum():.2f} kWh"))
     a = seiten.abschluss_laden()
     abw = seiten.abweichungen(b) if b.get("ok") else []
     if sel in a["monate"]:
@@ -237,18 +256,18 @@ def index():
         tot = r.solar + r.ht + r.nt
         aut = r.solar / tot * 100 if tot else None
         if k == "1OG":
-            partei, betrag, hinw = _parteien(cfg, p), r.solar_chf + r.netz_chf + gp * occ, ("verrechnet" if occ > 0.99 else "anteilig vermietet" if occ > 0 else "Betreiber")
+            partei, betrag, hinw = _parteien(cfg, p), r.solar_chf + r.netz_chf + r.speicher_chf - max(r.bonus_chf, 0) + gp * occ, ("verrechnet" if occ > 0.99 else "anteilig vermietet" if occ > 0 else "Betreiber")
         elif k == "2OG":
             partei, betrag, hinw = "Betreiber", None, "Eigenverbrauch"
         elif k == "AllgC":
-            partei, betrag, hinw = "ohne Ladestation, Gesamtrechnung", r.solar_chf + r.netz_chf + gp, "für Nebenkostenabrechnung"
+            partei, betrag, hinw = "ohne Ladestation, Gesamtrechnung", r.solar_chf + r.netz_chf + r.speicher_chf - max(r.bonus_chf, 0) + gp, "für Nebenkostenabrechnung"
         else:
             partei, betrag, hinw = "Betreiber", None, f"Ersparnis {r.ersparnis_chf:.2f} CHF ggü. Netz"
         verbraucher.append(dict(k=k, label=label, partei=partei, solar=r.solar, ht=r.ht, nt=r.nt, autarkie=aut, betrag=betrag, hinweis=hinw))
 
     sums = {k: _memo("s_" + k, lambda k=k: core.zaehler_summen(res, k)) for k, _ in ZL}
     tab = [(m.strftime("%m.%Y") + ("*" if mon.loc[m, "vorlaeufig"] else ""), [(sums[k].loc[m, "solar"], sums[k].loc[m, "ht"], sums[k].loc[m, "nt"],
-                                     sums[k].loc[m, "solar_chf"] + sums[k].loc[m, "netz_chf"]) for k, _ in ZL]) for m in perioden]
+                                     sums[k].loc[m, "solar_chf"] + sums[k].loc[m, "netz_chf"] + sums[k].loc[m, "speicher_chf"] - max(sums[k].loc[m, "bonus_chf"], 0)) for k, _ in ZL]) for m in perioden]
     auswahl = [(str(x), _titel(x) + (" (vorläufig)" if mon.loc[x, "vorlaeufig"] else "")) for x in reversed(perioden)]
     return S.page("Übersicht", render_template_string(
         UEBERSICHT, res_ok=True, abw=abw, auswahl=auswahl, sel=sel, titel=_titel(p), mon=mon.loc[p], vor=vor,
@@ -302,7 +321,7 @@ def verlauf():
         if z in ("1OG", "AllgC"):
             gp = invoices.grundpreis(cfg, p.start_time) * (occ.get(p, 0) if z == "1OG" else 1)
         tot = r.solar + r.ht + r.nt
-        total = (r.ersparnis_chf if z == "EV" else r.solar_chf + r.netz_chf + gp)
+        total = (r.ersparnis_chf if z == "EV" else r.solar_chf + r.netz_chf + r.speicher_chf - max(r.bonus_chf, 0) + gp)
         status = "abgeschlossen" if str(p) in a["monate"] else ("vorläufig" if mon.loc[p, "vorlaeufig"] else "offen")
         gruppe = _parteien(cfg, p) if z == "1OG" else None
         zeilen.append(dict(gruppe=gruppe if gruppe != gruppe_alt else None, label=_titel(p) + ("*" if mon.loc[p, "vorlaeufig"] else ""),

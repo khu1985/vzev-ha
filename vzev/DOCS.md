@@ -29,7 +29,7 @@ QR-Einzahlungsschein erstellen, Zahlungen verfolgen und Monate revisionssicher a
 - **Mieter:** Mietverhältnisse mit Historie.
 - **Tarife:** Tarife mit Gültig-ab-Datum und **Dynamische Strompreise** (Verlauf heute/morgen, Schnittstelle einstellen).
 - **Primeo:** Primeo-Rechnungen für den Abgleich, manuelle Erträge.
-- **Einstellungen:** Betreiber, Zähler, Regeln (Aufteilung sowie Batterie und dynamischer Tarif) und die Datei `vzev.yaml` direkt.
+- **Einstellungen:** Betreiber, Zähler, Regeln (Aufteilung sowie Speicher und Bonus dynamischer Tarif) und die Datei `vzev.yaml` direkt.
 
 **Anlage**
 - **Batterie:** Monatswerte des Speichers (geladen, entladen, Wirkungsgrad) aus den Solis-Daten.
@@ -60,7 +60,13 @@ Für die Zeit nach dem letzten Primeo-Lastgang rechnet die App mit den gesammelt
 
 ## Dynamische Strompreise
 
-Die App holt die Viertelstundenpreise über die Primeo-Schnittstelle (Standard: `https://tarife.primeo-energie.ch/api/v1/tariffs`), stündlich und zwischen 18 und 21 Uhr alle 15 Minuten. Adresse, Tarifname, Tariftyp und Startdatum lassen sich unter **Tarife → Dynamische Strompreise → Schnittstelle einstellen** ändern. Die Preise enthalten keine kantonalen/kommunalen Abgaben und keine MWST. Für die Abrechnung werden sie noch nicht verwendet.
+Die App holt die Viertelstundenpreise über die Primeo-Schnittstelle (Standard: `https://tarife.primeo-energie.ch/api/v1/tariffs`), stündlich und zwischen 18 und 21 Uhr alle 15 Minuten. Adresse, Tarifname, Tariftyp und Startdatum lassen sich unter **Tarife → Dynamische Strompreise → Schnittstelle einstellen** ändern. Die Preise enthalten keine kantonalen/kommunalen Abgaben und keine MWST.
+
+**Bonus (ab 2027):** Die Rechnung bleibt bei HT/NT. Pro Viertelstunde rechnet die App Standardtarif minus dynamischen Preis (Typ `integrated` plus Konzessionsabgabe auf `grid_usage`, plus MWST) mal Netzbezug und schreibt die Summe als Zeile «Bonus dynamischer Stromtarif» gut – pro Monat nie negativ. Fehlt ein Preis, gibt es für diese Viertelstunde keinen Bonus (Kontrolle in der Übersicht). Einstellungen unter **Einstellungen → Regeln**.
+
+**Speicher (ab 2027):** Netzbezug am Zähler der PV-Anlage über der Standby-Grenze ist Laden der Batterie aus dem Netz und geht auf den Betreiber. Strom, der aus diesem Vorrat später im Haus verbraucht wird (zuerst geladen, zuerst verbraucht, abzüglich Wirkungsgrad), erscheint als «Speicher NT» zum vZEV-Preis und nicht als Solarstrom.
+
+**80-%-Grenze:** Die Übersicht prüft pro Monat, ob der Solarpreis höchstens 80 % des Standardprodukts beträgt (gewichtet nach HT/NT des Solarverbrauchs). Voraussetzung: Solar- und Netztarife auf der gleichen Basis (inkl. MWST).
 
 ## Daten und Sicherung
 

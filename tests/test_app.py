@@ -121,8 +121,8 @@ def test_formulare_speichern_ohne_werte_zu_aendern(app):
             if m.group(1):
                 a = m.group(1)
                 n = re.search(r'name="([^"]+)"', a)
-                if not n or 'type="checkbox"' in a:
-                    continue
+                if not n or ('type="checkbox"' in a and "checked" not in a):
+                    continue  # wie der Browser: nur angehakte Checkboxen werden gesendet
                 v = re.search(r'value="([^"]*)"', a)
                 daten_.append((n.group(1), (v.group(1) if v else "").replace("&#39;", "'").replace("&amp;", "&")))
             else:
@@ -263,11 +263,14 @@ def test_strompreise_einstellen_und_abrufen(app):
         assert "preise_abrufen" not in c.get("/batterie").get_data(as_text=True)
         assert "preise_abrufen" not in c.get("/primeo").get_data(as_text=True)
         h = c.get("/einstellungen?tab=regeln").get_data(as_text=True)
-        assert "Batterie und dynamischer Tarif" in h and "Netzladung zahlt" in h
-        r = c.post("/einstellungen?tab=batterie", data={"netzladung_zahlt": "betreiber", "entladung_netzanteil": "offen",
-                                                        "dynamisch_ab": "2027-01-01", "notiz": "Test"})
+        assert "Speicher und dynamischer Tarif" in h and "Standby PV-Anlage bis" in h and "Konzessionsabgabe" in h
+        r = c.post("/einstellungen?tab=batterie", data={"speicher_ab": "2027-01-01", "pva_standby_max_kwh": "0,06",
+                                                        "speicher_wirkungsgrad": "88", "bonus": "1", "bonus_ab": "2027-01-01",
+                                                        "konzession_prozent": "4.1", "mwst_prozent": "8.1"})
         assert "tab=regeln" in ziel(r) and "Gespeichert" in ziel(r)
-        assert yaml.safe_load((d / "vzev.yaml").read_text())["batterie"]["notiz"] == "Test"
+        y = yaml.safe_load((d / "vzev.yaml").read_text())
+        assert y["regeln"]["pva_standby_max_kwh"] == 0.06 and y["regeln"]["speicher_wirkungsgrad"] == 0.88
+        assert "bonus" not in y["dynamisch"] and y["dynamisch"]["api_url"] == url  # Standard bleibt unsichtbar, Schnittstelle erhalten
     finally:
         srv.shutdown()
 

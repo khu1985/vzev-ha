@@ -187,3 +187,25 @@ def typen_vorhanden(db):
 
 def verbinden(pfad):
     return lambda: sqlite3.connect(pfad, timeout=30)
+
+
+def serie(db, ab=None):
+    """Gespeicherte Preise als Tabelle: Index = Viertelstunde Lokalzeit (wie die Lastgänge), Spalten je Tariftyp."""
+    import pandas as pd
+    with db() as c:
+        rows = c.execute("SELECT start_lokal, typ, chf_kwh FROM preise" + (" WHERE start_lokal >= ?" if ab else ""),
+                         ((str(ab),) if ab else ())).fetchall()
+    if not rows:
+        return None
+    t = pd.DataFrame(rows, columns=["zeit", "typ", "chf"])
+    t["zeit"] = pd.to_datetime(t["zeit"])
+    return t.groupby(["zeit", "typ"])["chf"].first().unstack("typ")
+
+
+def stand(db):
+    """Kurzer Schlüssel, der sich ändert, sobald neue Preise gespeichert werden (für den Rechen-Zwischenspeicher)."""
+    try:
+        with db() as c:
+            return tuple(c.execute("SELECT COUNT(*), MAX(abgerufen) FROM preise").fetchone())
+    except Exception:
+        return (0, None)

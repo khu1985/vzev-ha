@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0
+
+- Speicher ab 2027: Lädt die Batterie aus dem Netz (Netzbezug am Zähler der PV-Anlage über dem Standby), bezahlt das der Betreiber; im Allgemeinstrom bleibt nur der Standby. Wird dieser Netzstrom später im Haus verbraucht, steht er auf der Rechnung als eigene Spalte «Speicher NT» zum vZEV-Preis und nicht als Solarstrom.
+- Bonus dynamischer Tarif ab 2027: Die Rechnung bleibt bei HT/NT; der Vorteil des dynamischen Primeo-Tarifs (pro Viertelstunde Standardtarif minus dynamischer Preis inkl. Konzessionsabgabe und MWST) wird als eigene Zeile gutgeschrieben, pro Monat nie negativ.
+- Übersicht: neue Kontrollen «Solarpreis höchstens 80 % des Standardprodukts», «Dynamische Preise vollständig» und Netzladung des Speichers.
+- Einstellungen → Regeln: Speicher (gilt ab, Standby-Grenze, Wirkungsgrad) und Bonus (ab, Konzessionsabgabe, MWST).
+- Jahresabrechnung und Excel-Export mit Speicher und Bonus; Wertschöpfung rechnet Speicherverkauf minus Kosten der Netzladung.
+- Rechnungs-PDF: Diagramme passen sich an, wenn mehr Fussnoten nötig sind.
+
 ## 0.6.0
 
 - Jahresabrechnung: neue Seite unter «Abrechnung» mit Allgemeinstrom fürs ganze Jahr (Monatstabelle und Total), Mietern (berechnet, in Rechnung gestellt, bezahlt), Zählern pro Monat und Wertschöpfung. Hinweis «vorläufig», solange nicht alle Monate abgeschlossen sind.

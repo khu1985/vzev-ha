@@ -78,6 +78,78 @@ def tarif_hinweise(cfg, von, bis):
             + (" bzw. ".join(f"{x:.2f}" for x in gp) or "–") + " CHF pro Zähler und Monat."]
 
 
+def tabelle(c, L, R, hy, rows):
+    """Monatstabelle (Rechnung und Jahresaufstellung). Spalte «Speicher NT» nur, wenn Netzstrom aus dem Speicher
+    geliefert wurde; Bonus aus dem dynamischen Tarif als eigene Zeile vor dem Total. Gibt (y unter Total, Total) zurück."""
+    speicher = any(r.get("speicher", 0) > 0.0005 for r in rows)
+    bonus = round(sum(r.get("bonus", 0) for r in rows), 2)
+    if speicher:
+        cols = [("Monat", 0, "l"), ("Solar kWh", 46, "r"), ("HT kWh", 64, "r"), ("NT kWh", 81, "r"),
+                ("Speicher NT", 100, "r"), ("Solar CHF", 117, "r"), ("Netz CHF", 135, "r"), ("Grundpreis*", 152, "r"),
+                ("Total CHF", 168, "r")]
+    else:
+        cols = [("Monat", 0, "l"), ("Solar kWh", 52, "r"), ("Netz HT kWh", 74, "r"), ("Netz NT kWh", 96, "r"),
+                ("Solar CHF", 116, "r"), ("Netz CHF", 134, "r"), ("Grundpreis*", 153, "r"), ("Total CHF", 170, "r")]
+
+    def zeile(vals, y):
+        for (name, x, al), v in zip(cols, vals):
+            (c.drawString if al == "l" else c.drawRightString)(L + (2 if al == "l" else x) * mm, y, v)
+
+    def werte(label, r, total):
+        v = [label, kwh(r["solar"]), kwh(r["ht"]), kwh(r["nt"])]
+        if speicher:
+            v.append(kwh(r.get("speicher", 0)))
+        # Netz CHF inkl. Netzstrom aus Speicher; Total ohne Bonus (der folgt als eigene Zeile)
+        return v + [chf(r["solar_chf"]), chf(r["netz_chf"] + r.get("speicher_chf", 0)), chf(r["grundpreis"]), chf(total)]
+
+    c.setFillColor(HexColor("#26313A"))
+    c.rect(L, hy - 2.2 * mm, R - L, 7 * mm, stroke=0, fill=1)
+    c.setFillColor(white)
+    c.setFont("Helvetica-Bold", 7 if speicher else 7.5)
+    zeile([n for n, _, _ in cols], hy)
+    yy = hy - 7 * mm
+    c.setFont("Helvetica", 8.5)
+    keys = ("solar", "ht", "nt", "speicher", "solar_chf", "netz_chf", "speicher_chf", "grundpreis", "total")
+    sums = dict.fromkeys(keys, 0)
+    for r in rows:
+        c.setFillColor(INK)
+        zeile(werte(r["monat"], r, r["total"] + r.get("bonus", 0)), yy)
+        for k in keys:
+            sums[k] += r.get(k, 0)
+        c.setStrokeColor(LINE)
+        c.setLineWidth(0.4)
+        c.line(L, yy - 2.5 * mm, R, yy - 2.5 * mm)
+        yy -= 6.5 * mm
+    total = round(sums["total"], 2)
+    if bonus:
+        c.setFillColor(HexColor("#2E8B57"))
+        c.setFont("Helvetica-Bold", 8.5)
+        c.drawString(L + 2 * mm, yy, "Bonus dynamischer Stromtarif (Gutschrift)")
+        c.drawRightString(L + cols[-1][1] * mm, yy, "– " + chf(bonus))
+        c.setStrokeColor(LINE)
+        c.line(L, yy - 2.5 * mm, R, yy - 2.5 * mm)
+        yy -= 6.5 * mm
+    c.setFillColor(SOFT)
+    c.rect(L, yy - 2.2 * mm, R - L, 6.5 * mm, stroke=0, fill=1)
+    c.setFillColor(INK)
+    c.setFont("Helvetica-Bold", 8.5)
+    zeile(werte("Total", sums, total), yy)
+    return yy, total
+
+
+def zusatz_hinweise(cfg, rows):
+    """Fussnoten zu Speicher und Bonus, nur wenn sie vorkommen."""
+    out = []
+    if any(r.get("speicher", 0) > 0.0005 for r in rows):
+        out.append("Speicher NT: Netzstrom, der nachts in den Batteriespeicher geladen und später im Haus verbraucht wurde, "
+                   "zum vZEV-Preis; nicht als Solarstrom ausgewiesen.")
+    if any(r.get("bonus", 0) for r in rows):
+        fehlt = sum(r.get("dyn_fehlt", 0) for r in rows)
+        out.append("Bonus: Differenz zwischen Standardtarif HT/NT und dem dynamischen Tarif von Primeo pro Viertelstunde, "
+                   "voll gutgeschrieben" + (f" ({int(fehlt)} Viertelstunden ohne publizierten Preis ausgenommen)." if fehlt else "."))
+    return out
+
+
 def render_jahr(path, cfg, rows, jahr, von, bis, vorlaeufig):
     """Jahresaufstellung Allgemeinstrom für die Nebenkostenabrechnung."""
     W, H = A4
@@ -106,43 +178,12 @@ def render_jahr(path, cfg, rows, jahr, von, bis, vorlaeufig):
     c.setFont("Helvetica-Bold", 15)
     c.drawString(L, ty, f"Allgemeinstrom {jahr} · Aufstellung für die Nebenkostenabrechnung" if not vorlaeufig
                  else f"Allgemeinstrom {jahr} · Aufstellung (vorläufig)")
-    cols = [("Monat", 0, "l"), ("Solar kWh", 52, "r"), ("Netz HT kWh", 74, "r"), ("Netz NT kWh", 96, "r"),
-            ("Solar CHF", 116, "r"), ("Netz CHF", 134, "r"), ("Grundpreis*", 153, "r"), ("Total CHF", 170, "r")]
     hy = ty - 10 * mm
-    c.setFillColor(HexColor("#26313A"))
-    c.rect(L, hy - 2.2 * mm, R - L, 7 * mm, stroke=0, fill=1)
-    c.setFillColor(white)
-    c.setFont("Helvetica-Bold", 7.5)
-    for name, x, al in cols:
-        (c.drawString if al == "l" else c.drawRightString)(L + (2 if al == "l" else x) * mm, hy, name)
-    yy = hy - 7 * mm
-    c.setFont("Helvetica", 8.5)
-    sums = dict(solar=0, ht=0, nt=0, solar_chf=0, netz_chf=0, grundpreis=0, total=0)
-    for r in rows:
-        c.setFillColor(INK)
-        vals = [r["monat"], kwh(r["solar"]), kwh(r["ht"]), kwh(r["nt"]), chf(r["solar_chf"]), chf(r["netz_chf"]),
-                chf(r["grundpreis"]), chf(r["total"])]
-        for (name, x, al), v in zip(cols, vals):
-            (c.drawString if al == "l" else c.drawRightString)(L + (2 if al == "l" else x) * mm, yy, v)
-        for k in sums:
-            sums[k] += r[k]
-        c.setStrokeColor(LINE)
-        c.setLineWidth(0.4)
-        c.line(L, yy - 2.5 * mm, R, yy - 2.5 * mm)
-        yy -= 6.5 * mm
-    total = round(sums["total"], 2)
-    c.setFillColor(SOFT)
-    c.rect(L, yy - 2.2 * mm, R - L, 6.5 * mm, stroke=0, fill=1)
-    c.setFillColor(INK)
-    c.setFont("Helvetica-Bold", 8.5)
-    vals = ["Total", kwh(sums["solar"]), kwh(sums["ht"]), kwh(sums["nt"]), chf(sums["solar_chf"]),
-            chf(sums["netz_chf"]), chf(sums["grundpreis"]), chf(total)]
-    for (name, x, al), v in zip(cols, vals):
-        (c.drawString if al == "l" else c.drawRightString)(L + (2 if al == "l" else x) * mm, yy, v)
+    yy, total = tabelle(c, L, R, hy, rows)
     ny = yy - 9 * mm
     c.setFont("Helvetica", 7)
     c.setFillColor(MUTED)
-    notes = tarif_hinweise(cfg, von, bis) + [
+    notes = tarif_hinweise(cfg, von, bis) + zusatz_hinweise(cfg, rows) + [
         "Ohne Ladestation (separat erfasst); inkl. Standby-Netzbezug der PV-Anlage. Grundlage: Primeo-Lastgänge in 15-Minuten-Auflösung."]
     if vorlaeufig:
         notes.append("Vorläufig: Nicht alle Monate des Zeitraums sind abgeschlossen oder es fehlen noch Lastgänge.")
@@ -171,12 +212,14 @@ def lines_for(res, cfg, zaehler, von, bis):
         m1 = min(per.end_time.date(), bis)
         days, dim = (m1 - m0).days + 1, calendar.monthrange(per.year, per.month)[1]
         gp = round(grundpreis(cfg, m0) * days / dim, 2)
-        solar_chf, netz_chf = round(r.solar_chf, 2), round(r.netz_chf, 2)
-        total_kwh = r.solar + r.ht + r.nt
+        solar_chf, netz_chf, speicher_chf = round(r.solar_chf, 2), round(r.netz_chf, 2), round(r.speicher_chf, 2)
+        bonus = max(round(r.bonus_chf, 2), 0.0)  # der Mieter hat nie einen Nachteil
+        total_kwh = r.solar + r.ht + r.nt + r.speicher
         rows.append(dict(
             monat=MONATE[per.month] + ("" if days == dim else f" ({m0.day}.–{m1.day}.)"),
             solar=r.solar, ht=r.ht, nt=r.nt, solar_chf=solar_chf, netz_chf=netz_chf, grundpreis=gp,
-            total=round(solar_chf + netz_chf + gp, 2),
+            speicher=r.speicher, speicher_chf=speicher_chf, bonus=bonus, dyn_fehlt=int(r.dyn_fehlt),
+            total=round(solar_chf + netz_chf + speicher_chf + gp - bonus, 2),
             autarkie=100 * r.solar / total_kwh if total_kwh else 100.0,
             letzte=r.letzte_viertelstunde, monatsende=per.end_time.floor("15min"),
         ))
@@ -206,7 +249,7 @@ def donuts_png(rows):
     fig, axes = plt.subplots(1, n, figsize=(1.6 * n, 1.75), dpi=220)
     axes = [axes] if n == 1 else axes
     for ax, r in zip(axes, rows):
-        netz = r["ht"] + r["nt"]
+        netz = r["ht"] + r["nt"] + r.get("speicher", 0)
         ax.pie([r["solar"], max(netz, 1e-6)], colors=["#E8A21B", "#3B5B8C"], startangle=90, counterclock=False,
                wedgeprops=dict(width=0.32, edgecolor="white", linewidth=1.5))
         ax.text(0, 0.06, f"{r['autarkie']:.1f}%", ha="center", va="center", fontsize=10, fontweight="bold", color="#16201C")
@@ -368,43 +411,12 @@ def render(path, cfg, inv, nummer, rechnungsdatum, quartal_label):
     c.drawString(L, ty, f"{title} · {quartal_label}" + (" (vorläufig)" if inv["vorlaeufig"] else ""))
 
     # Tabelle
-    cols = [("Monat", 0, "l"), ("Solar kWh", 52, "r"), ("Netz HT kWh", 74, "r"), ("Netz NT kWh", 96, "r"),
-            ("Solar CHF", 116, "r"), ("Netz CHF", 134, "r"), ("Grundpreis*", 153, "r"), ("Total CHF", 170, "r")]
     hy = ty - 9 * mm
-    c.setFillColor(HexColor("#26313A"))
-    c.rect(L, hy - 2.2 * mm, R - L, 7 * mm, stroke=0, fill=1)
-    c.setFillColor(white)
-    c.setFont("Helvetica-Bold", 7.5)
-    for name, x, al in cols:
-        (c.drawString if al == "l" else c.drawRightString)(L + (2 if al == "l" else x) * mm, hy, name)
-    yy = hy - 7 * mm
-    c.setFont("Helvetica", 8.5)
-    sums = dict(solar=0, ht=0, nt=0, solar_chf=0, netz_chf=0, grundpreis=0, total=0)
-    for r in rows:
-        c.setFillColor(INK)
-        vals = [r["monat"], kwh(r["solar"]), kwh(r["ht"]), kwh(r["nt"]), chf(r["solar_chf"]), chf(r["netz_chf"]),
-                chf(r["grundpreis"]), chf(r["total"])]
-        for (name, x, al), v in zip(cols, vals):
-            (c.drawString if al == "l" else c.drawRightString)(L + (2 if al == "l" else x) * mm, yy, v)
-        for k in sums:
-            sums[k] += r[k]
-        c.setStrokeColor(LINE)
-        c.setLineWidth(0.4)
-        c.line(L, yy - 2.5 * mm, R, yy - 2.5 * mm)
-        yy -= 6.5 * mm
-    c.setFillColor(SOFT)
-    c.rect(L, yy - 2.2 * mm, R - L, 6.5 * mm, stroke=0, fill=1)
-    c.setFillColor(INK)
-    c.setFont("Helvetica-Bold", 8.5)
-    vals = ["Total", kwh(sums["solar"]), kwh(sums["ht"]), kwh(sums["nt"]), chf(sums["solar_chf"]),
-            chf(sums["netz_chf"]), chf(sums["grundpreis"]), chf(total)]
-    for (name, x, al), v in zip(cols, vals):
-        (c.drawString if al == "l" else c.drawRightString)(L + (2 if al == "l" else x) * mm, yy, v)
-
+    yy, total = tabelle(c, L, R, hy, rows)
     ny = yy - 8 * mm
     c.setFont("Helvetica", 7)
     c.setFillColor(MUTED)
-    notes = tarif_hinweise(cfg, inv["von"], inv["bis"])
+    notes = tarif_hinweise(cfg, inv["von"], inv["bis"]) + zusatz_hinweise(cfg, rows)
     if not wohnung:
         notes.append("Ohne Ladestation (separat erfasst); inkl. Standby-Netzbezug der PV-Anlage. Zur Übernahme in die Nebenkostenabrechnung.")
     for i, n in enumerate(notes):
@@ -416,7 +428,9 @@ def render(path, cfg, inv, nummer, rechnungsdatum, quartal_label):
     c.setFillColor(INK)
     c.drawString(L, gy, "Anteil Solarstrom (Autarkie) pro Monat")
     img = donuts_png(rows)
-    iw, ih = 36 * mm * len(rows), 39 * mm
+    by_fest = 113 * mm if wohnung else None
+    ih = 39 * mm if by_fest is None else max(22 * mm, min(39 * mm, gy - by_fest - 17 * mm))  # nicht in den Betrag hinein
+    iw = 36 * mm * len(rows) * ih / (39 * mm)
     c.drawImage(img, L, gy - ih - 1 * mm, iw, ih, mask="auto")
     lx = L + iw + 6 * mm
     for i, (col, lab) in enumerate([(AMBER, "Solarstrom"), (BLUE, "Netzstrom")]):

@@ -187,12 +187,12 @@ GET https://tarife.primeo-energie.ch/api/v1/tariffs
 - Adresse, Tarifname, Tariftyp und Startdatum sind in der App einstellbar (Seite «Tarife»), gespeichert im Abschnitt `dynamisch` von `vzev.yaml`.
 - Die Preise enthalten keine kantonalen/kommunalen Abgaben und keine MWST.
 
-Noch offen, bevor die Preise in die Abrechnung einfliessen:
+So fliessen sie ab 2027 in die Abrechnung ein (Entscheid Betreiber):
 
-- Netzstrompreis für die Mieter: dynamischer Viertelstundenpreis oder fester Preis (Basis-Standardtarif als Obergrenze)
-- kantonale und kommunale Abgaben 2027 (Primeo-Preisblatt 2027)
-- Batterie-Netzladung: läuft über den Zähler «Netzbezug PV-Anlage» und muss vom Standby getrennt und dem Betreiber zugerechnet werden
-- Verrechnung von Netzstrom, der aus der Batterie wieder entladen wird (mit Primeo abzuklären)
+- **Rechnung bleibt HT/NT** zum Standardtarif; Solarstrom separat zum vZEV-Preis (Pauschale, höchstens 80 % des Standardprodukts – Kontrolle in der Übersicht).
+- **Bonus:** pro Viertelstunde `Netzbezug × (Standardtarif − dynamischer Preis)`, dynamischer Preis = (`integrated` + Konzessionsabgabe × `grid_usage`) × (1 + MWST). Summe als Gutschrift auf der Rechnung, pro Monat nie negativ; ohne publizierten Preis kein Bonus.
+- **Speicher:** Netzbezug am Zähler «Netzbezug PV-Anlage» über der Standby-Grenze ist Netzladung (Kosten Betreiber). Ein Vorrat (× Wirkungsgrad) wird beim nächsten internen Verbrauch von Anlagenstrom zuerst aufgebraucht (FIFO); diese kWh erscheinen als «Speicher NT» zum vZEV-Preis statt als Solarstrom.
+- Alles gilt ab dem eingestellten Datum (Standard 01.01.2027); abgeschlossene Monate davor bleiben unverändert.
 
 ## Daten und Sicherung
 
