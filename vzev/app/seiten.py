@@ -263,7 +263,7 @@ MIETER = """
 {{ tabelle|safe }}
 <p class="muted">Bis leer = läuft noch. Adresse leer = Adresse der Liegenschaft. Jede Zeile ergibt eine eigene Rechnung pro Quartal.</p>
 <button class="primary">Speichern</button></form>
-<style>.zeitachse{display:flex;gap:3px;min-height:52px}.seg{background:var(--okbg);color:var(--ok);border-radius:8px;padding:6px 8px;overflow:hidden;min-width:70px}
+<style>.zeitachse{display:flex;gap:3px;min-height:52px}@media (max-width:759px){.zeitachse{flex-direction:column}.seg{flex:none!important}}.seg{background:var(--okbg);color:var(--ok);border-radius:8px;padding:6px 8px;overflow:hidden;min-width:70px}
 .seg span{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.seg small{font-size:11px;white-space:nowrap}
 .seg.leer{background:var(--warnbg);color:var(--warn)}</style>"""
 
@@ -581,14 +581,14 @@ BATTERIE = """
  <div class="kpi"><div>Entladen {{ monat }}</div><div>{{ akt.entladen|f2 }} kWh</div></div>
  <div class="kpi"><div>Wirkungsgrad {{ monat }}</div><div>{{ '%.0f %%'|format(akt.entladen / akt.geladen * 100) if akt.geladen else '–' }}</div></div>
 </div>
-<div class="card"><h2>Pro Monat</h2><div class="scroll"><table>
+<div class="card"><h2>Pro Monat</h2><div class="scroll"><table class="wide">
 <tr><th>Monat</th><th>Tage mit Daten</th><th>Geladen kWh</th><th>Entladen kWh</th><th>Wirkungsgrad</th><th>PV-Ertrag kWh</th><th>Netzbezug kWh</th><th>Einspeisung kWh</th></tr>
 {% for m in monate %}<tr><td>{{ m.monat }}</td><td>{{ m.tage }}</td><td>{{ m.geladen|f2 }}</td><td>{{ m.entladen|f2 }}</td>
 <td>{{ '%.0f %%'|format(m.entladen / m.geladen * 100) if m.geladen else '–' }}</td><td>{{ m.pv|f2 }}</td><td>{{ m.bezug|f2 }}</td><td>{{ m.einspeisung|f2 }}</td></tr>
 {% else %}<tr><td colspan="8" class="l">Noch keine Daten vom Wechselrichter. Der Datensammler speichert sie alle 15 Minuten.</td></tr>{% endfor %}</table></div>
 <p class="muted">Tageswerte des Solis-Wechselrichters (Höchstwert pro Tag), gesammelt vom Datensammler. Für die Abrechnung zählen weiterhin die Primeo-Lastgänge.</p></div>
 <form method="post" action="batterie" class="card"><h2>Regeln für die Abrechnung</h2>
-<table style="width:auto"><tr><td class="l">Netzladung zahlt</td><td class="l"><select name="netzladung_zahlt">{% for k, v in [('betreiber','Betreiber'),('alle','alle Bezüger anteilig')] %}<option value="{{ k }}" {{ 'selected' if r.netzladung_zahlt == k }}>{{ v }}</option>{% endfor %}</select></td></tr>
+<table class="form"><tr><td class="l">Netzladung zahlt</td><td class="l"><select name="netzladung_zahlt">{% for k, v in [('betreiber','Betreiber'),('alle','alle Bezüger anteilig')] %}<option value="{{ k }}" {{ 'selected' if r.netzladung_zahlt == k }}>{{ v }}</option>{% endfor %}</select></td></tr>
 <tr><td class="l">Netzanteil bei Entladung</td><td class="l"><select name="entladung_netzanteil">{% for k, v in [('solarpreis','wie Solarstrom zum vZEV-Preis'),('ladepreis','zum Preis beim Laden'),('offen','noch abzuklären')] %}<option value="{{ k }}" {{ 'selected' if r.entladung_netzanteil == k }}>{{ v }}</option>{% endfor %}</select></td></tr>
 <tr><td class="l">Dynamischer Tarif ab</td><td class="l"><input type="date" name="dynamisch_ab" value="{{ r.dynamisch_ab or '' }}"></td></tr>
 <tr><td class="l">Preis-Schnittstelle Primeo</td><td class="l"><input name="preis_api" value="{{ r.preis_api or '' }}" placeholder="URL, sobald von Primeo bekannt" style="width:360px"></td></tr>
@@ -636,7 +636,7 @@ def batterie():
 EINST_TABS = """<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">{% for k, v in [('betreiber','Betreiber und Rechnungen'),('zaehler','Zähler'),('regeln','Regeln'),('datei','Datei vzev.yaml')] %}
 <a class="btn {{ 'primary' if k == tab }}" href="einstellungen?tab={{ k }}">{{ v }}</a>{% endfor %}</div>"""
 
-BETREIBER = """<form method="post" action="einstellungen?tab=betreiber" class="card"><h2>Betreiber</h2><table style="width:auto">
+BETREIBER = """<form method="post" action="einstellungen?tab=betreiber" class="card"><h2>Betreiber</h2><table class="form">
 {% for k, l in felder %}<tr><td class="l">{{ l }}</td><td class="l"><input name="b.{{ k }}" value="{{ b.get(k) or '' }}" style="width:320px"></td></tr>{% endfor %}
 <tr><td class="l">vZEV-Start</td><td class="l"><input type="date" name="vzev_start" value="{{ start }}"></td></tr>
 <tr><td class="l">Zahlungsfrist (Tage)</td><td class="l"><input name="frist" value="{{ r.zahlungsfrist_tage }}" style="width:80px"></td></tr>
@@ -649,7 +649,7 @@ ZAEHLER = """<form method="post" action="einstellungen?tab=zaehler"><div class="
 <p class="muted">Energie-Sensoren in kWh (total_increasing). Der Datensammler speichert sie alle 15 Minuten.</p></div>
 <p><button class="primary">Speichern</button></p></form>"""
 
-REGELN = """<form method="post" action="einstellungen?tab=regeln" class="card"><h2>Regeln der Aufteilung</h2><table style="width:auto">
+REGELN = """<form method="post" action="einstellungen?tab=regeln" class="card"><h2>Regeln der Aufteilung</h2><table class="form">
 <tr><td class="l">Netzbezug PV-Anlage (Standby) geht auf</td><td class="l"><select name="pva_standby_auf">{% for k, v in [('Allg','Allgemeinstrom')] %}<option value="{{ k }}" selected>{{ v }}</option>{% endfor %}</select></td></tr>
 <tr><td class="l">Allgemeinstrom</td><td class="l"><select name="allgemein_rechnung"><option value="gesamt" selected>Gesamtrechnung für die Nebenkostenabrechnung</option></select></td></tr>
 <tr><td class="l">Mieteranteil Allgemeinstrom (nur Wertschöpfung)</td><td class="l"><input name="allgemein_mieteranteil" value="{{ (r.allgemein_mieteranteil * 100)|round(1) }}" style="width:80px"> %</td></tr>

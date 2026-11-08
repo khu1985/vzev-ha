@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.5
+
+- Handy: Tabellen werden zu Karten mit Beschriftung pro Wert (Import, Abschluss, Verbraucher, Abgleich, Datensammler, Rechnungen, Protokoll).
+- Handy: Eingabetabellen (Mieter, Tarife, Primeo, Zähler) als Karten pro Zeile mit vollbreiten Feldern; Formulare (Betreiber, Regeln, Batterie) mit Beschriftung über dem Feld. Nichts ragt mehr über den Bildschirmrand.
+- Handy: Monatstabellen (Verlauf, Alle Monate, Wertschöpfung) scrollen seitlich mit fester Monatsspalte; Diagramme mit grösserer Beschriftung, beginnend bei den neuesten Monaten.
+- Handy: Mieter-Historie untereinander statt nebeneinander.
+
 ## 0.3.4
 
 - Verlauf: neue Spalte «Verbrauch kWh» (Solar + Netz HT + Netz NT) pro Monat und in der Summe, für alle Zähler. Im Diagramm zeigt der Tooltip zuerst den Verbrauch gesamt, dann Solar und Netz.

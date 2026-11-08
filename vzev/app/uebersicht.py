@@ -115,7 +115,7 @@ Angezeigt wird nur die Vorschau aus Home Assistant. Prüfe die Dateien unter <a 
 <tr><th class="l">Zähler</th><th>Home Assistant kWh</th><th>Primeo kWh</th><th>Differenz</th><th>%</th></tr>
 {% for v in vergleich %}<tr><td class="l">{{ v.zaehler }}</td><td>{{ v.ha|f2 }}</td><td>{{ v.primeo|f2 }}</td><td>{{ v.diff|f2 }}</td><td>{{ '%.1f'|format(v.prozent) if v.prozent is not none else '–' }}</td></tr>{% endfor %}
 </table></div><p class="muted">Zeitraum, in dem beides vorliegt. Zeigt, wie genau die Vorschau ist.</p></div>{% endif %}
-<details class="card"><summary><b>Alle Monate pro Zähler</b></summary><div class="scroll" style="margin-top:12px"><table>
+<details class="card"><summary><b>Alle Monate pro Zähler</b></summary><div class="scroll" style="margin-top:12px"><table class="wide">
 <tr><th>Monat</th>{% for z in zl %}<th>{{ z[1] }} Solar</th><th>Netz HT/NT</th><th>CHF*</th>{% endfor %}</tr>
 {% for m, row in tab %}<tr><td>{{ m }}</td>{% for c in row %}<td>{{ c[0]|f2 }}</td><td>{{ c[1]|f2 }} / {{ c[2]|f2 }}</td><td>{{ c[3]|f2 }}</td>{% endfor %}</tr>{% endfor %}
 </table></div><p class="muted">kWh. * Solar- plus Netzkosten ohne Grundpreis; Allgemein ohne Ladestation, inkl. Standby PV-Anlage.</p></details>
@@ -124,7 +124,7 @@ Angezeigt wird nur die Vorschau aus Home Assistant. Prüfe die Dateien unter <a 
 <tr><th>Rechnung</th><th class="l">Position</th><th>Primeo kWh</th><th>Berechnet kWh</th><th>Differenz</th><th></th></tr>
 {% for r in abg.itertuples() %}<tr><td>{{ r.rechnung }}</td><td class="l">{{ r.position }}</td><td>{{ r.primeo_kwh }}</td><td>{{ r.berechnet_kwh|f2 }}</td><td>{{ r.diff|f2 }}</td>
 <td><span class="pill {{ 'ok' if r.ok else 'warn' }}">{{ 'stimmt' if r.ok else 'prüfen' }}</span></td></tr>{% endfor %}</table></div></details>{% endif %}
-<details class="card"><summary><b>Wertschöpfung Betreiber</b> {{ w.total_chf.sum()|f2 }} CHF</summary><div class="scroll" style="margin-top:12px"><table>
+<details class="card"><summary><b>Wertschöpfung Betreiber</b> {{ w.total_chf.sum()|f2 }} CHF</summary><div class="scroll" style="margin-top:12px"><table class="wide">
 <tr><th>Monat</th><th>Rücklieferung</th><th>Verkauf Mieter</th><th>Eigenverbrauch</th><th>Übrige</th><th>Total CHF</th></tr>
 {% for m, r in w.iterrows() %}<tr><td>{{ m.strftime('%m.%Y') }}{{ '*' if m in vorl }}</td><td>{{ r.export_chf|f2 }}</td><td>{{ r.mieter_chf|f2 }}</td><td>{{ r.eigen_chf|f2 }}</td><td>{{ r.uebrige_chf|f2 }}</td><td><b>{{ r.total_chf|f2 }}</b></td></tr>{% endfor %}
 <tr class="sum"><td>Summe</td><td>{{ w.export_chf.sum()|f2 }}</td><td>{{ w.mieter_chf.sum()|f2 }}</td><td>{{ w.eigen_chf.sum()|f2 }}</td><td>{{ w.uebrige_chf.sum()|f2 }}</td><td>{{ w.total_chf.sum()|f2 }}</td></tr>
@@ -257,7 +257,7 @@ VERLAUF = diagramme.STIL + """
  <div class="kpi"><div>{{ 'Ersparnis ggü. Netz' if z == 'EV' else 'Eigenverbrauch' if z == '2OG' else 'Verrechnet' }}</div><div>{{ tot.betrag|f2 }} <small>CHF</small></div></div>
 </div>
 <div class="card"><h2>Verbrauch pro Monat</h2>{{ chart|safe }}<p class="muted">kWh, Säulenhöhe = Verbrauch gesamt (Solar + Netz). * vorläufig.</p></div>
-<div class="card"><div class="scroll"><table>
+<div class="card"><div class="scroll"><table class="wide">
 <tr><th class="l">Monat</th><th>Verbrauch kWh</th><th>Solar kWh</th><th>Netz HT</th><th>Netz NT</th><th>Solar CHF</th><th>Netz CHF</th>{% if gp %}<th>Grundpreis*</th>{% endif %}<th>Total CHF</th><th>Autarkie</th><th class="l">Status</th></tr>
 {% for r in zeilen %}{% if r.gruppe %}<tr><td class="l" colspan="11" style="background:var(--bg);font-weight:600">{{ r.gruppe }}</td></tr>{% endif %}
 <tr><td class="l">{{ r.label }}</td><td><b>{{ r.verbrauch|f2 }}</b></td><td>{{ r.solar|f2 }}</td><td>{{ r.ht|f2 }}</td><td>{{ r.nt|f2 }}</td><td>{{ r.solar_chf|f2 }}</td><td>{{ r.netz_chf|f2 }}</td>

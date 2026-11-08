@@ -254,13 +254,38 @@ input,select,textarea{font:inherit;padding:8px 10px;border:1px solid #D3D8D2;bor
 .msg{padding:12px 16px;border-radius:10px;margin-bottom:16px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
 .kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px}.kpi div:first-child{color:var(--muted);font-size:13px}.kpi div:last-child{font-size:22px;font-weight:600;margin-top:4px}
 .kpi .v{font-size:24px;font-weight:600;margin-top:4px}.kpi .v small{font-size:13px;font-weight:500;color:var(--muted)}.kpi div.s{font-size:12px;font-weight:400;color:var(--muted);margin-top:4px}
-form.inline{display:inline}</style></head><body>
+form.inline{display:inline}
+/* Tabellen auf dem Handy: Zeilen als Karten mit Beschriftung, breite Monatstabellen scrollen mit fester erster Spalte */
+@media (max-width:759px){
+ .scroll>table:not(.wide),table.form{min-width:0}
+ table:not(.wide) tr:has(>th){display:none}
+ table:not(.wide),table:not(.wide) tbody,table:not(.wide) tr,table:not(.wide) td{display:block;width:100%}
+ table:not(.wide) tr{border-bottom:1px solid var(--line);padding:8px 0}
+ table:not(.wide) td{border:0;padding:4px 0;text-align:right;display:flex;justify-content:space-between;align-items:center;gap:12px;white-space:normal;min-height:0}
+ table:not(.wide) td[data-label]::before{content:attr(data-label);color:var(--muted);font-size:13px;font-weight:500;text-align:left;flex-shrink:0;max-width:45%}
+ table:not(.wide) td.l{text-align:left}
+ table:not(.wide) td:empty{display:none}
+ table:not(.wide) td>*:not(.pill){max-width:100%}
+ table.edit tr{border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:8px}
+ table.edit td{display:grid;grid-template-columns:110px 1fr;text-align:left}
+ table.edit td::before{max-width:none!important}
+ table.edit input,table.edit select,table.form input,table.form select{width:100%!important;min-width:0}
+ table.form tr{padding:8px 0}table.form td{display:block!important;text-align:left;padding:2px 0}
+ table.form td:first-child{color:var(--muted);font-size:13px}
+ table.wide th:first-child,table.wide td:first-child{position:sticky;left:0;background:#fff;z-index:1}
+ td.akt{min-width:0!important}
+ table.edit td label{display:inline-flex;align-items:center;gap:6px;justify-self:start}
+ .chart .ax{font-size:19px!important}
+ form.datum,td.akt form{justify-content:flex-end}
+}</style></head><body>
 <div class="app"><aside class="side" id="side"><div class="top"><span class="brand">☀ vZEV {{ anlage }}</span><span class="ver" title="Version der App">v{{ version }}</span>
 <button id="menu" type="button" aria-expanded="false" aria-controls="nav" onclick="var s=document.getElementById('side');var o=s.classList.toggle('offen');this.setAttribute('aria-expanded',o);this.textContent=o?'Schliessen':'Menü'">Menü</button></div>
 <nav id="nav">{% for gruppe, eintraege in navigation %}<div class="grp"><span class="gl">{{ gruppe }}</span>{% for href, label in eintraege %}
 <a href="{{ href }}" class="{{ 'on' if label == title else '' }}"{% if label == title %} aria-current="page"{% endif %}>{{ label }}{% if label == 'Protokoll' and nfehler %} <span class="pill warn">{{ nfehler }}</span>{% endif %}</a>{% endfor %}</div>{% endfor %}</nav></aside>
 <script>(function(){var a=document.querySelector('nav a.on');if(a&&innerWidth<1200&&innerWidth>=760)a.scrollIntoView({block:'nearest',inline:'center'})})()</script>
-<main><h1>{{ title }}</h1>{% if msg %}<div class="msg {{ msgclass or 'ok' }}">{{ msg }}</div>{% endif %}{{ body|safe }}</main></div></body></html>"""
+<main><h1>{{ title }}</h1>{% if msg %}<div class="msg {{ msgclass or 'ok' }}">{{ msg }}</div>{% endif %}{{ body|safe }}</main></div><script>if(innerWidth<760)document.querySelectorAll('.scroll').forEach(function(d){if(d.querySelector('svg.chart'))d.scrollLeft=d.scrollWidth});
+document.querySelectorAll('table').forEach(function(t){var h=null;t.querySelectorAll('tr').forEach(function(r){var th=r.querySelectorAll(':scope>th');if(th.length){h=Array.from(th).map(function(x){return x.textContent.trim()});return}
+if(!h)return;var i=0;r.querySelectorAll(':scope>td').forEach(function(td){var n=td.colSpan||1;if(n==1&&h[i]&&!td.hasAttribute('data-label'))td.setAttribute('data-label',h[i]);i+=n})})})</script></body></html>"""
 
 
 def page(title, body, **kw):
@@ -393,9 +418,9 @@ Rechnungsdatum <input name="datum" type="date" value="{{ heute }}">
 {% if korr %}<br><br>Begründung der Korrektur <input name="grund" style="width:420px" required placeholder="z. B. Lastgang Primeo korrigiert">{% endif %}
 <button class="primary">{{ 'Korrektur erstellen' if korr else 'Erstellen' }}</button></form>
 <p class="muted">Pro Mietverhältnis eine Rechnung für die Wohnung (mit QR-Einzahlungsschein) und eine Gesamtrechnung Allgemeinstrom für die Nebenkostenabrechnung. Ein erneutes Erstellen überschreibt die Dateien dieses Quartals.</p></div>
-<div class="card"><h2>Erstellte Rechnungen</h2><table><tr><th class="l">Quartal</th><th class="l">Datei</th><th>Erstellt</th><th></th></tr>
+<div class="card"><h2>Erstellte Rechnungen</h2><div class="scroll"><table><tr><th class="l">Quartal</th><th class="l">Datei</th><th>Erstellt</th><th></th></tr>
 {% for q, p, t in pdfs %}<tr><td class="l">{{ q }}</td><td class="l">{{ p }}</td><td>{{ t }}</td><td><a class="btn" href="datei?pfad={{ q }}/{{ p }}" target="_blank">Öffnen</a></td></tr>
-{% else %}<tr><td class="l" colspan="4">Noch keine Rechnungen.</td></tr>{% endfor %}</table></div>"""
+{% else %}<tr><td class="l" colspan="4">Noch keine Rechnungen.</td></tr>{% endfor %}</table></div></div>"""
 
 
 @app.route("/rechnungen", methods=["GET", "POST"])
@@ -454,7 +479,7 @@ SAMMLER = """
 {% endfor %}</table></div>
 <p class="muted">Letzter Wert = Zählerstand beim letzten Abruf. «unavailable» heisst: Home Assistant hat den Sensor gerade nicht erreicht.</p></div>
 <div class="card"><h2>Ladevorgänge aus evcc</h2><p>{{ s.evcc_status }} · {{ s.evcc_sessions }} Ladevorgänge gespeichert. Abruf stündlich.</p>
-{% if monate %}<h2 style="margin-top:16px">Pro Monat</h2><div class="scroll"><table>
+{% if monate %}<h2 style="margin-top:16px">Pro Monat</h2><div class="scroll"><table class="wide">
 <tr><th>Monat</th><th>Ladevorgänge</th><th>kWh evcc</th><th>davon Solar kWh</th><th>Solaranteil</th><th>kWh Ladestation laut Abrechnung</th><th>Kosten evcc CHF</th></tr>
 {% for m in monate %}<tr><td>{{ m.monat }}</td><td>{{ m.n }}</td><td>{{ m.kwh|f2 }}</td><td>{{ m.solar_kwh|f2 }}</td><td>{{ '%.0f %%'|format(m.solar_anteil) if m.solar_anteil is not none else '–' }}</td>
 <td>{{ m.abrechnung|f2 }}</td><td>{{ m.preis|f2 }}</td></tr>{% endfor %}</table></div>
