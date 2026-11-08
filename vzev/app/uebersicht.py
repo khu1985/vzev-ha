@@ -195,7 +195,10 @@ def index():
             kontrollen.append((None, "Abgleich mit Primeo", "Für diesen Monat ist noch keine Primeo-Rechnung erfasst (Seite «Primeo»)."))
     if (rm["quelle"] == "primeo").any() and b.get("ok"):
         lade = b["files"].get("Lade")
-        kontrollen.append((b["ev"] < 0.01, "Ladestation = Summe der Ladevorgänge", f"Wallbox-Export {lade[0] if lade else ''}: Differenz {b['ev']:.2f} kWh über alle Monate"))
+        ev_summe = float(b["res"]["EV"].sum())
+        kontrollen.append((b["ev"] < 0.01 and ev_summe > 0, "Ladestation = Summe der Ladevorgänge",
+                           (f"{lade[2]} aus {lade[0]}: {ev_summe:.2f} kWh verteilt, Differenz {b['ev']:.2f} kWh" if lade else "kein Wallbox-Export")
+                           + ("" if ev_summe > 0 else " – keine Ladung verteilt, Wallbox-Export prüfen")))
         luecken = int(rm[rm["quelle"] == "primeo"][["1OG", "2OG", "Allg", "PVA", "Prod"]].isna().any(axis=1).sum())
         kontrollen.append((luecken == 0, "Alle Primeo-Zähler liefern Daten", "keine Lücke im 15-Minuten-Raster" if not luecken else f"{luecken} Viertelstunden ohne Wert"))
     if (rm["quelle"] == "ha").any():

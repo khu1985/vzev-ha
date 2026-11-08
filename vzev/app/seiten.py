@@ -472,7 +472,7 @@ def primeo():
 ABSCHLUSS = """
 {% if not b.ok %}<div class="msg warn">Noch keine vollständige Berechnung: {{ b.fehler }}</div>{% endif %}
 {% if abw %}<div class="msg warn"><b>Abgeschlossene Monate haben sich verändert:</b> {% for m, t in abw %}{{ m }}: {{ t }}{{ '; ' if not loop.last }}{% endfor %}.
-Prüfe, ob eine Datei ersetzt wurde. Ist die Änderung gewollt, öffne den Monat mit Begründung wieder und schliesse ihn neu ab.</div>{% endif %}
+Prüfe, ob eine Datei ersetzt wurde. Ist die Änderung gewollt, übernimm die neuen Werte mit Begründung – das steht dann unter «Korrekturen».</div>{% endif %}
 <div class="card"><h2>Monate</h2><div class="scroll"><table>
 <tr><th class="l">Monat</th><th class="l">Status</th><th>1. OG CHF</th><th>Allgemein CHF</th><th>Ladestation kWh</th><th>Wertschöpfung CHF</th><th class="l">Aktion</th></tr>
 {% for m in monate %}<tr><td class="l">{{ m.label }}</td>
@@ -482,6 +482,8 @@ Prüfe, ob eine Datei ersetzt wurde. Ist die Änderung gewollt, öffne den Monat
 <td>{{ m.w['1OG'].chf|f2 }}</td><td>{{ m.w['AllgC'].chf|f2 }}</td><td>{{ (m.w['EV'].solar + m.w['EV'].ht + m.w['EV'].nt)|f2 }}</td><td>{{ m.w.wertschoepfung|f2 }}</td>
 <td class="l akt">{% if m.zu %}<form class="inline datum" method="post" action="abschluss"><input type="hidden" name="monat" value="{{ m.key }}"><input type="hidden" name="aktion" value="datum">
 <input type="date" name="datum" value="{{ m.datum.isoformat() }}" min="{{ m.min }}" max="{{ heute }}" aria-label="Abschlussdatum {{ m.label }}"> <button title="Abschlussdatum ändern">Ändern</button></form>
+{% if m.abw %}<form class="inline" method="post" action="abschluss" onsubmit="var g=prompt('{{ m.label }} hat sich verändert ({{ m.abw_text }}). Neue Werte festhalten – Begründung:');if(!g)return false;this.grund.value=g">
+<input type="hidden" name="monat" value="{{ m.key }}"><input type="hidden" name="aktion" value="uebernehmen"><input type="hidden" name="grund"><button class="primary">Neue Werte übernehmen</button></form>{% endif %}
 {% if m.letzter %}<form class="inline" method="post" action="abschluss" onsubmit="var g=prompt('Begründung für das Wiederöffnen von {{ m.label }}:');if(!g)return false;this.grund.value=g">
 <input type="hidden" name="monat" value="{{ m.key }}"><input type="hidden" name="aktion" value="oeffnen"><input type="hidden" name="grund"><button class="danger">Wieder öffnen</button></form>{% endif %}
 {% elif m.naechster and m.w.vollstaendig %}<form class="inline datum" method="post" action="abschluss"><input type="hidden" name="monat" value="{{ m.key }}"><input type="hidden" name="aktion" value="schliessen">
@@ -533,6 +535,15 @@ def abschluss():
             S.log.info("Abschlussdatum %s geändert: %s -> %s", m, alt, datum)
             return redirect(f"abschluss?msg=Abschlussdatum {m} auf {datum:%d.%m.%Y} geändert")
         grund = (request.form.get("grund") or "").strip()
+        if aktion == "uebernehmen":
+            abw = dict(abweichungen(b)) if b.get("ok") else {}
+            if m not in a["monate"] or m not in abw or m not in mw or not grund:
+                return redirect("abschluss?c=warn&msg=Nur veränderte abgeschlossene Monate, und nur mit Begründung.")
+            a["monate"][m]["werte"] = mw[m]
+            a["korrekturen"].append({"zeit": jetzt, "monat": m, "art": f"neue Werte übernommen ({abw[m]})", "grund": grund})
+            abschluss_speichern(a)
+            S.log.warning("Abschluss %s: neue Werte übernommen (%s) – %s", m, abw[m], grund)
+            return redirect(f"abschluss?msg=Neue Werte für {m} übernommen")
         if not zu or zu[-1] != m or not grund:
             return redirect("abschluss?c=warn&msg=Nur der zuletzt abgeschlossene Monat kann wieder geöffnet werden, und nur mit Begründung.")
         a["monate"].pop(m)
@@ -546,7 +557,7 @@ def abschluss():
     for k in sorted(set(mw) | set(a["monate"]), reverse=True):
         w = mw.get(k) or a["monate"][k]["werte"]
         zu_k = a["monate"].get(k)
-        monate.append(dict(key=k, label=pd.Period(k, "M").strftime("%m.%Y"), w=w, zu=zu_k, abw=k in abw,
+        monate.append(dict(key=k, label=pd.Period(k, "M").strftime("%m.%Y"), w=w, zu=zu_k, abw=k in abw, abw_text=abw.get(k, "").replace("'", ""),
                            datum=_abschlussdatum(zu_k) if zu_k else None, min=(pd.Period(k, "M").end_time.date() + timedelta(days=1)).isoformat(),
                            letzter=bool(zu) and zu[-1] == k, naechster=bool(offen) and offen[0] == k))
     return S.page("Abschluss", render_template_string(ABSCHLUSS, b=b, monate=monate, abw=sorted(abw.items()), heute=date.today().isoformat(),

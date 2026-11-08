@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.3
+
+- Korrektur: Der Wallbox-Export mit Sekunden («11.05.2026 08:26:31») wurde in Home Assistant nicht gelesen. Die Ladestation war deshalb 0 und blieb im Allgemeinstrom. Das Datum wird jetzt unabhängig von der pandas-Version gelesen.
+- Liest die App keinen einzigen Ladevorgang, bricht die Berechnung mit einer klaren Meldung ab, statt mit 0 weiterzurechnen.
+- Kontrolle «Ladestation = Summe der Ladevorgänge» zeigt Anzahl Ladevorgänge und verteilte kWh und schlägt an, wenn nichts verteilt wurde.
+- Abschluss: Hat sich ein abgeschlossener Monat verändert, lassen sich die neuen Werte mit Begründung übernehmen, ohne den Monat wieder zu öffnen. Steht unter «Korrekturen».
+
 ## 0.3.2
 
 - Lastgänge robuster einlesen: Datum als Datum oder Text (TT.MM.JJJJ), Uhrzeit als Zeit oder Text, Summen- und Leerzeilen am Ende werden übersprungen. Wallbox-Export mit oder ohne Sekunden.

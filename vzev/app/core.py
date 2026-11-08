@@ -69,6 +69,18 @@ def _als_datum(v):
     return pd.NaT
 
 
+def _als_zeitpunkt(v):
+    if v is None or (not isinstance(v, str) and pd.isna(v)):
+        return pd.NaT
+    t = str(v).strip()
+    for f in ("%d.%m.%Y %H:%M:%S", "%d.%m.%Y %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M"):
+        try:
+            return pd.Timestamp(datetime.strptime(t, f))
+        except ValueError:
+            continue
+    return pd.NaT
+
+
 def _als_zeit(v):
     if v is None or (not isinstance(v, str) and pd.isna(v)):
         return pd.NaT
@@ -164,10 +176,17 @@ def load(datadir, cfg, cache_dir=None):
         t = pd.read_csv(p, sep=";", decimal=",", dtype=str)
         if "Zaehlerstand Differenz [kWh]" in t.columns:
             t = t.dropna(subset=["Start"])
-            t["Start"] = pd.to_datetime(t["Start"], dayfirst=True, format="mixed", errors="coerce")
-            t["Ende"] = pd.to_datetime(t["Ende"], dayfirst=True, format="mixed", errors="coerce")
+            zeilen = len(t)
+            # Zeitpunkte mit oder ohne Sekunden; bewusst ohne pandas-Sonderformate, damit es mit
+            # jeder pandas-Version gleich funktioniert (Home Assistant nutzt eine ältere als die Entwicklung)
+            t["Start"] = pd.to_datetime(t["Start"].map(_als_zeitpunkt))
+            t["Ende"] = pd.to_datetime(t["Ende"].map(_als_zeitpunkt))
             t["kwh"] = pd.to_numeric(t["Zaehlerstand Differenz [kWh]"].str.replace(",", "."), errors="coerce")
             t = t.dropna(subset=["Start", "Ende", "kwh"])
+            if zeilen and t.empty:
+                raise ValueError(f"{p.name}: keiner der {zeilen} Ladevorgänge hat ein lesbares Start-/Enddatum")
+            if len(t) < zeilen:
+                probleme.append(f"{p.name}: {zeilen - len(t)} Ladevorgänge ohne lesbares Datum übersprungen")
             lade, files["Lade"] = t, (p.name, "Wallbox", f"{len(t)} Ladevorgänge")
     if cache_dir is not None and Path(cache_dir).exists():  # Zwischenspeicher entfernter Dateien aufräumen
         for c in Path(cache_dir).glob("*.pkl"):
