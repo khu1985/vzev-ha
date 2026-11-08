@@ -32,6 +32,7 @@ class Collector:
     def _init_db(self):
         with self._db() as c:
             c.execute("CREATE TABLE IF NOT EXISTS messwerte (ts TEXT, entity TEXT, wert REAL, PRIMARY KEY (ts, entity))")
+            c.execute("CREATE TABLE IF NOT EXISTS entitaeten (entity TEXT PRIMARY KEY, name TEXT, einheit TEXT, zustand TEXT, geprueft TEXT)")
             c.execute("CREATE TABLE IF NOT EXISTS evcc_sessions (id TEXT PRIMARY KEY, daten TEXT, abgerufen TEXT)")
 
     # --- Home Assistant ------------------------------------------------
@@ -55,16 +56,20 @@ class Collector:
             raise RuntimeError("Kein Zugang zu Home Assistant (läuft die App im HA?)")
         ts = datetime.now().replace(second=0, microsecond=0)
         ts = ts - timedelta(minutes=ts.minute % 15)
-        rows, fehlt = [], []
+        rows, fehlt, meta = [], [], []
+        jetzt = datetime.now().isoformat(timespec="seconds")
         for eid in self.entities():
             r = requests.get(f"{base}/states/{eid}", headers={"Authorization": f"Bearer {token}"}, timeout=10)
             if r.status_code != 200:
                 fehlt.append(f"{eid} (HTTP {r.status_code})")
                 continue
+            j = r.json()
+            attr = j.get("attributes") or {}
+            meta.append((eid, attr.get("friendly_name"), attr.get("unit_of_measurement"), str(j.get("state")), jetzt))
             try:
-                rows.append((ts.isoformat(timespec="minutes"), eid, float(r.json()["state"])))
-            except (ValueError, KeyError):
-                fehlt.append(f"{eid} ({r.json().get('state')})")  # unavailable/unknown
+                rows.append((ts.isoformat(timespec="minutes"), eid, float(j["state"])))
+            except (ValueError, KeyError, TypeError):
+                fehlt.append(f"{eid} ({j.get('state')})")  # unavailable/unknown
         meldung = ", ".join(fehlt)
         if meldung != getattr(self, "_fehlt", ""):  # nur Änderungen protokollieren
             if fehlt:
@@ -74,6 +79,7 @@ class Collector:
             self._fehlt = meldung
         with self._db() as c:
             c.executemany("INSERT OR REPLACE INTO messwerte VALUES (?, ?, ?)", rows)
+            c.executemany("INSERT OR REPLACE INTO entitaeten VALUES (?, ?, ?, ?, ?)", meta)
         if self.last_run is None:
             log.info("Datensammler: erster Abruf, %d von %d Entitäten gespeichert", len(rows), len(self.entities()))
         self.last_run = ts
@@ -111,10 +117,27 @@ class Collector:
     def status(self):
         with self._db() as c:
             n, first, last = c.execute("SELECT COUNT(*), MIN(ts), MAX(ts) FROM messwerte").fetchone()
-            per = c.execute("SELECT entity, COUNT(*), MAX(ts) FROM messwerte GROUP BY entity ORDER BY entity").fetchall()
+            # SQLite liefert bei MAX() die übrigen Spalten aus derselben Zeile, also den letzten Wert
+            per = {e: (n, ts, w) for e, n, ts, w in c.execute("SELECT entity, COUNT(*), MAX(ts), wert FROM messwerte GROUP BY entity")}
+            meta = {r[0]: r[1:] for r in c.execute("SELECT * FROM entitaeten")}
             ns = c.execute("SELECT COUNT(*) FROM evcc_sessions").fetchone()[0]
-        return {"anzahl": n, "erster": first, "letzter": last, "entitaeten": per, "evcc_sessions": ns,
-                "evcc_status": self.evcc_status, "fehler": self.last_error, "erwartet": self.entities()}
+        zweck = {}
+        ha = self.get_config().get("homeassistant", {})
+        for gruppe in ("zaehler", "solis", "kia"):
+            for k, v in (ha.get(gruppe) or {}).items():
+                if v:
+                    zweck.setdefault(v, f"{gruppe} · {k}")
+        zeilen = []
+        for e in self.entities():
+            anzahl, zeit, wert = per.get(e, (0, None, None))
+            name, einheit, zustand, geprueft = meta.get(e, (None, None, None, None))
+            zeilen.append(dict(entity=e, zweck=zweck.get(e, ""), name=name, einheit=einheit or "", anzahl=anzahl,
+                               zeit=zeit, wert=wert, zustand=zustand, geprueft=geprueft,
+                               ok=zustand is not None and wert is not None and zustand not in ("unavailable", "unknown")))
+        reihenfolge = {"zaehler": 0, "solis": 1, "kia": 2}
+        zeilen.sort(key=lambda z: (reihenfolge.get(z["zweck"].split(" · ")[0], 3), z["zweck"], z["entity"]))
+        return {"anzahl": n, "erster": first, "letzter": last, "zeilen": zeilen, "evcc_sessions": ns,
+                "evcc_status": self.evcc_status, "fehler": self.last_error}
 
     # --- Schleife ------------------------------------------------------
     def loop(self):

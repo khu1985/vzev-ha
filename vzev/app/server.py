@@ -397,9 +397,14 @@ SAMMLER = """
 <p>{{ s.anzahl }} Werte gespeichert{% if s.erster %}, von {{ s.erster.replace('T',' ') }} bis {{ s.letzter.replace('T',' ') }}{% endif %}. Abruf alle 15 Minuten.</p>
 {% if s.fehler %}<div class="msg warn">{{ s.fehler }}</div>{% endif %}
 <form method="post" action="sammler"><button>Jetzt abrufen</button></form>
-<div class="scroll" style="margin-top:12px"><table><tr><th class="l">Entität</th><th>Werte</th><th>Letzter Wert</th></tr>
-{% for e in s.erwartet %}{% set hit = (s.entitaeten | selectattr(0, 'equalto', e) | list) %}
-<tr><td class="l">{{ e }}</td><td>{{ hit[0][1] if hit else 0 }}</td><td>{{ hit[0][2].replace('T',' ') if hit else '–' }}</td></tr>{% endfor %}</table></div></div>
+<div class="scroll" style="margin-top:12px"><table><tr><th class="l">Zweck</th><th class="l">Entität</th><th>Letzter Wert</th><th>Gespeichert um</th><th>Werte</th><th class="l">Status</th></tr>
+{% for z in s.zeilen %}<tr><td class="l">{{ z.zweck }}</td>
+<td class="l">{{ z.name or z.entity }}{% if z.name %}<br><span class="muted">{{ z.entity }}</span>{% endif %}</td>
+<td>{% if z.wert is not none %}<b>{{ '{:,.3f}'.format(z.wert).replace(',', "'") }}</b> {{ z.einheit }}{% else %}–{% endif %}</td>
+<td>{{ z.zeit.replace('T',' ')[8:10] ~ '.' ~ z.zeit[5:7] ~ '. ' ~ z.zeit[11:16] if z.zeit else '–' }}</td><td>{{ z.anzahl }}</td>
+<td class="l">{% if z.zustand is none %}<span class="pill warn">noch nicht abgefragt</span>{% elif z.ok %}<span class="pill ok">liefert Werte</span>{% else %}<span class="pill warn">{{ z.zustand }}</span>{% endif %}</td></tr>
+{% endfor %}</table></div>
+<p class="muted">Letzter Wert = Zählerstand beim letzten Abruf. «unavailable» heisst: Home Assistant hat den Sensor gerade nicht erreicht.</p></div>
 <div class="card"><h2>evcc</h2><p>{{ s.evcc_status }} · {{ s.evcc_sessions }} Ladevorgänge gespeichert.</p></div>"""
 
 
