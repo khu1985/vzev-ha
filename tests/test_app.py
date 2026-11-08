@@ -79,12 +79,12 @@ def test_kaputte_datei_wird_gemeldet(app):
 def test_seiten_mit_daten(app):
     server, c, d, quelle = app
     warten(server)
-    for u in ["/", "/?m=2026-03", "/?m=2026-04", "/verlauf?z=1OG", "/verlauf?z=AllgC", "/verlauf?z=EV",
+    for u in ["/", "/uebersicht?m=2026-03", "/uebersicht?m=2026-04", "/verlauf?z=1OG", "/verlauf?z=AllgC", "/verlauf?z=EV",
               "/abschluss", "/primeo", "/sammler", "/import"]:
         r = c.get(u)
         assert r.status_code == 200 and b"schiefgelaufen" not in r.data, u
         assert b'id="warten"' not in r.data, u
-    h = c.get("/?m=2026-03").get_data(as_text=True)
+    h = c.get("/uebersicht?m=2026-03").get_data(as_text=True)
     assert "Ladestation = Summe der Ladevorgänge" in h and "12.00 kWh verteilt" in h
     assert "Daten importieren" in h and "v" + server.VERSION in h
 
@@ -311,7 +311,7 @@ def test_wertschoepfung_seite(app):
     total = server.core.wertschoepfung(b["res"], b["cfg"])["total_chf"].sum()
     assert f"{total:,.2f}".replace(",", "'") in h
     assert c.get("/wertschoepfung?j=2026").status_code == 200
-    assert 'href="wertschoepfung"' in c.get("/").get_data(as_text=True)
+    assert 'href="wertschoepfung"' in c.get("/uebersicht").get_data(as_text=True)
 
 
 def test_was_ist_neu(app):
@@ -380,7 +380,7 @@ def test_waermepumpen(app):
         b = server.berechnung()
         assert b["ok"], b.get("fehler")
         assert b["res"]["WP"].sum() == pytest.approx(0.06 * (len(b["res"].loc["2026-04"]) - 1), rel=0.01)
-        h = c.get("/?m=2026-04").get_data(as_text=True)
+        h = c.get("/uebersicht?m=2026-04").get_data(as_text=True)
         assert "Wärmepumpen aus dem Allgemeinstrom herausgerechnet" in h and "Heizung und Warmwasser, Gesamtrechnung" in h
         h = c.get("/verlauf?z=WP").get_data(as_text=True)
         assert "Wärmepumpen" in h
@@ -397,3 +397,23 @@ def test_waermepumpen(app):
         assert "Wärmepumpen am Allgemeinzähler" in h and "sensor.t_shelly_ww" in h
     finally:
         (d / "vzev.yaml").write_text(cfg_alt)
+
+
+def test_energiefluss_startseite(app):
+    server, c, d, quelle = app
+    warten(server)
+    h = c.get("/").get_data(as_text=True)
+    assert "Energiefluss" in h and 'aria-current="page">Energiefluss' in h
+    h = c.get("/?p=monat&m=2026-04").get_data(as_text=True)
+    assert "April 2026" in h and "PV-Anlage" in h and "animateMotion" in h and "Autarkie Haus" in h
+    assert 'href="uebersicht?m=2026-04"' in h
+    h = c.get("/?p=jahr&j=2026").get_data(as_text=True)
+    assert "Jahr 2026" in h and "Ladestation" in h
+    h = c.get("/?p=heute").get_data(as_text=True)
+    assert "noch keine Daten" in h
+    import fluss
+    b = server.berechnung()
+    r = b["res"].loc["2026-04"]
+    w = fluss.werte(r, b["cfg"])
+    assert w["haus"] == pytest.approx(sum(v["total"] for v in w["verbraucher"]))
+    assert w["solar_haus"] + w["export"] == pytest.approx(w["prod"], rel=1e-6)      # Produktion = im Haus + Rücklieferung

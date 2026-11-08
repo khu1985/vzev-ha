@@ -111,7 +111,7 @@ def _changelog():
 CHANGELOG = _changelog()
 NEU_KURZ = (CHANGELOG[0][1][0].split(":")[0] if CHANGELOG and CHANGELOG[0][0] == VERSION and CHANGELOG[0][1] else "Verbesserungen")
 NAVIGATION = [
-    ("Auswertung", [("./", "Übersicht"), ("verlauf", "Verlauf"), ("wertschoepfung", "Wertschöpfung")]),
+    ("Auswertung", [("./", "Energiefluss"), ("uebersicht", "Übersicht"), ("verlauf", "Verlauf"), ("wertschoepfung", "Wertschöpfung")]),
     ("Abrechnung", [("import", "Daten importieren"), ("rechnungen", "Rechnungen"), ("jahr", "Jahresabrechnung"), ("abschluss", "Abschluss")]),
     ("Stammdaten", [("mieter", "Mieter"), ("tarife", "Tarife"), ("primeo", "Primeo"), ("einstellungen", "Einstellungen")]),
     ("Anlage", [("prognose", "Prognose"), ("batterie", "Batterie"), ("sammler", "Datensammler"), ("protokoll", "Protokoll")]),
@@ -769,7 +769,7 @@ def einstellungen():
 
 
 # --- Status und Warteseite ------------------------------------------------------
-BRAUCHT_BERECHNUNG = {"index", "verlauf", "wertschoepfung", "abschluss", "primeo", "sammler", "import_page", "jahr"}
+BRAUCHT_BERECHNUNG = {"index", "uebersicht", "verlauf", "wertschoepfung", "abschluss", "primeo", "sammler", "import_page", "jahr"}
 
 
 @app.get("/status")
@@ -814,6 +814,8 @@ uebersicht.register(app, sys.modules[__name__])
 zahlungen.register(app, sys.modules[__name__])
 jahr.register(app, sys.modules[__name__])
 prognose.register(app, sys.modules[__name__])
+import fluss  # noqa: E402
+fluss.register(app, sys.modules[__name__])
 app.jinja_env.filters["dmy"] = lambda x: "" if not x else f"{str(x)[8:10]}.{str(x)[5:7]}.{str(x)[:4]}"
 
 # --- Protokoll ----------------------------------------------------------------

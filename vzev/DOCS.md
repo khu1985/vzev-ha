@@ -17,6 +17,7 @@ und getrennt ausgewiesenem Netzstrom aus dem Batteriespeicher.
 ## Seiten
 
 **Auswertung**
+- **Energiefluss** (Startseite): animiertes Diagramm von PV-Anlage, Netz und Speicher zum Haus und zu den Verbrauchern, für heute, gestern, einen Monat oder ein Jahr. Die Ringe zeigen den Anteil Solar-, Speicher- und Netzstrom; Werte erscheinen per Maus oder Tippen. Speicherwerte stammen vom Wechselrichter, alles andere aus derselben Rechnung wie die Abrechnung.
 - **Übersicht:** Monat wählen; Produktion, Autarkie, Rücklieferung, Wertschöpfung; Diagramm «Energiefluss pro Monat»; Kontrollen (Abgleich mit Primeo, Ladestation, Lücken, Rückliefertarif, Solarpreis höchstens 80 % des Standardprodukts, dynamische Preise vollständig, Netzladung des Speichers, Abschluss, offene Rechnungen); Verbraucher des Monats mit Betrag inkl. Grundpreis.
 - **Wertschöpfung:** Ertrag des Betreibers pro Monat nach Quelle (Verkauf an Mieter, Eigenverbrauch, Rücklieferung, Gutschriften), kumuliert, Verwendung des Solarstroms und Wert pro kWh; filterbar nach Jahr.
 - **Verlauf:** pro Zähler Verbrauch, Solar/Netz und Kosten pro Monat, beim 1. OG nach Mietverhältnis gruppiert.

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.10.0
+
+- Energiefluss: neue Startseite unter «Auswertung» mit animiertem Diagramm – PV-Anlage, Netz, Speicher und Haus (Ring = Herkunft des Stroms), darunter die Verbraucher (1. OG, 2. OG, Allgemein, Ladestation, Wärmepumpen). Punkte laufen umso schneller, je mehr Energie fliesst; Werte per Maus oder Tippen. Zeitraum: heute, gestern, Monat oder Jahr.
+- Die bisherige Übersicht ist unter «Übersicht» erreichbar.
+
 ## 0.9.0
 
 - Wärmepumpen: Heizung und Warmwasser als Unterzähler am Allgemeinzähler (Energie-Sensoren aus Home Assistant, Auswahlliste unter Einstellungen → Zähler, Korrekturfaktor für geschätzte Werte). Ihr Verbrauch wird pro Viertelstunde aus dem Allgemeinstrom herausgerechnet, mit eigenem Solaranteil.
