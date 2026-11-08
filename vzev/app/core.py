@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+from datetime import datetime
 import pandas as pd
 import yaml
 
@@ -54,14 +55,51 @@ def read_header(path):
     return cell(3), cell(4)
 
 
+def _als_datum(v):
+    if v is None or (not isinstance(v, str) and pd.isna(v)):
+        return pd.NaT
+    if isinstance(v, (pd.Timestamp, datetime)):
+        return pd.Timestamp(v).normalize()
+    t = str(v).strip()
+    for f in ("%d.%m.%Y", "%Y-%m-%d", "%d.%m.%y", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return pd.Timestamp(datetime.strptime(t, f)).normalize()
+        except ValueError:
+            continue
+    return pd.NaT
+
+
+def _als_zeit(v):
+    if v is None or (not isinstance(v, str) and pd.isna(v)):
+        return pd.NaT
+    if hasattr(v, "hour"):  # time oder datetime
+        return pd.Timedelta(hours=v.hour, minutes=v.minute)
+    try:
+        h, m = str(v).strip().split(":")[:2]
+        return pd.Timedelta(hours=int(h), minutes=int(m))
+    except ValueError:
+        return pd.NaT
+
+
 def read_lastgang(path):
     messpunkt, lieferstelle = read_header(path)
     df = pd.read_excel(path, sheet_name="Lastgang", skiprows=8)
-    ts = pd.to_datetime(df["Datum"]).dt.normalize() + pd.to_timedelta(df["Uhrzeit"].astype(str))
+    fehlt = [c for c in ("Datum", "Uhrzeit", "kWh") if c not in df.columns]
+    if fehlt:
+        raise ValueError(f"Spalten {fehlt} fehlen in Zeile 9 (gefunden: {list(df.columns)[:6]})")
+    if "Tarif" not in df.columns:
+        df["Tarif"] = None
+    # Datum als Datum oder Text (TT.MM.JJJJ); Summen- oder Leerzeilen am Ende werden übersprungen
+    datum = df["Datum"].map(_als_datum)
+    zeit = df["Uhrzeit"].map(_als_zeit)
+    gueltig = datum.notna() & zeit.notna()
+    if not gueltig.any():
+        raise ValueError("keine Zeile mit gültigem Datum und Uhrzeit")
+    df, ts = df[gueltig], (datum[gueltig] + zeit[gueltig])
     out = pd.DataFrame(
         {"kwh": pd.to_numeric(df["kWh"], errors="coerce").values, "tarif": df["Tarif"].values},
         index=pd.DatetimeIndex(ts.values),
-    )
+    ).sort_index()
     # Lokalzeit: bei der Umstellung auf Winterzeit kommt 02:00–02:45 doppelt vor -> zusammenfassen
     if out.index.has_duplicates:
         out = out.groupby(level=0).agg({"kwh": "sum", "tarif": "first"})
@@ -99,37 +137,44 @@ def load(datadir, cfg, cache_dir=None):
     datadir = Path(datadir)
     series, files = {}, {}
     namen = set()
+    probleme = []
     for p in sorted(datadir.glob("*.xlsx")):
         namen.add(p.name)
         try:
             s, mp, lieferstelle = read_lastgang_cached(p, cache_dir)
-        except Exception:
+        except Exception as e:
+            probleme.append(f"{p.name} nicht lesbar: {e}")
             continue
         key = cfg["messpunkte"].get(mp)
-        if key:
+        if not key:
+            probleme.append(f"{p.name}: Messpunkt «{mp}» ist keinem Zähler zugeordnet")
+        elif key in series:
+            probleme.append(f"{p.name} und {files[key][0]} gehören beide zu {key}; verwendet wird {files[key][0]}")
+        else:
             series[key], files[key] = s, (p.name, mp, lieferstelle)
     missing = {"1OG", "2OG", "Allg", "PVA", "Prod"} - set(series)
     if missing:
-        raise SystemExit(f"Fehlende Lastgänge: {sorted(missing)}")
+        raise ValueError(f"Lastgang fehlt für {', '.join(sorted(missing))}" + (". " + "; ".join(probleme) if probleme else ""))
     idx = series["1OG"].index
     df = pd.DataFrame({k: s["kwh"].reindex(idx) for k, s in series.items()}, index=idx)
     df["tarif"] = series["1OG"]["tarif"]
     df = df[df.index >= pd.Timestamp(cfg["vzev_start"])]
     lade = None
-    for p in datadir.glob("*.csv"):
+    for p in sorted(datadir.glob("*.csv")):
         t = pd.read_csv(p, sep=";", decimal=",", dtype=str)
         if "Zaehlerstand Differenz [kWh]" in t.columns:
             t = t.dropna(subset=["Start"])
-            t["Start"] = pd.to_datetime(t["Start"], format="%d.%m.%Y %H:%M")
-            t["Ende"] = pd.to_datetime(t["Ende"], format="%d.%m.%Y %H:%M")
-            t["kwh"] = t["Zaehlerstand Differenz [kWh]"].str.replace(",", ".").astype(float)
+            t["Start"] = pd.to_datetime(t["Start"], dayfirst=True, format="mixed", errors="coerce")
+            t["Ende"] = pd.to_datetime(t["Ende"], dayfirst=True, format="mixed", errors="coerce")
+            t["kwh"] = pd.to_numeric(t["Zaehlerstand Differenz [kWh]"].str.replace(",", "."), errors="coerce")
+            t = t.dropna(subset=["Start", "Ende", "kwh"])
             lade, files["Lade"] = t, (p.name, "Wallbox", f"{len(t)} Ladevorgänge")
     if cache_dir is not None and Path(cache_dir).exists():  # Zwischenspeicher entfernter Dateien aufräumen
         for c in Path(cache_dir).glob("*.pkl"):
             if c.name.rsplit(".", 3)[0] not in namen:
                 c.unlink(missing_ok=True)
     if lade is None:
-        raise SystemExit("Ladestation-Datei fehlt")
+        raise ValueError("Wallbox-Export (CSV mit «Zaehlerstand Differenz [kWh]») fehlt")
     return df, lade, files
 
 

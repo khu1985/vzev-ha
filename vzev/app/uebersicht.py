@@ -86,6 +86,8 @@ def _status(m, abschluss):
 UEBERSICHT = diagramme.STIL + """
 {% if not res_ok %}<div class="msg warn">Noch keine Berechnung möglich: {{ fehler }}. <a href="import">Dateien importieren</a></div>
 {% else %}
+{% if primeo_fehler %}<div class="msg warn"><b>Die Primeo-Lastgänge lassen sich nicht berechnen:</b> {{ primeo_fehler }}<br>
+Angezeigt wird nur die Vorschau aus Home Assistant. Prüfe die Dateien unter <a href="import">Daten importieren</a>.</div>{% endif %}
 {% if abw %}<div class="msg warn">Abgeschlossene Monate haben sich verändert: {% for m, t in abw %}{{ m }} ({{ t }}){{ ', ' if not loop.last }}{% endfor %}. Details unter <a href="abschluss">Abschluss</a>.</div>{% endif %}
 <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin:-8px 0 16px">
 <form method="get" action="./"><select name="m" onchange="this.form.submit()">{% for k, l in auswahl %}<option value="{{ k }}" {{ 'selected' if k == sel }}>{{ l }}</option>{% endfor %}</select></form>
@@ -236,7 +238,7 @@ def index():
         vor_label=_titel(perioden[i - 1]) if i > 0 else "", wert=wert, chart=chart, kontrollen=kontrollen, verbraucher=verbraucher,
         info=d["info"], viertel=VIERTEL, primeo_bis=(b["res"].index.max().strftime("%d.%m.%Y") if b.get("ok") else "–"),
         zl=ZL, tab=tab, abg=abg, w=w, vorl={x for x in perioden if mon.loc[x, "vorlaeufig"]},
-        vergleich=d["vergleich"]))
+        vergleich=d["vergleich"], primeo_fehler=None if b.get("ok") else b.get("fehler")))
 
 
 # =============================================================================

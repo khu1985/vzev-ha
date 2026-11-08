@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.2
+
+- Lastgänge robuster einlesen: Datum als Datum oder Text (TT.MM.JJJJ), Uhrzeit als Zeit oder Text, Summen- und Leerzeilen am Ende werden übersprungen. Wallbox-Export mit oder ohne Sekunden.
+- Klare Fehlermeldung, wenn die Lastgänge nicht berechnet werden können: welche Datei nicht lesbar ist, welcher Messpunkt keinem Zähler zugeordnet ist oder ob zwei Dateien zum selben Zähler gehören. Die Meldung steht in der Übersicht, unter «Daten importieren» und im Protokoll.
+- «Daten importieren» zeigt oben, von wann bis wann die Berechnung aus den Lastgängen reicht.
+
 ## 0.3.1
 
 - Abschluss: Beim Abschliessen lässt sich das Abschlussdatum wählen (Standard heute); bei abgeschlossenen Monaten kann es nachträglich geändert werden, z. B. für Monate, die schon früher abgeschlossen wurden. Jede Änderung steht mit altem und neuem Datum unter «Korrekturen und Abschlüsse».

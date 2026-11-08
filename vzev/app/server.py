@@ -184,9 +184,10 @@ def _lastgang_zeitraum(path):
     try:
         von = bis = None
         for r in wb["Lastgang"].iter_rows(min_row=9, max_col=1, values_only=True):
-            if isinstance(r[0], datetime):
-                von = von or r[0]
-                bis = r[0]
+            d = core._als_datum(r[0])
+            if not pd.isna(d):
+                von = von or d
+                bis = d
         return (von.date().isoformat() if von else None), (bis.date().isoformat() if bis else None)
     finally:
         wb.close()
@@ -269,6 +270,8 @@ def page(title, body, **kw):
 
 # --- Import -------------------------------------------------------------------
 IMPORT = """
+{% if status %}<div class="msg {{ 'ok' if status.ok else 'warn' }}">{% if status.ok %}Berechnung aus den Lastgängen: {{ status.von }} bis {{ status.bis }}.
+{% else %}<b>Berechnung nicht möglich:</b> {{ status.fehler }}{% endif %}</div>{% endif %}
 <div class="card"><h2>Dateien hochladen</h2>
 <form id="up" method="post" action="hochladen" enctype="multipart/form-data">
 <input id="upfiles" type="file" name="dateien" multiple accept=".xlsx,.csv" required> <button class="primary" id="upbtn">Hochladen</button></form>
@@ -329,7 +332,12 @@ def speichern(fs):
 
 @app.route("/import")
 def import_page():
-    return page("Daten importieren", render_template_string(IMPORT, files=liste(), rollen=ROLLEN))
+    status = None
+    if any(p.is_file() for p in PRIMEO.iterdir()):
+        b = berechnung()
+        status = {"ok": True, "von": b["res"].index.min().strftime("%d.%m.%Y"), "bis": b["res"].index.max().strftime("%d.%m.%Y")} if b.get("ok") \
+            else {"ok": False, "fehler": b.get("fehler")}
+    return page("Daten importieren", render_template_string(IMPORT, files=liste(), rollen=ROLLEN, status=status))
 
 
 @app.post("/hochladen")
