@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+- Schneller: Die eingelesenen Primeo-Lastgänge werden zwischengespeichert. Nach einem Neustart oder einer Änderung an Tarifen, Mietern oder Regeln wird nur noch neu gerechnet, nicht neu eingelesen (im Test 0.2 statt 3.4 Sekunden, auf dem Raspberry Pi entsprechend mehr).
+- Nach dem Start und nach jedem Upload rechnet die App im Hintergrund, damit die nächste Seite nicht warten muss.
+- Gleichzeitige Seitenaufrufe lösen nur noch eine Berechnung aus.
+
 ## 0.2.0
 
 - Neue Seite «Mieter»: Mietverhältnisse als Tabelle bearbeiten, mit Historie pro Einheit inkl. Leerstand. Prüft Überschneidungen.

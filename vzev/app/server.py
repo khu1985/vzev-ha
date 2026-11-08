@@ -4,6 +4,8 @@ import logging
 import os
 import shutil
 import sys
+import threading
+import time
 from logging.handlers import RotatingFileHandler
 import traceback
 from datetime import date, datetime
@@ -93,16 +95,40 @@ def files_key():
     return tuple((p.name, p.stat().st_mtime) for p in fs) + ((CFG.name, CFG.stat().st_mtime),)
 
 
+_rechnen = threading.Lock()
+
+
 def berechnung():
     key = files_key()
-    if _cache.get("key") != key:
+    if _cache.get("key") == key:
+        return _cache
+    with _rechnen:  # nur eine Berechnung gleichzeitig; wer wartet, bekommt das fertige Ergebnis
+        key = files_key()
+        if _cache.get("key") == key:
+            return _cache
+        t0 = time.time()
         try:
-            cfg, res, files, lade, ev = core.run(PRIMEO, CFG)
+            cfg, res, files, lade, ev = core.run(PRIMEO, CFG, DATA / ".cache")
             _cache.update(key=key, ok=True, cfg=cfg, res=res, files=files, ev=ev, fehler=None)
         except BaseException as e:  # SystemExit bei fehlenden Dateien
             _cache.update(key=key, ok=False, fehler=str(e) or traceback.format_exc(limit=1))
             log.warning("Berechnung nicht möglich: %s", _cache["fehler"])
+        else:
+            if time.time() - t0 > 5:
+                log.info("Berechnung neu erstellt in %.0f s", time.time() - t0)
     return _cache
+
+
+def im_hintergrund_rechnen():
+    """Nach Start oder Upload schon rechnen, damit die nächste Seite nicht warten muss."""
+    def lauf():
+        try:
+            if any(p.is_file() for p in PRIMEO.iterdir()):
+                liste()  # Dateiinfos für «Daten importieren»
+                berechnung()
+        except Exception:
+            log.exception("Berechnung im Hintergrund fehlgeschlagen")
+    threading.Thread(target=lauf, daemon=True).start()
 
 
 INFO_DATEI = DATA / ".dateiinfo.json"
@@ -334,6 +360,7 @@ def hochladen():
             teile.append(f"{fs.filename}: Fehler {e}")
             fehler = True
     msg = "; ".join(teile)
+    im_hintergrund_rechnen()
     if request.headers.get("X-Requested-With") == "fetch":
         return {"ok": not fehler, "msg": msg}
     return redirect("import?" + ("c=warn&" if fehler else "") + "msg=" + msg)
@@ -345,6 +372,7 @@ def ersetzen():
     if alt.exists():
         shutil.move(str(alt), PRIMEO / "_entfernt" / f"{datetime.now():%Y%m%d%H%M%S}_{alt.name}")
     neu, _ = speichern(request.files["datei"])
+    im_hintergrund_rechnen()
     return redirect(f"import?msg={alt.name} ersetzt durch {neu['name']}")
 
 
@@ -353,6 +381,7 @@ def entfernen():
     p = PRIMEO / secure_filename(request.form["name"])
     if p.exists():
         shutil.move(str(p), PRIMEO / "_entfernt" / f"{datetime.now():%Y%m%d%H%M%S}_{p.name}")
+    im_hintergrund_rechnen()
     return redirect(f"import?msg={p.name} entfernt")
 
 
@@ -547,4 +576,5 @@ if __name__ == "__main__":
     import logging
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     log.info("App gestartet. Daten in %s, %d Dateien im Import", DATA, sum(1 for p in PRIMEO.iterdir() if p.is_file()))
+    im_hintergrund_rechnen()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8099)), threaded=True)

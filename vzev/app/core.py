@@ -68,12 +68,41 @@ def read_lastgang(path):
     return out, messpunkt, lieferstelle
 
 
-def load(datadir, cfg):
+def read_lastgang_cached(path, cache_dir=None):
+    """Wie read_lastgang, merkt sich das Ergebnis aber pro Datei (Name, Grösse, Änderungszeit).
+
+    Das Einlesen der Excel-Dateien ist der langsamste Schritt; mit dem Zwischenspeicher wird nach einer
+    Änderung an Tarifen oder Mietern nur noch neu gerechnet, nicht neu eingelesen.
+    """
+    if cache_dir is None:
+        return read_lastgang(path)
+    import pickle
+    st = Path(path).stat()
+    cache_dir = Path(cache_dir)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    ziel = cache_dir / f"{Path(path).name}.{st.st_size}.{int(st.st_mtime)}.pkl"
+    if ziel.exists():
+        try:
+            with open(ziel, "rb") as f:
+                return pickle.load(f)
+        except Exception:
+            pass
+    out = read_lastgang(path)
+    for alt in cache_dir.glob(f"{Path(path).name}.*.pkl"):
+        alt.unlink(missing_ok=True)
+    with open(ziel, "wb") as f:
+        pickle.dump(out, f, protocol=pickle.HIGHEST_PROTOCOL)
+    return out
+
+
+def load(datadir, cfg, cache_dir=None):
     datadir = Path(datadir)
     series, files = {}, {}
+    namen = set()
     for p in sorted(datadir.glob("*.xlsx")):
+        namen.add(p.name)
         try:
-            s, mp, lieferstelle = read_lastgang(p)
+            s, mp, lieferstelle = read_lastgang_cached(p, cache_dir)
         except Exception:
             continue
         key = cfg["messpunkte"].get(mp)
@@ -95,6 +124,10 @@ def load(datadir, cfg):
             t["Ende"] = pd.to_datetime(t["Ende"], format="%d.%m.%Y %H:%M")
             t["kwh"] = t["Zaehlerstand Differenz [kWh]"].str.replace(",", ".").astype(float)
             lade, files["Lade"] = t, (p.name, "Wallbox", f"{len(t)} Ladevorgänge")
+    if cache_dir is not None and Path(cache_dir).exists():  # Zwischenspeicher entfernter Dateien aufräumen
+        for c in Path(cache_dir).glob("*.pkl"):
+            if c.name.rsplit(".", 3)[0] not in namen:
+                c.unlink(missing_ok=True)
     if lade is None:
         raise SystemExit("Ladestation-Datei fehlt")
     return df, lade, files
@@ -195,9 +228,9 @@ def abgleich(res, cfg):
     return out
 
 
-def run(datadir, config=None):
+def run(datadir, config=None, cache_dir=None):
     cfg = load_config(config)
-    df, lade, files = load(datadir, cfg)
+    df, lade, files = load(datadir, cfg, cache_dir)
     res = compute(df, lade, cfg)
     ev_check = abs(res["EV"].sum() - lade["kwh"].sum())
     return cfg, res, files, lade, ev_check
