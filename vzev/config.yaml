@@ -1,5 +1,5 @@
 name: vZEV Abrechnung
-version: "0.4.1"
+version: "0.5.0"
 slug: vzev
 description: vZEV-Abrechnung – Primeo-Lastgänge, Ladestation, Rechnungen mit QR-Einzahlungsschein
 url: https://github.com/khu1985/vzev-ha

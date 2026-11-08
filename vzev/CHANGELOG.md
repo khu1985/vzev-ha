@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+- Dynamische Strompreise (Primeo Dynamisch / NetzDynamisch): Die App holt die Viertelstundenpreise über die Primeo-Schnittstelle, stündlich und zwischen 18 und 21 Uhr alle 15 Minuten (Veröffentlichung für den nächsten Tag bis 18 Uhr). Fehlende Tage werden nachgeladen, ab einem einstellbaren Datum (Standard 01.01.2027).
+- Seite «Batterie»: Preisverlauf heute und morgen, Durchschnitt, Spanne und günstigste Stunde; «Jetzt abrufen»; Schnittstelle einstellbar (Adresse, Tarifname, Tariftyp, ab Datum, automatisch an/aus).
+- Die Preise werden noch nicht für die Abrechnung verwendet; das folgt, wenn die offenen Fragen (Mieterpreis, Abgaben 2027, Batterie-Netzladung) geklärt sind.
+
 ## 0.4.1
 
 - Rechnungen: «Datum ändern» pro Rechnung – Rechnungsdatum und Fälligkeit im Register anpassen (z. B. wenn die Rechnung früher verschickt wurde). Fällig leer = Datum + Zahlungsfrist. Jede Änderung wird festgehalten und ins Protokoll geschrieben; das PDF bleibt unverändert.

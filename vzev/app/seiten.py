@@ -591,11 +591,25 @@ BATTERIE = """
 <td>{{ '%.0f %%'|format(m.entladen / m.geladen * 100) if m.geladen else '–' }}</td><td>{{ m.pv|f2 }}</td><td>{{ m.bezug|f2 }}</td><td>{{ m.einspeisung|f2 }}</td></tr>
 {% else %}<tr><td colspan="8" class="l">Noch keine Daten vom Wechselrichter. Der Datensammler speichert sie alle 15 Minuten.</td></tr>{% endfor %}</table></div>
 <p class="muted">Tageswerte des Solis-Wechselrichters (Höchstwert pro Tag), gesammelt vom Datensammler. Für die Abrechnung zählen weiterhin die Primeo-Lastgänge.</p></div>
+<div class="card"><h2>Dynamische Strompreise</h2>
+<p>{{ p.status }}{% if p.letzter %} · zuletzt {{ p.letzter }}{% endif %}{% if p.naechster %} · nächster Abruf {{ p.naechster }}{% endif %}</p>
+{% if p.fehler %}<div class="msg warn">Abruf fehlgeschlagen: {{ p.fehler }}</div>{% endif %}
+{% if p.tage %}<div class="grid" style="margin:12px 0">{% for t in p.tage %}<div class="kpi"><div class="t">{{ t.label }}</div>
+<div class="v">{{ '%.1f'|format(t.mittel) }} <small>Rp./kWh Ø</small></div><div class="s">{{ '%.1f'|format(t.min) }} – {{ '%.1f'|format(t.max) }} Rp., günstigste Stunde ab {{ t.guenstig }}</div></div>{% endfor %}</div>
+{{ p.chart|safe }}<p class="muted">Typ «{{ p.typ }}», ohne kantonale/kommunale Abgaben und MWST.</p>{% endif %}
+<form method="post" action="preise_abrufen" data-busy="Strompreise werden abgerufen …" style="margin-top:8px"><button>Jetzt abrufen</button></form>
+<details style="margin-top:12px"><summary class="muted">Schnittstelle einstellen</summary>
+<form method="post" action="batterie?teil=dynamisch"><table class="form">
+<tr><td class="l">Adresse (URL)</td><td class="l"><input name="api_url" value="{{ p.e.api_url }}" style="width:420px" required></td></tr>
+<tr><td class="l">Tarifname</td><td class="l"><input name="tarif_name" value="{{ p.e.tarif_name }}" style="width:200px"> <span class="muted">NetzDynamisch, NetzDynamischAVAG, NetzDynamischELAG</span></td></tr>
+<tr><td class="l">Tariftyp</td><td class="l"><select name="tarif_typ">{% for k, v in [('', 'alle'), ('integrated', 'integrated – Netz + Energie'), ('electricity', 'electricity – Energie'), ('grid', 'grid – Netz inkl. nationale Abgaben'), ('grid_usage', 'grid_usage – nur Netznutzung')] %}<option value="{{ k }}" {{ 'selected' if k == p.e.tarif_typ }}>{{ v }}</option>{% endfor %}</select></td></tr>
+<tr><td class="l">Abrufen ab</td><td class="l"><input type="date" name="abrufen_ab" value="{{ p.e.abrufen_ab }}"></td></tr>
+<tr><td class="l">Automatisch abrufen</td><td class="l"><label><input type="checkbox" name="aktiv" value="1" {{ 'checked' if p.e.aktiv }}> stündlich, zwischen 18 und 21 Uhr alle 15 Minuten</label></td></tr>
+</table><p><button class="primary">Speichern</button> <span class="muted">Standard laut Primeo-Merkblatt: https://tarife.primeo-energie.ch/api/v1/tariffs</span></p></form></details></div>
 <form method="post" action="batterie" class="card"><h2>Regeln für die Abrechnung</h2>
 <table class="form"><tr><td class="l">Netzladung zahlt</td><td class="l"><select name="netzladung_zahlt">{% for k, v in [('betreiber','Betreiber'),('alle','alle Bezüger anteilig')] %}<option value="{{ k }}" {{ 'selected' if r.netzladung_zahlt == k }}>{{ v }}</option>{% endfor %}</select></td></tr>
 <tr><td class="l">Netzanteil bei Entladung</td><td class="l"><select name="entladung_netzanteil">{% for k, v in [('solarpreis','wie Solarstrom zum vZEV-Preis'),('ladepreis','zum Preis beim Laden'),('offen','noch abzuklären')] %}<option value="{{ k }}" {{ 'selected' if r.entladung_netzanteil == k }}>{{ v }}</option>{% endfor %}</select></td></tr>
 <tr><td class="l">Dynamischer Tarif ab</td><td class="l"><input type="date" name="dynamisch_ab" value="{{ r.dynamisch_ab or '' }}"></td></tr>
-<tr><td class="l">Preis-Schnittstelle Primeo</td><td class="l"><input name="preis_api" value="{{ r.preis_api or '' }}" placeholder="URL, sobald von Primeo bekannt" style="width:360px"></td></tr>
 <tr><td class="l">Abgeklärt / Notiz</td><td class="l"><input name="notiz" value="{{ r.notiz or '' }}" style="width:360px"></td></tr></table>
 <p><button class="primary">Speichern</button></p>
 <p class="muted">Heute lädt die Batterie nur aus PV, deshalb ändert sie an der Abrechnung nichts: Solarstrom aus der Batterie ist Solarstrom. Ab dem dynamischen Tarif kann sie auch aus dem Netz laden;
@@ -605,8 +619,21 @@ dann rechnet die App die Netzladung dem Betreiber zu und verrechnet den Netzante
 def batterie():
     cfg = S.config()
     r = cfg.get("batterie") or {}
+    if request.method == "POST" and request.args.get("teil") == "dynamisch":
+        url = (request.form.get("api_url") or "").strip()
+        if not url.startswith(("http://", "https://")):
+            return redirect("batterie?c=warn&msg=Nicht gespeichert: Die Adresse muss mit http:// oder https:// beginnen")
+        try:
+            ab = _d(request.form.get("abrufen_ab") or "2027-01-01")
+        except ValueError:
+            return redirect("batterie?c=warn&msg=Nicht gespeichert: ungültiges Datum")
+        neu = {"api_url": url, "tarif_name": (request.form.get("tarif_name") or "NetzDynamisch").strip(),
+               "tarif_typ": request.form.get("tarif_typ") or "", "abrufen_ab": ab, "aktiv": bool(request.form.get("aktiv"))}
+        abschnitt_speichern("dynamisch", neu, "Dynamische Strompreise – bearbeitet in der App")
+        S.log.info("Preis-Schnittstelle gespeichert: %s (%s, %s)", url, neu["tarif_name"], neu["tarif_typ"] or "alle")
+        return redirect("batterie?msg=Gespeichert")
     if request.method == "POST":
-        neu = {k: (request.form.get(k) or "").strip() or None for k in ("netzladung_zahlt", "entladung_netzanteil", "preis_api", "notiz")}
+        neu = {k: (request.form.get(k) or "").strip() or None for k in ("netzladung_zahlt", "entladung_netzanteil", "notiz")}
         try:
             neu["dynamisch_ab"] = _d(request.form.get("dynamisch_ab") or None)
             abschnitt_speichern("batterie", neu, "Batterie – bearbeitet in der App")
@@ -632,8 +659,34 @@ def batterie():
             monate.append(dict(monat=m.strftime("%m.%Y"), tage=len(g), **{k: (g[k].sum() if k in g else None) for k in spalten}))
         monate.reverse()
     akt = monate[0] if monate and monate[0]["monat"] == date.today().strftime("%m.%Y") else dict(geladen=None, entladen=None)
-    return S.page("Batterie", render_template_string(BATTERIE, r=r, monate=monate, akt=akt, monat=date.today().strftime("%m.%Y"),
+    return S.page("Batterie", render_template_string(BATTERIE, r=r, monate=monate, akt=akt, monat=date.today().strftime("%m.%Y"), p=preis_infos(),
                                                      soc=soc_row[0] if soc_row else None))
+
+
+def preis_infos():
+    import diagramme
+    import preise
+    pa = S.preisabruf
+    e = preise.einstellungen(S.config())
+    vorhanden = preise.typen_vorhanden(pa.db)
+    typ = e["tarif_typ"] or next((t for t in preise.TYPEN if t in vorhanden), None)
+    tage, reihen = [], []
+    heute = date.today()
+    for d, label, farbe in [(heute, "Heute", diagramme.FARBEN["netz"]), (heute + timedelta(days=1), "Morgen", diagramme.FARBEN["solar"])]:
+        rows = preise.tag(pa.db, d, typ) if typ else []
+        if not rows:
+            continue
+        pkt = [(int(s[11:13]) * 60 + int(s[14:16]), v * 100) for s, v in rows]
+        w = [v for _, v in pkt]
+        stunden = {}
+        for m, v in pkt:
+            stunden.setdefault(m // 60, []).append(v)
+        guenstig = min(stunden, key=lambda h: sum(stunden[h]) / len(stunden[h]))
+        tage.append(dict(label=f"{label}, {d:%d.%m.}", mittel=sum(w) / len(w), min=min(w), max=max(w), guenstig=f"{guenstig:02d}:00"))
+        reihen.append((f"{label} {d:%d.%m.}", farbe, pkt))
+    naechster = S.collector.naechster.strftime("%H:%M") if getattr(S.collector, "naechster", None) else None
+    return dict(e=e, status=pa.status, fehler=pa.fehler, letzter=pa.letzter.strftime("%d.%m. %H:%M") if pa.letzter else None,
+                naechster=naechster, tage=tage, typ=typ, chart=(diagramme.STIL + diagramme.tagesverlauf(reihen)) if reihen else "")
 
 
 # --- Einstellungen ------------------------------------------------------------
@@ -730,3 +783,16 @@ def register(app, server):
     app.add_url_rule("/primeo", "primeo", primeo, methods=["GET", "POST"])
     app.add_url_rule("/abschluss", "abschluss", abschluss, methods=["GET", "POST"])
     app.add_url_rule("/batterie", "batterie", batterie, methods=["GET", "POST"])
+    app.add_url_rule("/preise_abrufen", "preise_abrufen", preise_abrufen, methods=["POST"])
+
+
+def preise_abrufen():
+    S.collector.aktiv = "Strompreise abrufen"
+    try:
+        n = S.preisabruf.abrufen()
+    finally:
+        S.collector.aktiv = None
+    pa = S.preisabruf
+    if pa.fehler:
+        return redirect(f"batterie?c=warn&msg=Abruf fehlgeschlagen: {pa.fehler}")
+    return redirect(f"batterie?msg={pa.status}")
