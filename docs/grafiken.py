@@ -89,12 +89,12 @@ k.append(box(X[2], s["mess"], BW, BH, "messwerte.sqlite", "Zählerstände, evcc"
 k.append(box(X[2], s["abschl"], BW, BH, "abschluss.json", "festgehaltene Monate", "daten", "zyl"))
 # Berechnung
 b = {"core": 118, "vorschau": 282}
-k.append(box(X[3], b["core"], BW, BH, "Rechenkern", "core.py · 15-Min.-Aufteilung", "app"))
+k.append(box(X[3], b["core"], BW, BH, "Rechenkern", "core.py · Speicher, Bonus", "app"))
 k.append(box(X[3], b["vorschau"], BW, BH, "Vorschau", "vorschau.py · laufender Monat", "app"))
 # Ausgabe
 a = {"ueb": 70, "rech": 165, "abs": 410, "prot": 282}
-k.append(box(X[4], a["ueb"], BW, BH, "Übersicht, Verlauf", "uebersicht.py · Diagramme", "aus"))
-k.append(box(X[4], a["rech"], BW, BH, "Rechnungen, Zahlungen", "invoices.py, zahlungen.py", "aus"))
+k.append(box(X[4], a["ueb"], BW, BH, "Übersicht, Wertschöpfung", "uebersicht.py · Kontrollen", "aus"))
+k.append(box(X[4], a["rech"], BW, BH, "Rechnungen, Jahr", "invoices, jahr, zahlungen", "aus"))
 k.append(box(X[4], a["prot"], BW, BH, "Status, Protokoll", "Statusanzeige, vzev.log", "aus"))
 k.append(box(X[4], a["abs"], BW, BH, "Abschluss, Korrekturen", "Sperre, Begründungen", "aus"))
 k.append(box(X[4], 530, BW, BH, "Batterie, Strompreise", "Verlauf heute/morgen", "aus"))
@@ -147,6 +147,6 @@ k += [pfeil(xs[0] + BW, my1, xs[1], my1), pfeil(xs[1] + BW, my1, xs[2], my1),
       f"<text x='{(xs[1]+xs[2])/2+BW/2}' y='{y1+BH+64}' text-anchor='middle' font-size='11' fill='#B4541A' {FONT}>nein: Datei prüfen, neu hochladen</text>",
       f"<path d='M{xs[3]+BW/2},{y1+BH} V{y2-40} H{xs[0]+BW/2} V{y2}' fill='none' stroke='{MUTED}' stroke-width='1.6' stroke-linejoin='round' marker-end='url(#pf)'/>",
       pfeil(xs[0] + BW, my2, xs[1], my2), pfeil(xs[1] + BW, my2, xs[2], my2, "Quartalsende"), pfeil(xs[2] + BW, my2, xs[3], my2)]
-k.append(f"<text x='30' y='{y2+BH+40}' font-size='12' fill='{MUTED}' {FONT}>Laufend und automatisch: Zählerstände alle 15 Min., evcc stündlich, Strompreise für morgen ab 18 Uhr, Vorschau des laufenden Monats.</text>")
+k.append(f"<text x='30' y='{y2+BH+40}' font-size='12' fill='{MUTED}' {FONT}>Jährlich: Jahresabrechnung (Allgemeinstrom-PDF für die NK-Abrechnung, Excel). Laufend: Zählerstände alle 15 Min., evcc stündlich, Strompreise ab 18 Uhr.</text>")
 open(f"{OUT}/prozess-monatlich.svg", "w").write(svg(W, y2 + BH + 60, "".join(k), "Monatlicher Ablauf"))
 print("ok")

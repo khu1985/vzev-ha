@@ -2,27 +2,29 @@
 
 Abrechnung eines virtuellen Zusammenschlusses zum Eigenverbrauch (vZEV) direkt in Home Assistant:
 Primeo-Lastgänge einlesen, Solar- und Netzstrom pro Viertelstunde aufteilen, Quartalsrechnungen mit
-QR-Einzahlungsschein erstellen, Zahlungen verfolgen und Monate revisionssicher abschliessen.
+QR-Einzahlungsschein erstellen, Zahlungen verfolgen, Monate revisionssicher abschliessen und am Jahresende
+den Allgemeinstrom für die Nebenkostenabrechnung ausgeben. Ab 2027 mit Bonus aus dem dynamischen Tarif
+und getrennt ausgewiesenem Netzstrom aus dem Batteriespeicher.
 
 ## Erste Schritte
 
 1. **Einstellungen → Betreiber und Rechnungen:** Name, Adresse, Bank und IBAN (erscheinen auf den Rechnungen und im QR-Einzahlungsschein), vZEV-Start, Zahlungsfrist.
 2. **Einstellungen → Zähler:** die fünf Primeo-Messpunkte (1. OG, 2. OG, Allgemein, Netzbezug PV-Anlage, Produktion) und die Energie-Sensoren in Home Assistant.
-3. **Tarife:** Solarpreis, Netzstrom HT/NT, Rücklieferung und Grundpreis, jeweils mit «Gültig ab».
+3. **Tarife:** Solarpreis, Netzstrom HT/NT, Rücklieferung und Grundpreis, jeweils mit «Gültig ab». Neue Preise (z. B. ab 01.01.2027) als neue Zeile eintragen, die alten bleiben für frühere Monate gültig.
 4. **Mieter:** Mietverhältnisse mit Von/Bis.
 5. **Daten importieren:** Lastgänge aller Zähler aus dem Primeo-Kundenportal (.xlsx) und den Wallbox-Export (.csv) hochladen.
 
 ## Seiten
 
 **Auswertung**
-- **Übersicht:** Monat wählen; Produktion, Autarkie, Rücklieferung, Wertschöpfung; Diagramm «Energiefluss pro Monat»; Kontrollen (Abgleich mit Primeo, Ladestation, Lücken, Rückliefertarif, Abschluss, offene Rechnungen); Verbraucher des Monats mit Betrag inkl. Grundpreis.
+- **Übersicht:** Monat wählen; Produktion, Autarkie, Rücklieferung, Wertschöpfung; Diagramm «Energiefluss pro Monat»; Kontrollen (Abgleich mit Primeo, Ladestation, Lücken, Rückliefertarif, Solarpreis höchstens 80 % des Standardprodukts, dynamische Preise vollständig, Netzladung des Speichers, Abschluss, offene Rechnungen); Verbraucher des Monats mit Betrag inkl. Grundpreis.
 - **Wertschöpfung:** Ertrag des Betreibers pro Monat nach Quelle (Verkauf an Mieter, Eigenverbrauch, Rücklieferung, Gutschriften), kumuliert, Verwendung des Solarstroms und Wert pro kWh; filterbar nach Jahr.
 - **Verlauf:** pro Zähler Verbrauch, Solar/Netz und Kosten pro Monat, beim 1. OG nach Mietverhältnis gruppiert.
 
 **Abrechnung**
 - **Daten importieren:** Dateien hochladen, ersetzen oder entfernen. Die Zuordnung erfolgt über die Messpunkt-Nummer im Dateikopf, nicht über den Dateinamen. Oben steht, bis wann die Lastgänge reichen.
 - **Jahresabrechnung:** Allgemeinstrom fürs ganze Jahr als PDF für die Nebenkostenabrechnung, Mieter, Wertschöpfung, Excel-Export (auf Wunsch mit allen Viertelstunden).
-- **Rechnungen:** Quartal und Rechnungsdatum wählen und erstellen – pro Mietverhältnis eine Rechnung mit QR-Einzahlungsschein, dazu eine Gesamtrechnung Allgemeinstrom für die Nebenkostenabrechnung. Darunter **Rechnungen und Zahlungen**: offene und überfällige Beträge, Zahlungen erfassen oder entfernen, Rechnungsdatum und Fälligkeit ändern.
+- **Rechnungen:** Quartal und Rechnungsdatum wählen und erstellen – pro Mietverhältnis eine Rechnung mit QR-Einzahlungsschein, dazu eine Gesamtrechnung Allgemeinstrom für die Nebenkostenabrechnung. Ab 2027 zusätzlich die Spalte «Speicher NT» und die Zeile «Bonus dynamischer Stromtarif», sobald sie vorkommen. Darunter **Rechnungen und Zahlungen**: offene und überfällige Beträge, Zahlungen erfassen oder entfernen, Rechnungsdatum und Fälligkeit ändern.
 - **Abschluss:** Monate der Reihe nach abschliessen (mit Abschlussdatum). Danach sind Änderungen an Tarifen, Mietern und Erträgen für diesen Monat gesperrt.
 
 **Stammdaten**
@@ -32,7 +34,7 @@ QR-Einzahlungsschein erstellen, Zahlungen verfolgen und Monate revisionssicher a
 - **Einstellungen:** Betreiber, Zähler, Regeln (Aufteilung sowie Speicher und Bonus dynamischer Tarif) und die Datei `vzev.yaml` direkt.
 
 **Anlage**
-- **Batterie:** Monatswerte des Speichers (geladen, entladen, Wirkungsgrad) aus den Solis-Daten.
+- **Batterie:** Monatswerte des Speichers (geladen, entladen, Wirkungsgrad) aus den Solis-Daten. Für die Abrechnung zählt die Netzladung aus den Primeo-Lastgängen (siehe «Dynamische Strompreise»).
 - **Datensammler:** Zählerstände aus Home Assistant (alle 15 Minuten) mit letztem Wert und Status, evcc-Ladevorgänge im Detail.
 - **Protokoll:** Uploads, Rechnungen, Zahlungen, Korrekturen, Warnungen und Fehler.
 
@@ -46,6 +48,7 @@ Ein Klick auf die **Versionsnummer** zeigt, was neu ist. Daneben zeigt eine **St
 4. Unter **Tarife** den Rückliefertarif des Quartals eintragen, sobald Primeo ihn publiziert.
 5. Unter **Abschluss** den Monat abschliessen.
 6. Am Quartalsende unter **Rechnungen** die Rechnungen erstellen und versenden; eingehende Zahlungen dort erfassen.
+7. Am Jahresende unter **Jahresabrechnung** das PDF Allgemeinstrom für die Nebenkostenabrechnung erstellen und bei Bedarf den Excel-Export herunterladen.
 
 ## Korrekturen
 
