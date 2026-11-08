@@ -44,6 +44,8 @@ Ein Klick auf die **Versionsnummer** zeigt, was neu ist. Der Knopf daneben stell
 
 ## Monatlicher Ablauf
 
+Am einfachsten über **Abrechnung → Aufgaben**: Der Assistent zeigt für jeden offenen Monat die Schritte unten, erkennt erledigte selbst und öffnet mit «→» die passende Seite («Zurück zu den Aufgaben» unten links führt zurück). Die Startseite zeigt die nächste Aufgabe.
+
 1. Lastgänge bei Primeo und Ladevorgänge der Wallbox exportieren und unter **Daten importieren** hochladen.
 2. In der **Übersicht** die Kontrollen prüfen. Bei «prüfen» die betroffene Datei ansehen und neu hochladen.
 3. Die Primeo-Rechnung unter **Primeo** erfassen (Netzbezug HT/NT, Rücklieferung) – damit läuft der Abgleich.

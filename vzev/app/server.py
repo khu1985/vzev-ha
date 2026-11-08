@@ -112,7 +112,7 @@ CHANGELOG = _changelog()
 NEU_KURZ = (CHANGELOG[0][1][0].split(":")[0] if CHANGELOG and CHANGELOG[0][0] == VERSION and CHANGELOG[0][1] else "Verbesserungen")
 NAVIGATION = [
     ("Auswertung", [("./", "Energiefluss"), ("uebersicht", "Übersicht"), ("verlauf", "Verlauf"), ("wertschoepfung", "Wertschöpfung")]),
-    ("Abrechnung", [("import", "Daten importieren"), ("rechnungen", "Rechnungen"), ("jahr", "Jahresabrechnung"), ("abschluss", "Abschluss")]),
+    ("Abrechnung", [("aufgaben", "Aufgaben"), ("import", "Daten importieren"), ("rechnungen", "Rechnungen"), ("jahr", "Jahresabrechnung"), ("abschluss", "Abschluss")]),
     ("Stammdaten", [("mieter", "Mieter"), ("tarife", "Tarife"), ("primeo", "Primeo"), ("einstellungen", "Einstellungen")]),
     ("Anlage", [("prognose", "Prognose"), ("batterie", "Batterie"), ("sammler", "Datensammler"), ("protokoll", "Protokoll")]),
 ]
@@ -186,7 +186,7 @@ def berechnung(grund="Seitenaufruf"):
         RECHNEN.update(aktiv=True, start=t0, grund=grund)
         try:
             cfg, res, files, lade, ev = core.run(PRIMEO, CFG, DATA / ".cache", dyn=dyn_preise(), wp=wp_reihe)
-            _cache.update(key=key, ok=True, cfg=cfg, res=res, files=files, ev=ev, fehler=None)
+            _cache.update(key=key, ok=True, cfg=cfg, res=res, files=files, ev=ev, lade=lade, fehler=None)
         except BaseException as e:  # SystemExit bei fehlenden Dateien
             _cache.update(key=key, ok=False, fehler=str(e) or traceback.format_exc(limit=1))
             log.warning("Berechnung nicht möglich: %s", _cache["fehler"])
@@ -331,6 +331,8 @@ html[data-theme=dark] svg [stroke="#16201C"]{stroke:var(--ink)}html[data-theme=d
 html[data-theme=dark] .hb-s{background:var(--line2)!important}html[data-theme=dark] .legende{color:var(--nav)}
 html[data-theme=dark] img.pdfvorschau{filter:none}
 html[data-theme=dark] #tip{background:#2A332F;border:1px solid #3A4440}html[data-theme=dark] .neu-hinweis{border:1px solid #3A4440}
+.zurueck{position:fixed;left:16px;bottom:16px;z-index:25;box-shadow:0 4px 16px rgba(0,0,0,.18)}
+@media (min-width:1200px){.zurueck{left:248px}}
 #thema{min-height:30px;padding:0 10px;font-size:12px;font-weight:600;border-radius:999px}
 /* Tabellen auf dem Handy: Zeilen als Karten mit Beschriftung, breite Monatstabellen scrollen mit fester erster Spalte */
 @media (max-width:759px){
@@ -434,6 +436,8 @@ a.ver{text-decoration:none}a.ver:hover{text-decoration:underline;color:var(--ink
 </script><script>if(innerWidth<760)document.querySelectorAll('.scroll').forEach(function(d){if(d.querySelector('svg.chart'))d.scrollLeft=d.scrollWidth});
 document.querySelectorAll('table').forEach(function(t){var h=null;t.querySelectorAll('tr').forEach(function(r){var th=r.querySelectorAll(':scope>th');if(th.length){h=Array.from(th).map(function(x){return x.textContent.trim()});return}
 if(!h)return;var i=0;r.querySelectorAll(':scope>td').forEach(function(td){var n=td.colSpan||1;if(n==1&&h[i]&&!td.hasAttribute('data-label'))td.setAttribute('data-label',h[i]);i+=n})})})</script>
+<script>(function(){try{var z=sessionStorage.getItem('vzev-assistent');if(z&&!/aufgaben/.test(location.pathname)){var a=document.createElement('a');
+a.href=z;a.className='btn primary zurueck';a.textContent='← Zurück zu den Aufgaben';document.body.appendChild(a)}}catch(e){}})();</script>
 <script>(function(){var b=document.getElementById('thema');if(!b)return;var h=document.documentElement,folge=['auto','light','dark'],
 txt={auto:'Auto',light:'Hell',dark:'Dunkel'};function zeigen(){b.textContent=txt[h.getAttribute('data-wahl')||'auto']}
 function setzen(t){try{localStorage.setItem('vzev-theme',t)}catch(e){}h.setAttribute('data-wahl',t);
@@ -791,7 +795,7 @@ def einstellungen():
 
 
 # --- Status und Warteseite ------------------------------------------------------
-BRAUCHT_BERECHNUNG = {"index", "uebersicht", "verlauf", "wertschoepfung", "abschluss", "primeo", "sammler", "import_page", "jahr"}
+BRAUCHT_BERECHNUNG = {"index", "uebersicht", "aufgaben", "verlauf", "wertschoepfung", "abschluss", "primeo", "sammler", "import_page", "jahr"}
 
 
 @app.get("/status")
@@ -838,6 +842,8 @@ jahr.register(app, sys.modules[__name__])
 prognose.register(app, sys.modules[__name__])
 import fluss  # noqa: E402
 fluss.register(app, sys.modules[__name__])
+import aufgaben  # noqa: E402
+aufgaben.register(app, sys.modules[__name__])
 app.jinja_env.filters["dmy"] = lambda x: "" if not x else f"{str(x)[8:10]}.{str(x)[5:7]}.{str(x)[:4]}"
 
 # --- Protokoll ----------------------------------------------------------------

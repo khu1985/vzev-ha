@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.0
+
+- Aufgaben-Assistent (Abrechnung → Aufgaben): führt Monat für Monat durch die regelmässigen Arbeiten – Lastgänge und Wallbox-Export importieren, Primeo-Rechnung erfassen, Kontrollen prüfen, Monat abschliessen; am Quartalsende Rechnungen erstellen, versenden und Zahlungen erfassen; am Jahresende die Jahresabrechnung. Erledigte Schritte erkennt die App selbst, «versendet» wird von Hand bestätigt.
+- Ausserdem: Tarife fürs neue Jahr (ab November) und überfällige Rechnungen.
+- Jeder Schritt öffnet die passende Seite; «Zurück zu den Aufgaben» führt wieder zum Assistenten. Die Startseite zeigt die nächste Aufgabe.
+
 ## 0.11.0
 
 - Dark Mode: dunkle Darstellung für alle Seiten und Diagramme. Umschalter oben neben der Versionsnummer: Auto (wie das Gerät), Hell oder Dunkel; die Wahl wird im Browser gespeichert.
