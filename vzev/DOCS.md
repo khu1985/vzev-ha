@@ -24,11 +24,12 @@ QR-Einzahlungsschein erstellen, Zahlungen verfolgen und Monate revisionssicher a
 - **Abschluss:** Monate der Reihe nach abschliessen (mit Abschlussdatum). Danach sind Änderungen an Tarifen, Mietern und Erträgen für diesen Monat gesperrt.
 
 **Stammdaten**
-- **Mieter, Tarife, Primeo:** Formulare für Mietverhältnisse, Tarife, Primeo-Rechnungen (für den Abgleich) und manuelle Erträge.
-- **Einstellungen:** Betreiber, Zähler, Regeln der Aufteilung und die Datei `vzev.yaml` direkt.
+- **Mieter, Tarife:** Mietverhältnisse mit Historie, Tarife mit Gültig-ab-Datum.
+- **Primeo:** **Dynamische Strompreise** (Verlauf heute/morgen, Schnittstelle einstellen), Primeo-Rechnungen für den Abgleich, manuelle Erträge.
+- **Einstellungen:** Betreiber, Zähler, Regeln (Aufteilung sowie Batterie und dynamischer Tarif) und die Datei `vzev.yaml` direkt.
 
 **Anlage**
-- **Batterie:** Monatswerte des Speichers (geladen, entladen, Wirkungsgrad) aus den Solis-Daten; **Dynamische Strompreise** mit Verlauf heute/morgen und einstellbarer Schnittstelle; Regeln für die Netzladung.
+- **Batterie:** Monatswerte des Speichers (geladen, entladen, Wirkungsgrad) aus den Solis-Daten.
 - **Datensammler:** Zählerstände aus Home Assistant (alle 15 Minuten) mit letztem Wert und Status, evcc-Ladevorgänge im Detail.
 - **Protokoll:** Uploads, Rechnungen, Zahlungen, Korrekturen, Warnungen und Fehler.
 
@@ -56,7 +57,7 @@ Für die Zeit nach dem letzten Primeo-Lastgang rechnet die App mit den gesammelt
 
 ## Dynamische Strompreise
 
-Die App holt die Viertelstundenpreise über die Primeo-Schnittstelle (Standard: `https://tarife.primeo-energie.ch/api/v1/tariffs`), stündlich und zwischen 18 und 21 Uhr alle 15 Minuten. Adresse, Tarifname, Tariftyp und Startdatum lassen sich unter **Batterie → Schnittstelle einstellen** ändern. Die Preise enthalten keine kantonalen/kommunalen Abgaben und keine MWST. Für die Abrechnung werden sie noch nicht verwendet.
+Die App holt die Viertelstundenpreise über die Primeo-Schnittstelle (Standard: `https://tarife.primeo-energie.ch/api/v1/tariffs`), stündlich und zwischen 18 und 21 Uhr alle 15 Minuten. Adresse, Tarifname, Tariftyp und Startdatum lassen sich unter **Primeo → Dynamische Strompreise → Schnittstelle einstellen** ändern. Die Preise enthalten keine kantonalen/kommunalen Abgaben und keine MWST. Für die Abrechnung werden sie noch nicht verwendet.
 
 ## Daten und Sicherung
 

@@ -184,7 +184,7 @@ GET https://tarife.primeo-energie.ch/api/v1/tariffs
 ```
 
 - Veröffentlichung täglich bis 18 Uhr für den nächsten Tag; die App ruft stündlich und von 18 bis 21 Uhr alle 15 Minuten ab und lädt fehlende Tage nach.
-- Adresse, Tarifname, Tariftyp und Startdatum sind in der App einstellbar (Seite «Batterie»), gespeichert im Abschnitt `dynamisch` von `vzev.yaml`.
+- Adresse, Tarifname, Tariftyp und Startdatum sind in der App einstellbar (Seite «Primeo»), gespeichert im Abschnitt `dynamisch` von `vzev.yaml`.
 - Die Preise enthalten keine kantonalen/kommunalen Abgaben und keine MWST.
 
 Noch offen, bevor die Preise in die Abrechnung einfliessen:

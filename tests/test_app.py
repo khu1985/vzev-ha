@@ -249,16 +249,24 @@ def test_strompreise_einstellen_und_abrufen(app):
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     try:
         url = f"http://127.0.0.1:{srv.server_port}/api/v1/tariffs"
-        assert "nicht gespeichert" in ziel(c.post("/batterie?teil=dynamisch", data={"api_url": "ftp://x"})).lower()
+        assert "nicht gespeichert" in ziel(c.post("/primeo?teil=dynamisch", data={"api_url": "ftp://x"})).lower()
         heute = date.today()
-        r = c.post("/batterie?teil=dynamisch", data={"api_url": url, "tarif_name": "NetzDynamisch", "tarif_typ": "",
+        r = c.post("/primeo?teil=dynamisch", data={"api_url": url, "tarif_name": "NetzDynamisch", "tarif_typ": "",
                                                      "abrufen_ab": (heute - timedelta(days=2)).isoformat(), "aktiv": "1"})
         assert "Gespeichert" in ziel(r)
         assert yaml.safe_load((d / "vzev.yaml").read_text())["dynamisch"]["api_url"] == url
         r = c.post("/preise_abrufen")
-        assert "Viertelstunden" in ziel(r), ziel(r)
-        h = c.get("/batterie").get_data(as_text=True)
+        assert "Viertelstunden" in ziel(r) and ziel(r).startswith("primeo"), ziel(r)
+        warten(server)
+        h = c.get("/primeo").get_data(as_text=True)
         assert "Dynamische Strompreise" in h and "Heute" in h and "Rp./kWh" in h and url in h
+        assert "preise_abrufen" not in c.get("/batterie").get_data(as_text=True)
+        h = c.get("/einstellungen?tab=regeln").get_data(as_text=True)
+        assert "Batterie und dynamischer Tarif" in h and "Netzladung zahlt" in h
+        r = c.post("/einstellungen?tab=batterie", data={"netzladung_zahlt": "betreiber", "entladung_netzanteil": "offen",
+                                                        "dynamisch_ab": "2027-01-01", "notiz": "Test"})
+        assert "tab=regeln" in ziel(r) and "Gespeichert" in ziel(r)
+        assert yaml.safe_load((d / "vzev.yaml").read_text())["batterie"]["notiz"] == "Test"
     finally:
         srv.shutdown()
 
