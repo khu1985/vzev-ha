@@ -136,7 +136,7 @@ Angezeigt wird nur die Vorschau aus Home Assistant. Prüfe die Dateien unter <a 
  <div class="kpi"><div class="t">Wertschöpfung</div><div class="v">{{ wert|f2 }} <small>CHF</small></div><div class="s">Rücklieferung, Verkauf Mieter, Eigenverbrauch</div></div>
 </div>
 <div class="card"><h2>Kontrollen {{ titel }}</h2>
-{% for ok, t, d in kontrollen %}<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #EEF0EC">
+{% for ok, t, d in kontrollen %}<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line2)">
 <span class="pill {{ 'ok' if ok == True else 'warn' if ok == False else '' }}" style="min-width:64px;text-align:center">{{ 'stimmt' if ok == True else 'prüfen' if ok == False else 'offen' }}</span>
 <div><b>{{ t }}</b><div class="muted">{{ d }}</div></div></div>{% endfor %}</div>
 <div class="card"><h2>Verbraucher {{ titel }}</h2><div class="scroll"><table>

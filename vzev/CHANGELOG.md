@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.0
+
+- Dark Mode: dunkle Darstellung für alle Seiten und Diagramme. Umschalter oben neben der Versionsnummer: Auto (wie das Gerät), Hell oder Dunkel; die Wahl wird im Browser gespeichert.
+
 ## 0.10.2
 
 - Wärmepumpen einzeln: Im Verlauf eigene Reiter (z. B. Heizung, Warmwasser) neben der Summe, im Energiefluss eigene Kreise; Aufteilung pro Viertelstunde nach den gemessenen Anteilen.
