@@ -145,6 +145,25 @@ def zahlung(key, datum, betrag, notiz=""):
     return r
 
 
+def daten_aendern(key, datum, faellig=None):
+    """Rechnungsdatum (und Fälligkeit) im Register anpassen, z. B. wenn die Rechnung früher verschickt wurde.
+    Ohne Fälligkeit wird sie aus Datum + Zahlungsfrist berechnet. Das PDF selbst bleibt unverändert."""
+    reg = laden()
+    r = reg["rechnungen"][key]
+    if faellig is None:
+        frist = int((S.config().get("rechnungen") or {}).get("zahlungsfrist_tage", 30))
+        faellig = datum + timedelta(days=frist)
+    if faellig < datum:
+        raise ValueError("Die Fälligkeit liegt vor dem Rechnungsdatum")
+    alt = (r["datum"], r["faellig"])
+    r["datum"], r["faellig"] = datum.isoformat(), faellig.isoformat()
+    r.setdefault("aenderungen", []).append({"zeit": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                                            "vorher": {"datum": alt[0], "faellig": alt[1]},
+                                            "nachher": {"datum": r["datum"], "faellig": r["faellig"]}})
+    speichern(reg)
+    return r, alt
+
+
 def zahlung_entfernen(key, index):
     reg = laden()
     z = reg["rechnungen"][key]["zahlungen"].pop(index)

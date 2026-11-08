@@ -215,7 +215,15 @@ def test_zahlungseingang(app):
     c.post("/zahlung", data={"key": neu[0]["key"], "datum": "2026-05-21", "betrag": f"{neu[0]['offen']:.2f}"})
     assert [r for r in server.zahlungen.uebersicht()["zeilen"] if r["key"] == neu[0]["key"]][0]["stand"] == "bezahlt"
     assert "entfernt" in ziel(c.post("/zahlung_entfernen", data={"key": neu[0]["key"], "index": "1"}))
+    # Rechnungsdatum ändern: Fälligkeit folgt der Zahlungsfrist oder wird direkt gesetzt
+    k = neu[0]["key"]
+    assert "fällig 31.05.2026" in ziel(c.post("/rechnung_datum", data={"key": k, "datum": "2026-05-01"}))
+    assert "fällig 15.05.2026" in ziel(c.post("/rechnung_datum", data={"key": k, "datum": "2026-05-01", "faellig": "2026-05-15"}))
+    assert "nicht geändert" in ziel(c.post("/rechnung_datum", data={"key": k, "datum": "2026-05-01", "faellig": "2026-04-15"}))
+    r = [r for r in server.zahlungen.uebersicht()["zeilen"] if r["key"] == k][0]
+    assert r["datum"] == "2026-05-01" and r["faellig"] == "2026-05-15" and len(r["aenderungen"]) == 2
     h = c.get("/rechnungen").get_data(as_text=True)
+    assert "Datum ändern" in h
     assert "Rechnungen und Zahlungen" in h and "2026-Q2-1OG" in h and "ersetzte Fassung" in h
 
 
