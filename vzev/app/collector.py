@@ -16,6 +16,24 @@ SUPERVISOR = "http://supervisor/core/api"
 log = logging.getLogger("vzev")
 
 
+def _zahl(x):
+    try:
+        return None if x is None else float(x)
+    except (TypeError, ValueError):
+        return None
+
+
+def _zeit(x):
+    """evcc-Zeitstempel (ISO mit Zeitzone) in lokale Zeit ohne Zeitzone."""
+    if not x or str(x).startswith("0001"):
+        return None
+    try:
+        t = datetime.fromisoformat(str(x).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return t.astimezone().replace(tzinfo=None) if t.tzinfo else t
+
+
 class Collector:
     def __init__(self, db_path, get_config):
         self.db_path = db_path
@@ -112,6 +130,28 @@ class Collector:
         if not self.evcc_status[:1].isdigit():
             log.info("evcc: %d Ladevorgänge abgerufen", len(data or []))
         self.evcc_status = f"{len(data or [])} Ladevorgänge abgerufen ({now[:16].replace('T', ' ')})"
+
+    def sessions(self):
+        """evcc-Ladevorgänge aufbereitet, neueste zuerst."""
+        with self._db() as c:
+            roh = [json.loads(d) for (d,) in c.execute("SELECT daten FROM evcc_sessions")]
+        out = []
+        for s in roh:
+            start = _zeit(s.get("created"))
+            if start is None:
+                continue
+            dauer = s.get("chargeDuration")
+            if isinstance(dauer, (int, float)) and dauer > 1e7:  # evcc liefert Nanosekunden
+                dauer = dauer / 1e9
+            kwh = _zahl(s.get("chargedEnergy"))
+            if kwh is None and _zahl(s.get("meterStop")) is not None and _zahl(s.get("meterStart")) is not None:
+                kwh = _zahl(s.get("meterStop")) - _zahl(s.get("meterStart"))
+            out.append(dict(start=start, ende=_zeit(s.get("finished")), ladepunkt=s.get("loadpoint") or "",
+                            fahrzeug=s.get("vehicle") or s.get("identifier") or "", kwh=kwh,
+                            dauer_min=(dauer / 60) if isinstance(dauer, (int, float)) else None,
+                            solar=_zahl(s.get("solarPercentage")), preis=_zahl(s.get("price")),
+                            preis_kwh=_zahl(s.get("pricePerKWh")), km=_zahl(s.get("odometer"))))
+        return sorted(out, key=lambda s: s["start"], reverse=True)
 
     # --- Status --------------------------------------------------------
     def status(self):

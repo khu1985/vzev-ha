@@ -405,7 +405,24 @@ SAMMLER = """
 <td class="l">{% if z.zustand is none %}<span class="pill warn">noch nicht abgefragt</span>{% elif z.ok %}<span class="pill ok">liefert Werte</span>{% else %}<span class="pill warn">{{ z.zustand }}</span>{% endif %}</td></tr>
 {% endfor %}</table></div>
 <p class="muted">Letzter Wert = Zählerstand beim letzten Abruf. «unavailable» heisst: Home Assistant hat den Sensor gerade nicht erreicht.</p></div>
-<div class="card"><h2>evcc</h2><p>{{ s.evcc_status }} · {{ s.evcc_sessions }} Ladevorgänge gespeichert.</p></div>"""
+<div class="card"><h2>Ladevorgänge aus evcc</h2><p>{{ s.evcc_status }} · {{ s.evcc_sessions }} Ladevorgänge gespeichert. Abruf stündlich.</p>
+{% if monate %}<h2 style="margin-top:16px">Pro Monat</h2><div class="scroll"><table>
+<tr><th>Monat</th><th>Ladevorgänge</th><th>kWh evcc</th><th>davon Solar kWh</th><th>Solaranteil</th><th>kWh Ladestation laut Abrechnung</th><th>Kosten evcc CHF</th></tr>
+{% for m in monate %}<tr><td>{{ m.monat }}</td><td>{{ m.n }}</td><td>{{ m.kwh|f2 }}</td><td>{{ m.solar_kwh|f2 }}</td><td>{{ '%.0f %%'|format(m.solar_anteil) if m.solar_anteil is not none else '–' }}</td>
+<td>{{ m.abrechnung|f2 }}</td><td>{{ m.preis|f2 }}</td></tr>{% endfor %}</table></div>
+<p class="muted">«Laut Abrechnung» = Ladestation aus den Primeo-Lastgängen und dem Wallbox-Export, wie sie in den Rechnungen verwendet wird. Solaranteil und Kosten berechnet evcc selbst.</p>{% endif %}
+{% if ladungen %}<h2 style="margin-top:16px">Einzelne Ladevorgänge</h2>
+<form method="get" action="sammler" style="margin-bottom:8px">Monat <select name="monat" onchange="this.form.submit()"><option value="">alle</option>
+{% for m in monate %}<option {{ 'selected' if m.monat == monat }}>{{ m.monat }}</option>{% endfor %}</select></form>
+<div class="scroll"><table>
+<tr><th class="l">Start</th><th>Ende</th><th>Dauer</th><th class="l">Ladepunkt</th><th class="l">Fahrzeug</th><th>kWh</th><th>Solar</th><th>CHF</th><th>Rp./kWh</th><th>km-Stand</th></tr>
+{% for l in ladungen %}<tr><td class="l">{{ l.start.strftime('%d.%m.%Y %H:%M') }}</td><td>{{ l.ende.strftime('%d.%m. %H:%M') if l.ende else 'läuft' }}</td>
+<td>{{ '%d:%02d h'|format(l.dauer_min // 60, l.dauer_min % 60) if l.dauer_min is not none else '–' }}</td>
+<td class="l">{{ l.ladepunkt }}</td><td class="l">{{ l.fahrzeug }}</td><td>{{ l.kwh|f2 }}</td>
+<td>{{ '%.0f %%'|format(l.solar) if l.solar is not none else '–' }}</td><td>{{ l.preis|f2 }}</td>
+<td>{{ '%.1f'|format(l.preis_kwh * 100) if l.preis_kwh else '–' }}</td><td>{{ '{:,.0f}'.format(l.km).replace(',', "'") if l.km else '–' }}</td></tr>{% endfor %}
+<tr class="sum"><td class="l">Summe</td><td></td><td></td><td></td><td></td><td>{{ ladungen|sum(attribute='kwh_s')|f2 }}</td><td></td><td>{{ ladungen|sum(attribute='preis_s')|f2 }}</td><td></td><td></td></tr>
+</table></div>{% endif %}</div>"""
 
 
 @app.route("/sammler", methods=["GET", "POST"])
@@ -417,7 +434,27 @@ def sammler():
             return redirect(f"sammler?msg={n} Werte gespeichert")
         except Exception as e:
             return redirect(f"sammler?c=warn&msg=Fehler: {e}")
-    return page("Datensammler", render_template_string(SAMMLER, s=collector.status()))
+    alle = collector.sessions()
+    for l in alle:
+        l["monat"] = l["start"].strftime("%m.%Y")
+        l["kwh_s"], l["preis_s"] = l["kwh"] or 0, l["preis"] or 0
+    abr = {}
+    b = berechnung() if any(PRIMEO.iterdir()) else {}
+    if b.get("ok"):
+        ev = core.zaehler_summen(b["res"], "EV")
+        abr = {m.strftime("%m.%Y"): r.solar + r.ht + r.nt for m, r in ev.iterrows()}
+    monate = []
+    for m in sorted({l["monat"] for l in alle} | set(abr), key=lambda x: (x[3:], x[:2]), reverse=True):
+        ls = [l for l in alle if l["monat"] == m]
+        kwh = sum(l["kwh_s"] for l in ls)
+        sk = sum(l["kwh_s"] * l["solar"] / 100 for l in ls if l["solar"] is not None)
+        mit = sum(l["kwh_s"] for l in ls if l["solar"] is not None)
+        monate.append(dict(monat=m, n=len(ls), kwh=kwh if ls else None, solar_kwh=sk if mit else None,
+                           solar_anteil=(sk / mit * 100) if mit else None, abrechnung=abr.get(m),
+                           preis=sum(l["preis_s"] for l in ls) if any(l["preis"] is not None for l in ls) else None))
+    monat = request.args.get("monat", "")
+    ladungen = [l for l in alle if not monat or l["monat"] == monat][:300]
+    return page("Datensammler", render_template_string(SAMMLER, s=collector.status(), monate=monate, ladungen=ladungen, monat=monat))
 
 
 # --- Einstellungen ------------------------------------------------------------
