@@ -87,6 +87,12 @@ def _version():
 
 
 VERSION = _version()
+NAVIGATION = [
+    ("Auswertung", [("./", "Übersicht"), ("verlauf", "Verlauf")]),
+    ("Abrechnung", [("import", "Daten importieren"), ("rechnungen", "Rechnungen"), ("abschluss", "Abschluss")]),
+    ("Stammdaten", [("mieter", "Mieter"), ("tarife", "Tarife"), ("primeo", "Primeo"), ("einstellungen", "Einstellungen")]),
+    ("Anlage", [("batterie", "Batterie"), ("sammler", "Datensammler"), ("protokoll", "Protokoll")]),
+]
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
@@ -221,9 +227,21 @@ BASE = """<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name=
 <title>vZEV · {{ title }}</title><style>
 :root{--ink:#16201C;--muted:#5B6660;--line:#E2E5E1;--bg:#F6F7F5;--amber:#E8A21B;--soft:#FDF3DF;--ok:#23603A;--okbg:#E3F1E8;--warn:#8A4307;--warnbg:#FCEBD9;--blue:#3B5B8C}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
-header{background:#fff;border-bottom:1px solid var(--line);padding:12px 24px;display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center}
-header b{font-size:16px;margin-right:12px}nav a{color:#3F4A44;text-decoration:none;padding:8px 10px;border-radius:8px;font-weight:500;display:inline-block}
-nav a.on{background:var(--soft);color:var(--ink)}main{max-width:1180px;margin:0 auto;padding:24px}
+main{max-width:1180px;margin:0 auto;padding:24px;min-width:0;width:100%}
+.side{background:#fff}.top{display:flex;align-items:center;gap:10px}.brand{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}.ver{color:var(--muted);font-size:12px;font-weight:500}
+nav a{color:#3F4A44;text-decoration:none;padding:8px 10px;border-radius:8px;font-weight:500;white-space:nowrap}nav a.on{background:var(--soft);color:var(--ink)}nav a:hover{background:var(--bg)}
+nav .gl{display:none;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+#menu{display:none;min-height:40px;margin-left:auto;flex-shrink:0}
+@media (min-width:1200px){.app{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
+ .side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);padding:20px 12px}
+ .top{padding:0 10px;flex-wrap:wrap;gap:4px 8px}.brand{white-space:normal}nav .gl{display:block;margin:18px 10px 4px}nav a{display:block}}
+@media (max-width:1199px){.side{position:sticky;top:0;z-index:5;border-bottom:1px solid var(--line);padding:10px 16px 0}
+ nav{display:flex;overflow-x:auto;scrollbar-width:none;padding:6px 0 8px}nav::-webkit-scrollbar{display:none}
+ nav .grp{display:flex;flex-shrink:0}nav .grp+.grp{border-left:1px solid var(--line);margin-left:6px;padding-left:6px}}
+@media (max-width:759px){ #menu{display:inline-flex}.ver{display:none}nav{display:none}
+ .side{padding:10px 16px}.side.offen nav{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;padding:8px 0 12px;max-height:calc(100vh - 70px);overflow-y:auto}
+ .side.offen nav .grp{display:block;border:0;margin:0;padding:0}.side.offen nav .gl{display:block;margin:10px 10px 2px}.side.offen nav a{display:block}
+ main{padding:16px}h1{font-size:22px}.card{padding:16px}}
 h1{font-size:26px;margin:4px 0 16px}h2{font-size:16px;margin:0 0 12px}.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:20px}
 .scroll{overflow-x:auto}table{border-collapse:collapse;width:100%}th{font-size:12px;color:var(--muted);text-align:right;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
 td{padding:9px 10px;border-bottom:1px solid #EEF0EC;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}th:first-child,td:first-child,.l{text-align:left}
@@ -236,15 +254,17 @@ input,select,textarea{font:inherit;padding:8px 10px;border:1px solid #D3D8D2;bor
 .kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px}.kpi div:first-child{color:var(--muted);font-size:13px}.kpi div:last-child{font-size:22px;font-weight:600;margin-top:4px}
 .kpi .v{font-size:24px;font-weight:600;margin-top:4px}.kpi .v small{font-size:13px;font-weight:500;color:var(--muted)}.kpi div.s{font-size:12px;font-weight:400;color:var(--muted);margin-top:4px}
 form.inline{display:inline}</style></head><body>
-<header><b>☀ vZEV {{ anlage }} <span class="muted" style="font-weight:500" title="Version der App">v{{ version }}</span></b><nav>
-{% for href, label in [('./','Übersicht'),('verlauf','Verlauf'),('import','Daten importieren'),('rechnungen','Rechnungen'),('abschluss','Abschluss'),('mieter','Mieter'),('tarife','Tarife'),('primeo','Primeo'),('batterie','Batterie'),('sammler','Datensammler'),('einstellungen','Einstellungen'),('protokoll','Protokoll')] %}
-<a href="{{ href }}" class="{{ 'on' if label == title else '' }}">{{ label }}{% if label == 'Protokoll' and nfehler %} <span class="pill warn">{{ nfehler }}</span>{% endif %}</a>{% endfor %}</nav></header>
-<main><h1>{{ title }}</h1>{% if msg %}<div class="msg {{ msgclass or 'ok' }}">{{ msg }}</div>{% endif %}{{ body|safe }}</main></body></html>"""
+<div class="app"><aside class="side" id="side"><div class="top"><span class="brand">☀ vZEV {{ anlage }}</span><span class="ver" title="Version der App">v{{ version }}</span>
+<button id="menu" type="button" aria-expanded="false" aria-controls="nav" onclick="var s=document.getElementById('side');var o=s.classList.toggle('offen');this.setAttribute('aria-expanded',o);this.textContent=o?'Schliessen':'Menü'">Menü</button></div>
+<nav id="nav">{% for gruppe, eintraege in navigation %}<div class="grp"><span class="gl">{{ gruppe }}</span>{% for href, label in eintraege %}
+<a href="{{ href }}" class="{{ 'on' if label == title else '' }}"{% if label == title %} aria-current="page"{% endif %}>{{ label }}{% if label == 'Protokoll' and nfehler %} <span class="pill warn">{{ nfehler }}</span>{% endif %}</a>{% endfor %}</div>{% endfor %}</nav></aside>
+<script>(function(){var a=document.querySelector('nav a.on');if(a&&innerWidth<1200&&innerWidth>=760)a.scrollIntoView({block:'nearest',inline:'center'})})()</script>
+<main><h1>{{ title }}</h1>{% if msg %}<div class="msg {{ msgclass or 'ok' }}">{{ msg }}</div>{% endif %}{{ body|safe }}</main></div></body></html>"""
 
 
 def page(title, body, **kw):
     b = config().get("betreiber", {})
-    return render_template_string(BASE, title=title, body=body, anlage=f"{b.get('strasse', '')} {b.get('hausnr', '')}".strip(), msg=request.args.get("msg"), msgclass=request.args.get("c"), nfehler=fehler_seit_start(), version=VERSION, **kw)
+    return render_template_string(BASE, title=title, body=body, anlage=f"{b.get('strasse', '')} {b.get('hausnr', '')}".strip(), msg=request.args.get("msg"), msgclass=request.args.get("c"), nfehler=fehler_seit_start(), version=VERSION, navigation=NAVIGATION, **kw)
 
 
 # --- Import -------------------------------------------------------------------

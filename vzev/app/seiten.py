@@ -476,17 +476,23 @@ Prüfe, ob eine Datei ersetzt wurde. Ist die Änderung gewollt, öffne den Monat
 <div class="card"><h2>Monate</h2><div class="scroll"><table>
 <tr><th class="l">Monat</th><th class="l">Status</th><th>1. OG CHF</th><th>Allgemein CHF</th><th>Ladestation kWh</th><th>Wertschöpfung CHF</th><th class="l">Aktion</th></tr>
 {% for m in monate %}<tr><td class="l">{{ m.label }}</td>
-<td class="l">{% if m.zu %}<span class="pill ok">abgeschlossen {{ m.zu.zeit[8:10] }}.{{ m.zu.zeit[5:7] }}.{{ m.zu.zeit[:4] }}</span>{% if m.abw %} <span class="pill warn">verändert</span>{% endif %}
+<td class="l" style="white-space:normal;max-width:220px">{% if m.zu %}<span class="pill ok" title="abgeschlossen per {{ m.datum.strftime('%d.%m.%Y') }}">abgeschlossen</span>{% if m.abw %} <span class="pill warn">verändert</span>{% endif %}
 {% elif not m.w.vollstaendig %}<span class="pill warn">Daten unvollständig</span>{% else %}<span class="muted">offen</span>{% endif %}
 {% if m.w.rueck_offen %} <span class="pill warn">Rücklieferungstarif offen</span>{% endif %}</td>
 <td>{{ m.w['1OG'].chf|f2 }}</td><td>{{ m.w['AllgC'].chf|f2 }}</td><td>{{ (m.w['EV'].solar + m.w['EV'].ht + m.w['EV'].nt)|f2 }}</td><td>{{ m.w.wertschoepfung|f2 }}</td>
-<td class="l">{% if m.zu %}{% if m.letzter %}<form class="inline" method="post" action="abschluss" onsubmit="var g=prompt('Begründung für das Wiederöffnen von {{ m.label }}:');if(!g)return false;this.grund.value=g">
+<td class="l akt">{% if m.zu %}<form class="inline datum" method="post" action="abschluss"><input type="hidden" name="monat" value="{{ m.key }}"><input type="hidden" name="aktion" value="datum">
+<input type="date" name="datum" value="{{ m.datum.isoformat() }}" min="{{ m.min }}" max="{{ heute }}" aria-label="Abschlussdatum {{ m.label }}"> <button title="Abschlussdatum ändern">Ändern</button></form>
+{% if m.letzter %}<form class="inline" method="post" action="abschluss" onsubmit="var g=prompt('Begründung für das Wiederöffnen von {{ m.label }}:');if(!g)return false;this.grund.value=g">
 <input type="hidden" name="monat" value="{{ m.key }}"><input type="hidden" name="aktion" value="oeffnen"><input type="hidden" name="grund"><button class="danger">Wieder öffnen</button></form>{% endif %}
-{% elif m.naechster and m.w.vollstaendig %}<form class="inline" method="post" action="abschluss"><input type="hidden" name="monat" value="{{ m.key }}"><input type="hidden" name="aktion" value="schliessen"><button class="primary">Abschliessen</button></form>{% endif %}</td></tr>
+{% elif m.naechster and m.w.vollstaendig %}<form class="inline datum" method="post" action="abschluss"><input type="hidden" name="monat" value="{{ m.key }}"><input type="hidden" name="aktion" value="schliessen">
+<input type="date" name="datum" value="{{ heute }}" min="{{ m.min }}" max="{{ heute }}" aria-label="Abschlussdatum {{ m.label }}"> <button class="primary">Abschliessen</button></form>{% endif %}</td></tr>
 {% endfor %}</table></div>
 <p class="muted">Beim Abschluss werden die Werte des Monats festgehalten. Danach lehnt die App Änderungen an Tarifen, Mietern und Erträgen ab, die diesen Monat betreffen,
-und Rechnungen eines Quartals mit abgeschlossenen Monaten lassen sich nur mit Begründung neu erstellen. Monate werden der Reihe nach abgeschlossen und rückwärts wieder geöffnet.</p></div>
-<div class="card"><h2>Korrekturen und Abschlüsse</h2><div class="scroll"><table><tr><th class="l">Zeit</th><th class="l">Monat</th><th class="l">Was</th><th class="l">Begründung</th></tr>
+und Rechnungen eines Quartals mit abgeschlossenen Monaten lassen sich nur mit Begründung neu erstellen. Monate werden der Reihe nach abgeschlossen und rückwärts wieder geöffnet.
+Das Abschlussdatum lässt sich nachträglich ändern, etwa wenn ein Monat schon früher ausserhalb der App abgeschlossen wurde; jede Änderung steht unten in der Liste.</p></div>
+<style>form.datum input[type=date]{padding:6px 8px}form.datum button,td.akt button{min-height:34px;padding:0 10px}
+td.akt{white-space:normal;min-width:300px}td.akt form{display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center;margin:2px 0}</style>
+<div class="card"><h2>Korrekturen und Abschlüsse</h2><div class="scroll"><table><tr><th class="l">Erfasst</th><th class="l">Monat</th><th class="l">Was</th><th class="l">Begründung</th></tr>
 {% for k in korrekturen %}<tr><td class="l">{{ k.zeit }}</td><td class="l">{{ k.monat }}</td><td class="l">{{ k.art }}</td><td class="l" style="white-space:normal">{{ k.grund }}</td></tr>
 {% else %}<tr><td class="l" colspan="4">Noch keine Einträge.</td></tr>{% endfor %}</table></div></div>"""
 
@@ -498,15 +504,34 @@ def abschluss():
     if request.method == "POST":
         m, aktion = request.form["monat"], request.form["aktion"]
         zu = sorted(a["monate"])
+        jetzt = datetime.now().strftime("%Y-%m-%d %H:%M")
+        if aktion in ("schliessen", "datum"):
+            try:
+                datum = date.fromisoformat(request.form.get("datum") or date.today().isoformat())
+            except ValueError:
+                return redirect("abschluss?c=warn&msg=Ungültiges Abschlussdatum.")
+            if datum <= pd.Period(m, "M").end_time.date() or datum > date.today():
+                return redirect(f"abschluss?c=warn&msg=Das Abschlussdatum für {m} muss nach dem Monatsende und spätestens heute sein.")
         if aktion == "schliessen":
             offen = [k for k in sorted(mw) if k not in a["monate"]]
             if not offen or offen[0] != m or not mw[m]["vollstaendig"]:
                 return redirect("abschluss?c=warn&msg=Monate werden der Reihe nach abgeschlossen, und nur mit vollständigen Daten.")
-            a["monate"][m] = {"zeit": datetime.now().strftime("%Y-%m-%d %H:%M"), "werte": mw[m]}
-            a["korrekturen"].append({"zeit": datetime.now().strftime("%Y-%m-%d %H:%M"), "monat": m, "art": "abgeschlossen", "grund": ""})
+            a["monate"][m] = {"zeit": jetzt, "datum": datum.isoformat(), "werte": mw[m]}
+            a["korrekturen"].append({"zeit": jetzt, "monat": m, "art": f"abgeschlossen per {datum:%d.%m.%Y}", "grund": ""})
             abschluss_speichern(a)
-            S.log.info("Monat %s abgeschlossen", m)
-            return redirect(f"abschluss?msg={m} abgeschlossen")
+            S.log.info("Monat %s abgeschlossen per %s", m, datum)
+            return redirect(f"abschluss?msg={m} abgeschlossen per {datum:%d.%m.%Y}")
+        if aktion == "datum":
+            if m not in a["monate"]:
+                return redirect("abschluss?c=warn&msg=Der Monat ist nicht abgeschlossen.")
+            alt = _abschlussdatum(a["monate"][m])
+            if alt == datum:
+                return redirect("abschluss")
+            a["monate"][m]["datum"] = datum.isoformat()
+            a["korrekturen"].append({"zeit": jetzt, "monat": m, "art": f"Abschlussdatum geändert: {alt:%d.%m.%Y} → {datum:%d.%m.%Y}", "grund": ""})
+            abschluss_speichern(a)
+            S.log.info("Abschlussdatum %s geändert: %s -> %s", m, alt, datum)
+            return redirect(f"abschluss?msg=Abschlussdatum {m} auf {datum:%d.%m.%Y} geändert")
         grund = (request.form.get("grund") or "").strip()
         if not zu or zu[-1] != m or not grund:
             return redirect("abschluss?c=warn&msg=Nur der zuletzt abgeschlossene Monat kann wieder geöffnet werden, und nur mit Begründung.")
@@ -520,10 +545,16 @@ def abschluss():
     monate = []
     for k in sorted(set(mw) | set(a["monate"]), reverse=True):
         w = mw.get(k) or a["monate"][k]["werte"]
-        monate.append(dict(key=k, label=pd.Period(k, "M").strftime("%m.%Y"), w=w, zu=a["monate"].get(k), abw=k in abw,
+        zu_k = a["monate"].get(k)
+        monate.append(dict(key=k, label=pd.Period(k, "M").strftime("%m.%Y"), w=w, zu=zu_k, abw=k in abw,
+                           datum=_abschlussdatum(zu_k) if zu_k else None, min=(pd.Period(k, "M").end_time.date() + timedelta(days=1)).isoformat(),
                            letzter=bool(zu) and zu[-1] == k, naechster=bool(offen) and offen[0] == k))
-    return S.page("Abschluss", render_template_string(ABSCHLUSS, b=b, monate=monate, abw=sorted(abw.items()),
+    return S.page("Abschluss", render_template_string(ABSCHLUSS, b=b, monate=monate, abw=sorted(abw.items()), heute=date.today().isoformat(),
                                                       korrekturen=list(reversed(a["korrekturen"]))))
+
+
+def _abschlussdatum(e):
+    return date.fromisoformat(e.get("datum") or e["zeit"][:10])
 
 
 def quartal_gesperrt(jahr, q):

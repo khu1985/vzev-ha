@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1
+
+- Abschluss: Beim Abschliessen lässt sich das Abschlussdatum wählen (Standard heute); bei abgeschlossenen Monaten kann es nachträglich geändert werden, z. B. für Monate, die schon früher abgeschlossen wurden. Jede Änderung steht mit altem und neuem Datum unter «Korrekturen und Abschlüsse».
+- Navigation nach Grösse des Bildschirms: Ab 1200 px Seitenleiste mit Gruppen (Auswertung, Abrechnung, Stammdaten, Anlage), auf Tablets eine Zeile zum Wischen, auf dem Handy ein Menü-Knopf mit allen Seiten in zwei Spalten.
+
 ## 0.3.0
 
 - Version der App oben neben dem Namen.

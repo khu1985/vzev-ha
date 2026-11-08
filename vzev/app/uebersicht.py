@@ -203,7 +203,7 @@ def index():
     a = seiten.abschluss_laden()
     abw = seiten.abweichungen(b) if b.get("ok") else []
     if sel in a["monate"]:
-        kontrollen.append((sel not in dict(abw), "Abgeschlossen und unverändert", f"abgeschlossen am {a['monate'][sel]['zeit'][:10]}"))
+        kontrollen.append((sel not in dict(abw), "Abgeschlossen und unverändert", f"abgeschlossen per {seiten._abschlussdatum(a['monate'][sel]):%d.%m.%Y}"))
 
     # Verbraucher
     import invoices
