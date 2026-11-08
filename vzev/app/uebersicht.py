@@ -218,6 +218,16 @@ def index():
     if sel in a["monate"]:
         kontrollen.append((sel not in dict(abw), "Abgeschlossen und unverändert", f"abgeschlossen per {seiten._abschlussdatum(a['monate'][sel]):%d.%m.%Y}"))
 
+    try:
+        import zahlungen
+        zst = zahlungen.uebersicht()
+        if any(r["art"] == "wohnung" for r in zst["zeilen"]):
+            kontrollen.append((zst["n_ueberfaellig"] == 0, "Rechnungen bezahlt",
+                               "keine überfälligen Rechnungen" if not zst["n_ueberfaellig"] else
+                               f"{zst['n_ueberfaellig']} überfällig, CHF {zst['ueberfaellig']:.2f} – siehe «Rechnungen»"))
+    except Exception:
+        S.log.exception("Zahlungsstand nicht lesbar")
+
     # Verbraucher
     import invoices
     gp = invoices.grundpreis(cfg, p.start_time)

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0
+
+- Zahlungseingang: Jede erstellte Rechnung kommt ins Register (Betrag, Rechnungsdatum, Fälligkeit). Zahlungen lassen sich unter «Rechnungen» mit Datum und Betrag erfassen und wieder entfernen; Status offen, teilweise, überfällig, bezahlt oder überzahlt. Oben: offener und überfälliger Betrag.
+- Bei einer Korrektur übernimmt die neue Rechnung die bereits erfassten Zahlungen; die alte Fassung bleibt als «ersetzt» sichtbar.
+- Allgemeinstrom-Rechnungen gelten als «intern» (für die Nebenkostenabrechnung) und brauchen keine Zahlung.
+- Rechnungen von vor diesem Update werden automatisch nachgetragen (Betrag aus der aktuellen Berechnung, Datum der Datei).
+- Übersicht: neue Kontrolle «Rechnungen bezahlt», sobald etwas überfällig ist.
+
 ## 0.3.12
 
 - Automatische Tests (44 Fälle) für Rechenkern, Rechnungen, Vorschau und Web-App; GitHub prüft jede Änderung im gleichen Debian-Image wie Home Assistant.

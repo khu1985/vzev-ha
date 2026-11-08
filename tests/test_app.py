@@ -187,6 +187,38 @@ def test_abschluss_sperre_und_korrekturen(app):
     assert "wieder geöffnet" in ziel(c.post("/abschluss", data={"monat": "2026-03", "aktion": "oeffnen", "grund": "Test"}))
 
 
+def test_zahlungseingang(app):
+    server, c, d, quelle = app
+    warten(server)
+    c.post("/abschluss", data={"monat": "2026-04", "aktion": "schliessen", "datum": "2026-05-02"})
+    r = c.post("/rechnungen", data={"jahr": "2026", "quartal": "2", "datum": "2026-05-05"})
+    assert "Erstellt" in ziel(r), ziel(r)
+    z = server.zahlungen.uebersicht()
+    wohnung = [r for r in z["zeilen"] if r["quartal"] == "2026-Q2" and r["art"] == "wohnung"][0]
+    allg = [r for r in z["zeilen"] if r["quartal"] == "2026-Q2" and r["art"] == "allgemein"][0]
+    assert wohnung["partei"] == "Max Beispiel" and wohnung["betrag"] > 0 and wohnung["faellig"] == "2026-06-04"
+    assert allg["stand"] == "intern"
+    teil = round(wohnung["betrag"] / 2, 2)
+    r = c.post("/zahlung", data={"key": wohnung["key"], "datum": "2026-05-20", "betrag": f"{teil}".replace(".", ",")})
+    assert "erfasst" in ziel(r)
+    w = [r for r in server.zahlungen.uebersicht()["zeilen"] if r["key"] == wohnung["key"]][0]
+    assert w["stand"] in ("teilweise", "überfällig") and w["offen"] == round(wohnung["betrag"] - teil, 2)
+    assert "Zahlung nicht erfasst" in ziel(c.post("/zahlung", data={"key": wohnung["key"], "datum": "2026-05-20", "betrag": "-5"}))
+    # Korrektur übernimmt die Zahlung
+    r = c.post("/rechnungen", data={"jahr": "2026", "quartal": "2", "datum": "2026-05-06", "grund": "Test"})
+    assert "Erstellt" in ziel(r)
+    zeilen = server.zahlungen.uebersicht()["zeilen"]
+    neu = [r for r in zeilen if r["quartal"] == "2026-Q2" and r["art"] == "wohnung" and r["stand"] != "ersetzt"]
+    assert len(neu) == 1 and neu[0]["bezahlt"] == teil
+    assert any(r["stand"] == "ersetzt" for r in zeilen if r["quartal"] == "2026-Q2")
+    # Rest bezahlen, dann entfernen
+    c.post("/zahlung", data={"key": neu[0]["key"], "datum": "2026-05-21", "betrag": f"{neu[0]['offen']:.2f}"})
+    assert [r for r in server.zahlungen.uebersicht()["zeilen"] if r["key"] == neu[0]["key"]][0]["stand"] == "bezahlt"
+    assert "entfernt" in ziel(c.post("/zahlung_entfernen", data={"key": neu[0]["key"], "index": "1"}))
+    h = c.get("/rechnungen").get_data(as_text=True)
+    assert "Rechnungen und Zahlungen" in h and "2026-Q2-1OG" in h and "ersetzte Fassung" in h
+
+
 def test_abschnitt_speichern_behaelt_kommentare(app):
     server, c, d, quelle = app
     text = (d / "vzev.yaml").read_text()
