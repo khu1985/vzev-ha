@@ -107,7 +107,7 @@ UEBERSICHT = diagramme.STIL + """
 Angezeigt wird nur die Vorschau aus Home Assistant. Prüfe die Dateien unter <a href="import">Daten importieren</a>.</div>{% endif %}
 {% if abw %}<div class="msg warn">Abgeschlossene Monate haben sich verändert: {% for m, t in abw %}{{ m }} ({{ t }}){{ ', ' if not loop.last }}{% endfor %}. Details unter <a href="abschluss">Abschluss</a>.</div>{% endif %}
 <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin:-8px 0 16px">
-<form method="get" action="./"><select name="m" onchange="this.form.submit()">{% for k, l in auswahl %}<option value="{{ k }}" {{ 'selected' if k == sel }}>{{ l }}</option>{% endfor %}</select></form>
+<form method="get" action="uebersicht"><select name="m" onchange="this.form.submit()">{% for k, l in auswahl %}<option value="{{ k }}" {{ 'selected' if k == sel }}>{{ l }}</option>{% endfor %}</select></form>
 <span class="muted">Primeo-Lastgänge bis {{ primeo_bis }}{% if info.bis %} · Vorschau aus Home Assistant bis {{ info.bis.strftime('%d.%m.%Y %H:%M') }}{% endif %}{% if pv and (pv[0] is not none or pv[1] is not none) %}
  · <a href="prognose">PV-Prognose{% if pv[0] is not none %} heute {{ '%.1f'|format(pv[0]) }}{% endif %}{% if pv[1] is not none %}, morgen {{ '%.1f'|format(pv[1]) }}{% endif %} kWh</a>{% endif %}</span></div>
 {% if mon.vorlaeufig %}<div class="msg" style="background:var(--soft)">{{ titel }} ist vorläufig{% if mon.ha %}: ab {{ info.von.strftime('%d.%m. %H:%M') if info.von else '' }} aus den Zählerständen in Home Assistant gerechnet
@@ -458,6 +458,6 @@ def register(app, server):
     global S
     S = server
     app.jinja_env.filters["k0"] = lambda x: "–" if x is None or pd.isna(x) else f"{x:,.0f}".replace(",", "'")
-    app.add_url_rule("/", "index", index)
+    app.add_url_rule("/uebersicht", "uebersicht", index)
     app.add_url_rule("/verlauf", "verlauf", verlauf)
     app.add_url_rule("/wertschoepfung", "wertschoepfung", wertschoepfung)
