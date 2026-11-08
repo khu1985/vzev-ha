@@ -402,6 +402,7 @@ def tarife():
 
 # --- Primeo -------------------------------------------------------------------
 PRIMEO = """
+{{ preiskarte|safe }}
 <form method="post" action="primeo">
 <div class="card"><h2>Primeo-Rechnungen für den Abgleich</h2>{{ t_rech|safe }}
 <h2 style="margin-top:16px">Rücklieferung laut Primeo-Rechnung</h2>{{ t_rueck|safe }}
@@ -433,6 +434,19 @@ def _monat(x, i):
 
 def primeo():
     cfg = S.config()
+    if request.method == "POST" and request.args.get("teil") == "dynamisch":
+        url = (request.form.get("api_url") or "").strip()
+        if not url.startswith(("http://", "https://")):
+            return redirect("primeo?c=warn&msg=Nicht gespeichert: Die Adresse muss mit http:// oder https:// beginnen")
+        try:
+            ab = _d(request.form.get("abrufen_ab") or "2027-01-01")
+        except ValueError:
+            return redirect("primeo?c=warn&msg=Nicht gespeichert: ungültiges Datum")
+        neu = {"api_url": url, "tarif_name": (request.form.get("tarif_name") or "NetzDynamisch").strip(),
+               "tarif_typ": request.form.get("tarif_typ") or "", "abrufen_ab": ab, "aktiv": bool(request.form.get("aktiv"))}
+        abschnitt_speichern("dynamisch", neu, "Dynamische Strompreise – bearbeitet in der App")
+        S.log.info("Preis-Schnittstelle gespeichert: %s (%s, %s)", url, neu["tarif_name"], neu["tarif_typ"] or "alle")
+        return redirect("primeo?msg=Gespeichert")
     if request.method == "POST":
         try:
             rech, rueck = lesen("r", F_RECH), lesen("rl", F_RUECK)
@@ -467,7 +481,7 @@ def primeo():
     man = cfg.get("manuell") or {}
     b = S.berechnung() if any(S.PRIMEO.iterdir()) else {}
     abg = core.abgleich(b["res"], b["cfg"]) if b.get("ok") else None
-    return S.page("Primeo", render_template_string(PRIMEO, abg=abg, t_rech=editor("r", F_RECH, rows_r), t_rueck=editor("rl", F_RUECK, rows_rl),
+    return S.page("Primeo", render_template_string(PRIMEO, preiskarte=render_template_string(PREISKARTE, p=preis_infos()), abg=abg, t_rech=editor("r", F_RECH, rows_r), t_rueck=editor("rl", F_RUECK, rows_rl),
                                                    t_vor=editor("v", F_VOR, [dict(e, monat=str(e["monat"])) for e in man.get("ruecklieferung_vor_start") or []]),
                                                    t_ue=editor("u", F_UE, [dict(e, monat=str(e["monat"])) for e in man.get("uebrige_ertraege") or []])))
 
@@ -591,56 +605,12 @@ BATTERIE = """
 <td>{{ '%.0f %%'|format(m.entladen / m.geladen * 100) if m.geladen else '–' }}</td><td>{{ m.pv|f2 }}</td><td>{{ m.bezug|f2 }}</td><td>{{ m.einspeisung|f2 }}</td></tr>
 {% else %}<tr><td colspan="8" class="l">Noch keine Daten vom Wechselrichter. Der Datensammler speichert sie alle 15 Minuten.</td></tr>{% endfor %}</table></div>
 <p class="muted">Tageswerte des Solis-Wechselrichters (Höchstwert pro Tag), gesammelt vom Datensammler. Für die Abrechnung zählen weiterhin die Primeo-Lastgänge.</p></div>
-<div class="card"><h2>Dynamische Strompreise</h2>
-<p>{{ p.status }}{% if p.letzter %} · zuletzt {{ p.letzter }}{% endif %}{% if p.naechster %} · nächster Abruf {{ p.naechster }}{% endif %}</p>
-{% if p.fehler %}<div class="msg warn">Abruf fehlgeschlagen: {{ p.fehler }}</div>{% endif %}
-{% if p.tage %}<div class="grid" style="margin:12px 0">{% for t in p.tage %}<div class="kpi"><div class="t">{{ t.label }}</div>
-<div class="v">{{ '%.1f'|format(t.mittel) }} <small>Rp./kWh Ø</small></div><div class="s">{{ '%.1f'|format(t.min) }} – {{ '%.1f'|format(t.max) }} Rp., günstigste Stunde ab {{ t.guenstig }}</div></div>{% endfor %}</div>
-{{ p.chart|safe }}<p class="muted">Typ «{{ p.typ }}», ohne kantonale/kommunale Abgaben und MWST.</p>{% endif %}
-<form method="post" action="preise_abrufen" data-busy="Strompreise werden abgerufen …" style="margin-top:8px"><button>Jetzt abrufen</button></form>
-<details style="margin-top:12px"><summary class="muted">Schnittstelle einstellen</summary>
-<form method="post" action="batterie?teil=dynamisch"><table class="form">
-<tr><td class="l">Adresse (URL)</td><td class="l"><input name="api_url" value="{{ p.e.api_url }}" style="width:420px" required></td></tr>
-<tr><td class="l">Tarifname</td><td class="l"><input name="tarif_name" value="{{ p.e.tarif_name }}" style="width:200px"> <span class="muted">NetzDynamisch, NetzDynamischAVAG, NetzDynamischELAG</span></td></tr>
-<tr><td class="l">Tariftyp</td><td class="l"><select name="tarif_typ">{% for k, v in [('', 'alle'), ('integrated', 'integrated – Netz + Energie'), ('electricity', 'electricity – Energie'), ('grid', 'grid – Netz inkl. nationale Abgaben'), ('grid_usage', 'grid_usage – nur Netznutzung')] %}<option value="{{ k }}" {{ 'selected' if k == p.e.tarif_typ }}>{{ v }}</option>{% endfor %}</select></td></tr>
-<tr><td class="l">Abrufen ab</td><td class="l"><input type="date" name="abrufen_ab" value="{{ p.e.abrufen_ab }}"></td></tr>
-<tr><td class="l">Automatisch abrufen</td><td class="l"><label><input type="checkbox" name="aktiv" value="1" {{ 'checked' if p.e.aktiv }}> stündlich, zwischen 18 und 21 Uhr alle 15 Minuten</label></td></tr>
-</table><p><button class="primary">Speichern</button> <span class="muted">Standard laut Primeo-Merkblatt: https://tarife.primeo-energie.ch/api/v1/tariffs</span></p></form></details></div>
-<form method="post" action="batterie" class="card"><h2>Regeln für die Abrechnung</h2>
-<table class="form"><tr><td class="l">Netzladung zahlt</td><td class="l"><select name="netzladung_zahlt">{% for k, v in [('betreiber','Betreiber'),('alle','alle Bezüger anteilig')] %}<option value="{{ k }}" {{ 'selected' if r.netzladung_zahlt == k }}>{{ v }}</option>{% endfor %}</select></td></tr>
-<tr><td class="l">Netzanteil bei Entladung</td><td class="l"><select name="entladung_netzanteil">{% for k, v in [('solarpreis','wie Solarstrom zum vZEV-Preis'),('ladepreis','zum Preis beim Laden'),('offen','noch abzuklären')] %}<option value="{{ k }}" {{ 'selected' if r.entladung_netzanteil == k }}>{{ v }}</option>{% endfor %}</select></td></tr>
-<tr><td class="l">Dynamischer Tarif ab</td><td class="l"><input type="date" name="dynamisch_ab" value="{{ r.dynamisch_ab or '' }}"></td></tr>
-<tr><td class="l">Abgeklärt / Notiz</td><td class="l"><input name="notiz" value="{{ r.notiz or '' }}" style="width:360px"></td></tr></table>
-<p><button class="primary">Speichern</button></p>
-<p class="muted">Heute lädt die Batterie nur aus PV, deshalb ändert sie an der Abrechnung nichts: Solarstrom aus der Batterie ist Solarstrom. Ab dem dynamischen Tarif kann sie auch aus dem Netz laden;
-dann rechnet die App die Netzladung dem Betreiber zu und verrechnet den Netzanteil bei der Entladung nach der gewählten Regel. Diese Berechnung baue ich ein, sobald die ersten Daten mit Netzladung da sind und die Regel mit Primeo abgeklärt ist.</p></form>"""
+<p class="muted">Dynamische Strompreise: Seite <a href="primeo">Primeo</a>. Regeln für Netzladung und Entladung: <a href="einstellungen?tab=regeln">Einstellungen → Regeln</a>.</p>"""
 
 
 def batterie():
     cfg = S.config()
     r = cfg.get("batterie") or {}
-    if request.method == "POST" and request.args.get("teil") == "dynamisch":
-        url = (request.form.get("api_url") or "").strip()
-        if not url.startswith(("http://", "https://")):
-            return redirect("batterie?c=warn&msg=Nicht gespeichert: Die Adresse muss mit http:// oder https:// beginnen")
-        try:
-            ab = _d(request.form.get("abrufen_ab") or "2027-01-01")
-        except ValueError:
-            return redirect("batterie?c=warn&msg=Nicht gespeichert: ungültiges Datum")
-        neu = {"api_url": url, "tarif_name": (request.form.get("tarif_name") or "NetzDynamisch").strip(),
-               "tarif_typ": request.form.get("tarif_typ") or "", "abrufen_ab": ab, "aktiv": bool(request.form.get("aktiv"))}
-        abschnitt_speichern("dynamisch", neu, "Dynamische Strompreise – bearbeitet in der App")
-        S.log.info("Preis-Schnittstelle gespeichert: %s (%s, %s)", url, neu["tarif_name"], neu["tarif_typ"] or "alle")
-        return redirect("batterie?msg=Gespeichert")
-    if request.method == "POST":
-        neu = {k: (request.form.get(k) or "").strip() or None for k in ("netzladung_zahlt", "entladung_netzanteil", "notiz")}
-        try:
-            neu["dynamisch_ab"] = _d(request.form.get("dynamisch_ab") or None)
-            abschnitt_speichern("batterie", neu, "Batterie – bearbeitet in der App")
-        except ValueError as e:
-            return redirect(f"batterie?c=warn&msg=Nicht gespeichert: {e}")
-        S.log.info("Batterie-Regeln gespeichert")
-        return redirect("batterie?msg=Gespeichert")
     r = {"netzladung_zahlt": "betreiber", "entladung_netzanteil": "offen", "dynamisch_ab": "2027-01-01", **r}
     sol = (cfg.get("homeassistant") or {}).get("solis") or {}
     spalten = {"geladen": sol.get("batterie_geladen_heute"), "entladen": sol.get("batterie_entladen_heute"), "pv": sol.get("pv_heute"),
@@ -706,6 +676,32 @@ ZAEHLER = """<form method="post" action="einstellungen?tab=zaehler"><div class="
 <p class="muted">Energie-Sensoren in kWh (total_increasing). Der Datensammler speichert sie alle 15 Minuten.</p></div>
 <p><button class="primary">Speichern</button></p></form>"""
 
+PREISKARTE = """<div class="card"><h2>Dynamische Strompreise</h2>
+<p>{{ p.status }}{% if p.letzter %} · zuletzt {{ p.letzter }}{% endif %}{% if p.naechster %} · nächster Abruf {{ p.naechster }}{% endif %}</p>
+{% if p.fehler %}<div class="msg warn">Abruf fehlgeschlagen: {{ p.fehler }}</div>{% endif %}
+{% if p.tage %}<div class="grid" style="margin:12px 0">{% for t in p.tage %}<div class="kpi"><div class="t">{{ t.label }}</div>
+<div class="v">{{ '%.1f'|format(t.mittel) }} <small>Rp./kWh Ø</small></div><div class="s">{{ '%.1f'|format(t.min) }} – {{ '%.1f'|format(t.max) }} Rp., günstigste Stunde ab {{ t.guenstig }}</div></div>{% endfor %}</div>
+{{ p.chart|safe }}<p class="muted">Typ «{{ p.typ }}», ohne kantonale/kommunale Abgaben und MWST.</p>{% endif %}
+<form method="post" action="preise_abrufen" data-busy="Strompreise werden abgerufen …" style="margin-top:8px"><button>Jetzt abrufen</button></form>
+<details style="margin-top:12px"><summary class="muted">Schnittstelle einstellen</summary>
+<form method="post" action="primeo?teil=dynamisch"><table class="form">
+<tr><td class="l">Adresse (URL)</td><td class="l"><input name="api_url" value="{{ p.e.api_url }}" style="width:420px" required></td></tr>
+<tr><td class="l">Tarifname</td><td class="l"><input name="tarif_name" value="{{ p.e.tarif_name }}" style="width:200px"> <span class="muted">NetzDynamisch, NetzDynamischAVAG, NetzDynamischELAG</span></td></tr>
+<tr><td class="l">Tariftyp</td><td class="l"><select name="tarif_typ">{% for k, v in [('', 'alle'), ('integrated', 'integrated – Netz + Energie'), ('electricity', 'electricity – Energie'), ('grid', 'grid – Netz inkl. nationale Abgaben'), ('grid_usage', 'grid_usage – nur Netznutzung')] %}<option value="{{ k }}" {{ 'selected' if k == p.e.tarif_typ }}>{{ v }}</option>{% endfor %}</select></td></tr>
+<tr><td class="l">Abrufen ab</td><td class="l"><input type="date" name="abrufen_ab" value="{{ p.e.abrufen_ab }}"></td></tr>
+<tr><td class="l">Automatisch abrufen</td><td class="l"><label><input type="checkbox" name="aktiv" value="1" {{ 'checked' if p.e.aktiv }}> stündlich, zwischen 18 und 21 Uhr alle 15 Minuten</label></td></tr>
+</table><p><button class="primary">Speichern</button> <span class="muted">Standard laut Primeo-Merkblatt: https://tarife.primeo-energie.ch/api/v1/tariffs</span></p></form></details></div>
+"""
+
+BATTERIE_REGELN = """<form method="post" action="einstellungen?tab=batterie" class="card"><h2>Batterie und dynamischer Tarif</h2>
+<table class="form"><tr><td class="l">Netzladung zahlt</td><td class="l"><select name="netzladung_zahlt">{% for k, v in [('betreiber','Betreiber'),('alle','alle Bezüger anteilig')] %}<option value="{{ k }}" {{ 'selected' if r.netzladung_zahlt == k }}>{{ v }}</option>{% endfor %}</select></td></tr>
+<tr><td class="l">Netzanteil bei Entladung</td><td class="l"><select name="entladung_netzanteil">{% for k, v in [('solarpreis','wie Solarstrom zum vZEV-Preis'),('ladepreis','zum Preis beim Laden'),('offen','noch abzuklären')] %}<option value="{{ k }}" {{ 'selected' if r.entladung_netzanteil == k }}>{{ v }}</option>{% endfor %}</select></td></tr>
+<tr><td class="l">Dynamischer Tarif ab</td><td class="l"><input type="date" name="dynamisch_ab" value="{{ r.dynamisch_ab or '' }}"></td></tr>
+<tr><td class="l">Abgeklärt / Notiz</td><td class="l"><input name="notiz" value="{{ r.notiz or '' }}" style="width:360px"></td></tr></table>
+<p><button class="primary">Speichern</button></p>
+<p class="muted">Heute lädt die Batterie nur aus PV, deshalb ändert sie an der Abrechnung nichts: Solarstrom aus der Batterie ist Solarstrom. Ab dem dynamischen Tarif kann sie auch aus dem Netz laden;
+dann rechnet die App die Netzladung dem Betreiber zu und verrechnet den Netzanteil bei der Entladung nach der gewählten Regel. Diese Berechnung baue ich ein, sobald die ersten Daten mit Netzladung da sind und die Regel mit Primeo abgeklärt ist.</p></form>"""
+
 REGELN = """<form method="post" action="einstellungen?tab=regeln" class="card"><h2>Regeln der Aufteilung</h2><table class="form">
 <tr><td class="l">Netzbezug PV-Anlage (Standby) geht auf</td><td class="l"><select name="pva_standby_auf">{% for k, v in [('Allg','Allgemeinstrom')] %}<option value="{{ k }}" selected>{{ v }}</option>{% endfor %}</select></td></tr>
 <tr><td class="l">Allgemeinstrom</td><td class="l"><select name="allgemein_rechnung"><option value="gesamt" selected>Gesamtrechnung für die Nebenkostenabrechnung</option></select></td></tr>
@@ -751,6 +747,11 @@ def einstellungen_formulare(tab):
                 ha["zaehler"] = {r["z"]: r["e"] for r in lesen("ha", F_HA) if r["z"] and r["e"]}
                 abschnitt_speichern("messpunkte", {r["mp"]: r["z"] for r in mp})
                 abschnitt_speichern("homeassistant", ha)
+            elif tab == "batterie":
+                neu = {k: (request.form.get(k) or "").strip() or None for k in ("netzladung_zahlt", "entladung_netzanteil", "notiz")}
+                neu["dynamisch_ab"] = _d(request.form.get("dynamisch_ab") or None)
+                abschnitt_speichern("batterie", neu, "Batterie – bearbeitet in der App")
+                tab = "regeln"
             elif tab == "regeln":
                 r = dict(cfg.get("regeln") or {})
                 r["allgemein_mieteranteil"] = float(request.form["allgemein_mieteranteil"].replace(",", ".")) / 100
@@ -770,7 +771,8 @@ def einstellungen_formulare(tab):
         body = render_template_string(ZAEHLER, t_mp=editor("mp", F_MP, [dict(mp=k, z=v) for k, v in (cfg.get("messpunkte") or {}).items()]),
                                       t_ha=editor("ha", F_HA, [dict(z=k, e=v) for k, v in ((cfg.get("homeassistant") or {}).get("zaehler") or {}).items()]))
     else:
-        body = render_template_string(REGELN, r=cfg.get("regeln") or {})
+        rb = {"netzladung_zahlt": "betreiber", "entladung_netzanteil": "offen", "dynamisch_ab": "2027-01-01", **(cfg.get("batterie") or {})}
+        body = render_template_string(REGELN, r=cfg.get("regeln") or {}) + render_template_string(BATTERIE_REGELN, r=rb)
     return S.page("Einstellungen", kopf + body)
 
 
@@ -794,5 +796,5 @@ def preise_abrufen():
         S.collector.aktiv = None
     pa = S.preisabruf
     if pa.fehler:
-        return redirect(f"batterie?c=warn&msg=Abruf fehlgeschlagen: {pa.fehler}")
-    return redirect(f"batterie?msg={pa.status}")
+        return redirect(f"primeo?c=warn&msg=Abruf fehlgeschlagen: {pa.fehler}")
+    return redirect(f"primeo?msg={pa.status}")

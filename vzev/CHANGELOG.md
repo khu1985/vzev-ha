@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1
+
+- Dynamische Strompreise jetzt auf der Seite «Primeo» (Verlauf, Jetzt abrufen, Schnittstelle einstellen).
+- Regeln für Batterie und dynamischen Tarif jetzt unter «Einstellungen → Regeln». Die Seite «Batterie» zeigt nur noch die Speicherwerte.
+- Statusanzeige: «Berechnung startet» blieb nach dem Speichern von Einstellungen stehen, bis eine Seite mit Berechnung geöffnet wurde. Die Berechnung startet jetzt sofort im Hintergrund.
+
 ## 0.5.0
 
 - Dynamische Strompreise (Primeo Dynamisch / NetzDynamisch): Die App holt die Viertelstundenpreise über die Primeo-Schnittstelle, stündlich und zwischen 18 und 21 Uhr alle 15 Minuten (Veröffentlichung für den nächsten Tag bis 18 Uhr). Fehlende Tage werden nachgeladen, ab einem einstellbaren Datum (Standard 01.01.2027).

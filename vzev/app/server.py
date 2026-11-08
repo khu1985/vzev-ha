@@ -718,6 +718,8 @@ BRAUCHT_BERECHNUNG = {"index", "verlauf", "abschluss", "primeo", "sammler", "imp
 @app.get("/status")
 def status():
     jetzt = time.time()
+    if veraltet() and not _rechnen.locked():  # z. B. nach dem Speichern von Einstellungen: gleich im Hintergrund rechnen
+        im_hintergrund_rechnen("Einstellungen geändert")
     hm = lambda t: datetime.fromtimestamp(t).strftime("%H:%M") if t else None
     return {
         "rechnen": {"aktiv": RECHNEN["aktiv"], "seit": (jetzt - RECHNEN["start"]) if RECHNEN["aktiv"] else 0,
