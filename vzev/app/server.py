@@ -114,7 +114,7 @@ NAVIGATION = [
     ("Auswertung", [("./", "Übersicht"), ("verlauf", "Verlauf"), ("wertschoepfung", "Wertschöpfung")]),
     ("Abrechnung", [("import", "Daten importieren"), ("rechnungen", "Rechnungen"), ("jahr", "Jahresabrechnung"), ("abschluss", "Abschluss")]),
     ("Stammdaten", [("mieter", "Mieter"), ("tarife", "Tarife"), ("primeo", "Primeo"), ("einstellungen", "Einstellungen")]),
-    ("Anlage", [("batterie", "Batterie"), ("sammler", "Datensammler"), ("protokoll", "Protokoll")]),
+    ("Anlage", [("prognose", "Prognose"), ("batterie", "Batterie"), ("sammler", "Datensammler"), ("protokoll", "Protokoll")]),
 ]
 
 app = Flask(__name__)
@@ -129,6 +129,9 @@ collector = Collector(str(DATA / "messwerte.sqlite"), config)
 import preise  # noqa: E402
 preisabruf = preise.Preisabruf(collector._db, config)
 collector.preise = preisabruf
+import prognose  # noqa: E402
+pvprognose = prognose.Prognose(collector, config)
+collector.prognose = pvprognose
 
 # --- Hilfen -------------------------------------------------------------------
 _cache = {}
@@ -796,6 +799,7 @@ seiten.register(app, sys.modules[__name__])
 uebersicht.register(app, sys.modules[__name__])
 zahlungen.register(app, sys.modules[__name__])
 jahr.register(app, sys.modules[__name__])
+prognose.register(app, sys.modules[__name__])
 app.jinja_env.filters["dmy"] = lambda x: "" if not x else f"{str(x)[8:10]}.{str(x)[5:7]}.{str(x)[:4]}"
 
 # --- Protokoll ----------------------------------------------------------------

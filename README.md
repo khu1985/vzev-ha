@@ -28,7 +28,7 @@ flowchart TB
         direction LR
         P["Primeo-Kundenportal<br/>Lastgänge .xlsx"]
         W["go-e Wallbox<br/>Ladevorgänge .csv"]
-        HA["Home Assistant<br/>whatwatt, go-e, Solis, Kia"]
+        HA["Home Assistant<br/>whatwatt, go-e, Solis, Solcast"]
         E["evcc<br/>Ladevorgänge"]
     end
 
@@ -83,6 +83,7 @@ flowchart TB
 | `vzev/app/jahr.py` | Jahresabrechnung: Allgemeinstrom-PDF für die Nebenkostenabrechnung, Mieter, Zähler pro Monat, Excel-Export |
 | `vzev/app/collector.py` | Speichert alle 15 Minuten die Zählerstände aus Home Assistant, stündlich die evcc-Ladevorgänge und stösst den Preisabruf an |
 | `vzev/app/preise.py` | Dynamische Viertelstundenpreise über die Primeo-Schnittstelle abrufen und speichern (Adresse einstellbar) |
+| `vzev/app/prognose.py` | PV-Prognose aus Solcast (Sensoren automatisch finden, Prognose und Vortags-Prognose speichern), Seite «Prognose» mit Ladefenstern und Trefferquote |
 | `vzev/app/zahlungen.py` | Rechnungsregister: Betrag, Fälligkeit, Zahlungen, Status; Übernahme von Zahlungen bei Korrekturen |
 | `vzev/app/diagramme.py` | Säulen-, Linien- und Balkendiagramme als SVG ohne externe Bibliothek |
 | `vzev/app/default_config.yaml` | Vorlage für `vzev.yaml` (ohne persönliche Daten) |
@@ -138,6 +139,8 @@ flowchart LR
     A["alle 15 Min.<br/>Zählerstände aus Home Assistant speichern"] --> B["stündlich<br/>evcc-Ladevorgänge abrufen"]
     B --> C["Übersicht: laufender Monat<br/>als Vorschau (vorläufig)"]
     A --> D["stündlich, 18–21 Uhr alle 15 Min.<br/>Strompreise für morgen bei Primeo abrufen"]
+    A --> P["stündlich<br/>PV-Prognose aus Solcast speichern"]
+    D & P --> L["Prognose: günstige Ladefenster,<br/>Trefferquote der Vortags-Prognose"]
 ```
 
 </details>
@@ -211,7 +214,7 @@ So fliessen sie ab 2027 in die Abrechnung ein (Entscheid Betreiber):
 |---|---|
 | `vzev.yaml` | Betreiber, Messpunkte, Tarife, Mietverhältnisse, Regeln, Home-Assistant-Sensoren; frühere Fassung als `vzev.yaml.bak` |
 | `primeo/` | importierte Lastgänge und Wallbox-Export; ersetzte Dateien unter `primeo/_entfernt/` |
-| `messwerte.sqlite` | Zählerstände aus Home Assistant, evcc-Ladevorgänge, dynamische Strompreise |
+| `messwerte.sqlite` | Zählerstände aus Home Assistant, evcc-Ladevorgänge, dynamische Strompreise, PV-Prognosen |
 | `abschluss.json` | abgeschlossene Monate mit festgehaltenen Werten, Korrekturen |
 | `rechnungen/` | erstellte PDFs, `register.json` (Rechnungen, Fälligkeiten, Zahlungen); ersetzte Fassungen unter `rechnungen/_alt/` |
 | `vzev.log` | Protokoll (auch in der App unter «Protokoll») |

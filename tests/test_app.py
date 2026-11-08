@@ -5,6 +5,7 @@ import re
 import shutil
 import sys
 import time
+from datetime import date, datetime, timedelta
 from urllib.parse import unquote
 
 import pytest
@@ -334,3 +335,27 @@ def test_protokoll_zeigt_eintraege(app):
     server, c, d, quelle = app
     h = c.get("/protokoll").get_data(as_text=True)
     assert "Hochgeladen" in h
+
+
+def test_prognose_seite(app):
+    server, c, d, quelle = app
+    import prognose
+    from test_prognose import solcast_attr
+    heute = date.today()
+    db = server.collector._db
+    jetzt = datetime.combine(heute - timedelta(days=1), datetime.min.time()) + timedelta(hours=20)
+    prognose.speichern(db, prognose.zerlegen(solcast_attr(heute)), jetzt=jetzt)
+    prognose.speichern(db, prognose.zerlegen(solcast_attr(heute + timedelta(days=1), 0.5)), jetzt=jetzt)
+    sol = yaml.safe_load((d / "vzev.yaml").read_text())["homeassistant"]["solis"]["pv_heute"]
+    with db() as con:  # gemessener PV-Tageszähler bis 12 Uhr
+        for i in range(49):
+            t = datetime.combine(heute, datetime.min.time()) + timedelta(minutes=15 * i)
+            con.execute("INSERT OR REPLACE INTO messwerte VALUES (?, ?, ?)", (t.isoformat(timespec="minutes"), sol, max(0, i - 28) * 0.8))
+    h = c.get("/prognose").get_data(as_text=True)
+    assert "Prognose heute" in h and "Prognose morgen" in h and "Gemessen heute" in h and "PV-Prognose (Band 10–90 %)" in h
+    assert "Trefferquote" in h and 'href="prognose"' in h
+    h = c.get("/prognose?d=morgen").get_data(as_text=True)
+    assert "Morgen," in h, h[-3000:]
+    assert "noch nicht publiziert" in h or "Günstig aus dem Netz laden" in h
+    r = c.get("/einstellungen?tab=zaehler").get_data(as_text=True)
+    assert "PV-Prognose (Solcast)" in r

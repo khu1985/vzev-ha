@@ -71,7 +71,7 @@ for x, t in zip(X, ["Quellen", "Erfassung", "Speicher", "Berechnung", "Ausgabe"]
 q = {"primeo": 60, "goe": 135, "ha": 245, "evcc": 320, "du": 430, "tarif": 530}
 k.append(box(X[0], q["primeo"], BW, BH, "Primeo-Portal", "Lastgänge .xlsx, 15 Min.", "quelle"))
 k.append(box(X[0], q["goe"], BW, BH, "go-e Wallbox", "Ladevorgänge .csv", "quelle"))
-k.append(box(X[0], q["ha"], BW, BH, "Home Assistant", "whatwatt, go-e, Solis, Kia", "quelle"))
+k.append(box(X[0], q["ha"], BW, BH, "Home Assistant", "whatwatt, go-e, Solis, Solcast", "quelle"))
 k.append(box(X[0], q["evcc"], BW, BH, "evcc", "Ladevorgänge (REST)", "quelle"))
 k.append(box(X[0], q["du"], BW, BH, "Betreiber", "Formulare in der App", "quelle"))
 k.append(box(X[0], q["tarif"], BW, BH, "Primeo-Tarife", "Strompreise (Internet)", "quelle"))
@@ -97,7 +97,7 @@ k.append(box(X[4], a["ueb"], BW, BH, "Übersicht, Wertschöpfung", "uebersicht.p
 k.append(box(X[4], a["rech"], BW, BH, "Rechnungen, Jahr", "invoices, jahr, zahlungen", "aus"))
 k.append(box(X[4], a["prot"], BW, BH, "Status, Protokoll", "Statusanzeige, vzev.log", "aus"))
 k.append(box(X[4], a["abs"], BW, BH, "Abschluss, Korrekturen", "Sperre, Begründungen", "aus"))
-k.append(box(X[4], 530, BW, BH, "Batterie, Strompreise", "Verlauf heute/morgen", "aus"))
+k.append(box(X[4], 530, BW, BH, "Prognose, Strompreise", "Ladefenster, Batterie", "aus"))
 m = BH / 2
 R = lambda i: X[i] + BW
 k += [

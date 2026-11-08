@@ -2,3 +2,5 @@ flowchart LR
     A["alle 15 Min.<br/>Zählerstände aus Home Assistant speichern"] --> B["stündlich<br/>evcc-Ladevorgänge abrufen"]
     B --> C["Übersicht: laufender Monat<br/>als Vorschau (vorläufig)"]
     A --> D["stündlich, 18–21 Uhr alle 15 Min.<br/>Strompreise für morgen bei Primeo abrufen"]
+    A --> P["stündlich<br/>PV-Prognose aus Solcast speichern"]
+    D & P --> L["Prognose: günstige Ladefenster,<br/>Trefferquote der Vortags-Prognose"]

@@ -34,6 +34,7 @@ und getrennt ausgewiesenem Netzstrom aus dem Batteriespeicher.
 - **Einstellungen:** Betreiber, Zähler, Regeln (Aufteilung sowie Speicher und Bonus dynamischer Tarif) und die Datei `vzev.yaml` direkt.
 
 **Anlage**
+- **Prognose:** PV-Prognose aus der Solcast-Integration (heute, morgen, folgende Tage) mit Bandbreite, gemessenem Ertrag, üblichem Verbrauch und dynamischem Strompreis; Zeitfenster «günstig aus dem Netz laden»; Trefferquote der Prognose vom Vortag.
 - **Batterie:** Monatswerte des Speichers (geladen, entladen, Wirkungsgrad) aus den Solis-Daten. Für die Abrechnung zählt die Netzladung aus den Primeo-Lastgängen (siehe «Dynamische Strompreise»).
 - **Datensammler:** Zählerstände aus Home Assistant (alle 15 Minuten) mit letztem Wert und Status, evcc-Ladevorgänge im Detail.
 - **Protokoll:** Uploads, Rechnungen, Zahlungen, Korrekturen, Warnungen und Fehler.
@@ -70,6 +71,14 @@ Die App holt die Viertelstundenpreise über die Primeo-Schnittstelle (Standard: 
 **Speicher (ab 2027):** Netzbezug am Zähler der PV-Anlage über der Standby-Grenze ist Laden der Batterie aus dem Netz und geht auf den Betreiber. Strom, der aus diesem Vorrat später im Haus verbraucht wird (zuerst geladen, zuerst verbraucht, abzüglich Wirkungsgrad), erscheint als «Speicher NT» zum vZEV-Preis und nicht als Solarstrom.
 
 **80-%-Grenze:** Die Übersicht prüft pro Monat, ob der Solarpreis höchstens 80 % des Standardprodukts beträgt (gewichtet nach HT/NT des Solarverbrauchs). Voraussetzung: Solar- und Netztarife auf der gleichen Basis (inkl. MWST).
+
+## PV-Prognose
+
+Voraussetzung ist die Solcast-Integration in Home Assistant (HACS «Solcast PV Forecast»). Die App sucht stündlich alle Sensoren mit Halbstunden-Prognose (Attribut `detailedForecast`) und speichert sie in `messwerte.sqlite`. Sollen nur bestimmte Sensoren zählen, unter **Einstellungen → Zähler → PV-Prognose** eintragen.
+
+- **Gemessen** ist der Tageszähler PV-Ertrag des Wechselrichters (Solis), **üblicher Verbrauch** das Mittel der letzten vier Wochen zur gleichen Uhrzeit (1. OG, 2. OG, Allgemein ohne Ladestation).
+- **Günstig aus dem Netz laden:** Viertelstunden, deren Preis im untersten Viertel zwischen Tiefst- und Höchstpreis des Tages liegt und in denen die Prognose den üblichen Verbrauch nicht deckt. Die App steuert nichts.
+- **Trefferquote:** Für jeden Tag zählt die letzte Prognose, die am Vortag gespeichert wurde. Liegt Solcast dauerhaft daneben, dort Ausrichtung, Neigung oder Leistung der Anlage prüfen.
 
 ## Daten und Sicherung
 
