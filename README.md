@@ -1,7 +1,8 @@
 # vZEV Abrechnung – Home-Assistant-App
 
 Abrechnung eines virtuellen Zusammenschlusses zum Eigenverbrauch (vZEV) in der Schweiz:
-Primeo-Lastgänge, Ladestation, Wertschöpfung und Quartalsrechnungen mit QR-Einzahlungsschein.
+Primeo-Lastgänge, Ladestation, Wertschöpfung, Quartalsrechnungen mit QR-Einzahlungsschein, Zahlungseingang,
+Monatsabschluss und dynamische Strompreise. Bedienung siehe [vzev/DOCS.md](vzev/DOCS.md) (in Home Assistant unter «Dokumentation»).
 
 ## Installation
 
@@ -14,7 +15,8 @@ sondern in die Konfiguration der App (Seite «Einstellungen»).
 ## Architektur
 
 Die App läuft als Container im Home Assistant und erscheint über Ingress als Seite in der Seitenleiste.
-Sie braucht kein Internet: Alle Daten liegen im Konfigurationsordner der App und sind damit im Home-Assistant-Backup enthalten.
+Alle Daten liegen im Konfigurationsordner der App und sind damit im Home-Assistant-Backup enthalten.
+Ins Internet geht nur der Abruf der dynamischen Strompreise bei Primeo; alles andere bleibt im lokalen Netz.
 
 ![Architektur](docs/architektur.svg)
 
@@ -71,12 +73,14 @@ flowchart TB
 |---|---|
 | `vzev/app/core.py` | Lastgänge einlesen (Messpunkt aus dem Dateikopf), Ladestation auf Viertelstunden verteilen, Solar/Netz pro Zähler aufteilen, Tarife mit Gültig-ab-Datum, Wertschöpfung, Abgleich mit Primeo-Rechnungen |
 | `vzev/app/vorschau.py` | Gleiche Rechnung mit den gesammelten Zählerständen aus Home Assistant für die Zeit nach dem letzten Lastgang |
-| `vzev/app/server.py` | Webserver, Navigation, Import, Rechnungen, Datensammler-Seite, Protokoll |
+| `vzev/app/server.py` | Webserver, Navigation, Statusanzeige, Import, Rechnungen, Datensammler-Seite, Protokoll |
 | `vzev/app/uebersicht.py` | Übersicht mit Kennzahlen, Kontrollen und Diagramm; Verlauf pro Zähler |
 | `vzev/app/seiten.py` | Formulare für Mieter, Tarife, Primeo, Batterie und Einstellungen; Monatsabschluss und Sperre |
 | `vzev/app/invoices.py` | Quartalsrechnungen als PDF: Wohnung mit QR-Einzahlungsschein, Allgemeinstrom als Gesamtrechnung |
-| `vzev/app/collector.py` | Speichert alle 15 Minuten die Zählerstände aus Home Assistant und stündlich die evcc-Ladevorgänge |
-| `vzev/app/diagramme.py` | Säulendiagramme als SVG ohne externe Bibliothek |
+| `vzev/app/collector.py` | Speichert alle 15 Minuten die Zählerstände aus Home Assistant, stündlich die evcc-Ladevorgänge und stösst den Preisabruf an |
+| `vzev/app/preise.py` | Dynamische Viertelstundenpreise über die Primeo-Schnittstelle abrufen und speichern (Adresse einstellbar) |
+| `vzev/app/zahlungen.py` | Rechnungsregister: Betrag, Fälligkeit, Zahlungen, Status; Übernahme von Zahlungen bei Korrekturen |
+| `vzev/app/diagramme.py` | Säulen- und Verlaufsdiagramme als SVG ohne externe Bibliothek |
 | `vzev/app/default_config.yaml` | Vorlage für `vzev.yaml` (ohne persönliche Daten) |
 
 ## Rechenmodell
@@ -123,6 +127,7 @@ Regeln, die in `vzev.yaml` einstellbar sind:
 flowchart LR
     A["alle 15 Min.<br/>Zählerstände aus Home Assistant speichern"] --> B["stündlich<br/>evcc-Ladevorgänge abrufen"]
     B --> C["Übersicht: laufender Monat<br/>als Vorschau (vorläufig)"]
+    A --> D["stündlich, 18–21 Uhr alle 15 Min.<br/>Strompreise für morgen bei Primeo abrufen"]
 ```
 
 </details>
@@ -143,6 +148,7 @@ flowchart TD
     E --> F["Abschluss: Monat abschliessen<br/>Werte werden festgehalten und gesperrt"]
     F --> G["Rechnungen: Quartal erstellen<br/>PDF pro Mietverhältnis + Allgemeinstrom"]
     G --> H["Rechnungen versenden<br/>Allgemeinstrom in die Nebenkostenabrechnung"]
+    H --> Z["Zahlungseingang erfassen<br/>offen, teilweise, überfällig, bezahlt"]
 ```
 
 </details>
@@ -166,15 +172,37 @@ flowchart LR
 
 </details>
 
+## Dynamische Strompreise (ab 2027)
+
+Ab 01.01.2027 bietet Primeo «Primeo Dynamisch» an (Netz- und Energiepreis pro Viertelstunde).
+Die App holt die Preise über die Schnittstelle laut Merkblatt Primeo NetzDynamisch:
+
+```
+GET https://tarife.primeo-energie.ch/api/v1/tariffs
+    ?start_timestamp=2027-01-01T00:00:00%2B01:00&end_timestamp=2027-01-02T00:00:00%2B01:00
+    &tariff_name=NetzDynamisch[&tariff_type=integrated|electricity|grid|grid_usage]
+```
+
+- Veröffentlichung täglich bis 18 Uhr für den nächsten Tag; die App ruft stündlich und von 18 bis 21 Uhr alle 15 Minuten ab und lädt fehlende Tage nach.
+- Adresse, Tarifname, Tariftyp und Startdatum sind in der App einstellbar (Seite «Batterie»), gespeichert im Abschnitt `dynamisch` von `vzev.yaml`.
+- Die Preise enthalten keine kantonalen/kommunalen Abgaben und keine MWST.
+
+Noch offen, bevor die Preise in die Abrechnung einfliessen:
+
+- Netzstrompreis für die Mieter: dynamischer Viertelstundenpreis oder fester Preis (Basis-Standardtarif als Obergrenze)
+- kantonale und kommunale Abgaben 2027 (Primeo-Preisblatt 2027)
+- Batterie-Netzladung: läuft über den Zähler «Netzbezug PV-Anlage» und muss vom Standby getrennt und dem Betreiber zugerechnet werden
+- Verrechnung von Netzstrom, der aus der Batterie wieder entladen wird (mit Primeo abzuklären)
+
 ## Daten und Sicherung
 
 | Datei / Ordner | Inhalt |
 |---|---|
 | `vzev.yaml` | Betreiber, Messpunkte, Tarife, Mietverhältnisse, Regeln, Home-Assistant-Sensoren; frühere Fassung als `vzev.yaml.bak` |
 | `primeo/` | importierte Lastgänge und Wallbox-Export; ersetzte Dateien unter `primeo/_entfernt/` |
-| `messwerte.sqlite` | Zählerstände aus Home Assistant und evcc-Ladevorgänge |
+| `messwerte.sqlite` | Zählerstände aus Home Assistant, evcc-Ladevorgänge, dynamische Strompreise |
 | `abschluss.json` | abgeschlossene Monate mit festgehaltenen Werten, Korrekturen |
-| `rechnungen/` | erstellte PDFs; ersetzte Fassungen unter `rechnungen/_alt/` |
+| `rechnungen/` | erstellte PDFs, `register.json` (Rechnungen, Fälligkeiten, Zahlungen); ersetzte Fassungen unter `rechnungen/_alt/` |
 | `vzev.log` | Protokoll (auch in der App unter «Protokoll») |
 
 Alles liegt im Konfigurationsordner der App und ist im Home-Assistant-Backup enthalten.

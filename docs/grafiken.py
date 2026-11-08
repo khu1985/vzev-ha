@@ -66,19 +66,21 @@ X = [20, 236, 452, 668, 884]
 k = []
 for x, t in zip(X, ["Quellen", "Erfassung", "Speicher", "Berechnung", "Ausgabe"]):
     k.append(f"<text x='{x+BW/2}' y='28' text-anchor='middle' font-size='13' font-weight='700' fill='{MUTED}' letter-spacing='1' {FONT}>{t.upper()}</text>")
-    k.append(f"<line x1='{x-12}' y1='44' x2='{x-12}' y2='520' stroke='#EEF0EC'/>" if x > 20 else "")
+    k.append(f"<line x1='{x-12}' y1='44' x2='{x-12}' y2='600' stroke='#EEF0EC'/>" if x > 20 else "")
 # Quellen
-q = {"primeo": 60, "goe": 135, "ha": 245, "evcc": 320, "du": 430}
+q = {"primeo": 60, "goe": 135, "ha": 245, "evcc": 320, "du": 430, "tarif": 530}
 k.append(box(X[0], q["primeo"], BW, BH, "Primeo-Portal", "Lastgänge .xlsx, 15 Min.", "quelle"))
 k.append(box(X[0], q["goe"], BW, BH, "go-e Wallbox", "Ladevorgänge .csv", "quelle"))
 k.append(box(X[0], q["ha"], BW, BH, "Home Assistant", "whatwatt, go-e, Solis, Kia", "quelle"))
 k.append(box(X[0], q["evcc"], BW, BH, "evcc", "Ladevorgänge (REST)", "quelle"))
 k.append(box(X[0], q["du"], BW, BH, "Betreiber", "Formulare in der App", "quelle"))
+k.append(box(X[0], q["tarif"], BW, BH, "Primeo-Tarife", "Strompreise (Internet)", "quelle"))
 # Erfassung
-e = {"import": 97, "sammler": 282, "seiten": 430}
+e = {"import": 97, "sammler": 282, "seiten": 430, "preise": 530}
 k.append(box(X[1], e["import"], BW, BH, "Import", "server.py · Messpunkt erkennen", "app"))
 k.append(box(X[1], e["sammler"], BW, BH, "Datensammler", "collector.py · alle 15 Min.", "app"))
 k.append(box(X[1], e["seiten"], BW, BH, "Stammdaten, Abschluss", "seiten.py", "app"))
+k.append(box(X[1], e["preise"], BW, BH, "Preisabruf", "preise.py · täglich ab 18 Uhr", "app"))
 # Speicher
 s = {"primeo": 70, "yaml": 165, "mess": 282, "abschl": 410}
 k.append(box(X[2], s["primeo"], BW, BH, "primeo/", "Lastgänge + Zwischenspeicher", "daten", "zyl"))
@@ -92,9 +94,10 @@ k.append(box(X[3], b["vorschau"], BW, BH, "Vorschau", "vorschau.py · laufender 
 # Ausgabe
 a = {"ueb": 70, "rech": 165, "abs": 410, "prot": 282}
 k.append(box(X[4], a["ueb"], BW, BH, "Übersicht, Verlauf", "uebersicht.py · Diagramme", "aus"))
-k.append(box(X[4], a["rech"], BW, BH, "Rechnungen", "invoices.py · PDF + QR", "aus"))
+k.append(box(X[4], a["rech"], BW, BH, "Rechnungen, Zahlungen", "invoices.py, zahlungen.py", "aus"))
 k.append(box(X[4], a["prot"], BW, BH, "Status, Protokoll", "Statusanzeige, vzev.log", "aus"))
 k.append(box(X[4], a["abs"], BW, BH, "Abschluss, Korrekturen", "Sperre, Begründungen", "aus"))
+k.append(box(X[4], 530, BW, BH, "Batterie, Strompreise", "Verlauf heute/morgen", "aus"))
 m = BH / 2
 R = lambda i: X[i] + BW
 k += [
@@ -116,9 +119,12 @@ k += [
     pfeil(R(3), b["core"] + m + 18, X[4], a["abs"] + m - 10, kurve=1),
     pfeil(R(3), b["vorschau"] + m - 10, X[4], a["ueb"] + m + 12, kurve=1),
     pfeil(R(2), s["abschl"] + m, X[4], a["abs"] + m + 10, kurve=1),
+    pfeil(R(0), q["tarif"] + m, X[1], e["preise"] + m),
+    pfeil(R(1), e["preise"] + m - 10, X[2], s["mess"] + m + 12, kurve=1),
+    pfeil(R(2), s["mess"] + m + 14, X[4], 530 + m, kurve=1),
 ]
-k.append(f"<text x='20' y='{520}' font-size='12' fill='{MUTED}' {FONT}>Alles läuft im Container der App; die Daten liegen im Konfigurationsordner der App und sind im Home-Assistant-Backup enthalten.</text>")
-open(f"{OUT}/architektur.svg", "w").write(svg(W, 540, "".join(k), "Architektur der vZEV-App"))
+k.append(f"<text x='20' y='{620}' font-size='12' fill='{MUTED}' {FONT}>Alles läuft im Container der App; die Daten liegen im Konfigurationsordner und sind im Home-Assistant-Backup enthalten. Ins Internet geht nur der Preisabruf.</text>")
+open(f"{OUT}/architektur.svg", "w").write(svg(W, 640, "".join(k), "Architektur der vZEV-App"))
 
 # --- Monatsprozess: zwei Reihen ------------------------------------------------
 W, BW, BH = 1080, 210, 84
@@ -133,7 +139,7 @@ k.append(box(xs[3], y1, BW, BH, "Primeo-Rechnung erfassen", "Netzbezug HT/NT und
 k.append(box(xs[0], y2, BW, BH, "Tarife prüfen", "Rückliefertarif eintragen,\nsobald publiziert", "app", nr=5))
 k.append(box(xs[1], y2, BW, BH, "Monat abschliessen", "Werte festhalten,\nÄnderungen gesperrt", "daten", nr=6))
 k.append(box(xs[2], y2, BW, BH, "Rechnungen erstellen", "pro Quartal: Wohnung mit QR,\nAllgemeinstrom gesamt", "aus", nr=7))
-k.append(box(xs[3], y2, BW, BH, "Versenden", "Mieter; Allgemeinstrom in die\nNebenkostenabrechnung", "quelle", nr=8))
+k.append(box(xs[3], y2, BW, BH, "Versenden, Zahlungen", "Allgemeinstrom in die NK-Abrechnung;\nZahlungseingang erfassen", "quelle", nr=8))
 my1, my2 = y1 + BH / 2, y2 + BH / 2
 k += [pfeil(xs[0] + BW, my1, xs[1], my1), pfeil(xs[1] + BW, my1, xs[2], my1),
       pfeil(xs[2] + BW, my1, xs[3], my1, "ja"),
@@ -141,6 +147,6 @@ k += [pfeil(xs[0] + BW, my1, xs[1], my1), pfeil(xs[1] + BW, my1, xs[2], my1),
       f"<text x='{(xs[1]+xs[2])/2+BW/2}' y='{y1+BH+64}' text-anchor='middle' font-size='11' fill='#B4541A' {FONT}>nein: Datei prüfen, neu hochladen</text>",
       f"<path d='M{xs[3]+BW/2},{y1+BH} V{y2-40} H{xs[0]+BW/2} V{y2}' fill='none' stroke='{MUTED}' stroke-width='1.6' stroke-linejoin='round' marker-end='url(#pf)'/>",
       pfeil(xs[0] + BW, my2, xs[1], my2), pfeil(xs[1] + BW, my2, xs[2], my2, "Quartalsende"), pfeil(xs[2] + BW, my2, xs[3], my2)]
-k.append(f"<text x='30' y='{y2+BH+40}' font-size='12' fill='{MUTED}' {FONT}>Laufend und automatisch: Zählerstände alle 15 Min., evcc stündlich, Vorschau des laufenden Monats in der Übersicht.</text>")
+k.append(f"<text x='30' y='{y2+BH+40}' font-size='12' fill='{MUTED}' {FONT}>Laufend und automatisch: Zählerstände alle 15 Min., evcc stündlich, Strompreise für morgen ab 18 Uhr, Vorschau des laufenden Monats.</text>")
 open(f"{OUT}/prozess-monatlich.svg", "w").write(svg(W, y2 + BH + 60, "".join(k), "Monatlicher Ablauf"))
 print("ok")
