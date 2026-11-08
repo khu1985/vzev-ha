@@ -189,6 +189,7 @@ SEITE = diagramme.STIL + """
 {% for k, l in monate %}<option value="{{ k }}" {{ 'selected' if sel == 'monat' and k == m }}>{{ l }}</option>{% endfor %}</select></form>
 <form method="get" action="./"><input type="hidden" name="p" value="jahr"><select name="j" onchange="this.form.submit()" aria-label="Jahr">
 {% for y in jahre %}<option {{ 'selected' if sel == 'jahr' and y == j }}>{{ y }}</option>{% endfor %}</select></form></div>
+{% if aufgabe %}<a class="msg" href="{{ aufgabe[1] }}" style="display:block;background:var(--soft);color:var(--ink);text-decoration:none"><b>Nächste Aufgabe:</b> {{ aufgabe[0] }} →</a>{% endif %}
 {% if not w %}<div class="msg warn">{{ fehler }}</div>{% else %}
 <div class="card"><h2>{{ titel }}{% if vorlaeufig %} <span class="pill">vorläufig</span>{% endif %}</h2>
 {{ svg|safe }}
@@ -253,7 +254,12 @@ def seite():
     link_m = f"?m={str(pd.Period(von, 'M'))}" if sel != "jahr" else ""
     return S.page("Energiefluss", render_template_string(
         SEITE, w=w, svg=diagramm(w, sp), titel=titel, tabs=tabs, monate=mon, jahre=jahre, sel=sel, m=m, j=j, F=F, k=k,
-        quelle=quelle, vorlaeufig=ha or bis >= heute, link_m=link_m))
+        quelle=quelle, vorlaeufig=ha or bis >= heute, link_m=link_m, aufgabe=_aufgabe()))
+
+
+def _aufgabe():
+    import aufgaben
+    return aufgaben.naechste()
 
 
 def register(app, server):

@@ -181,51 +181,11 @@ def _parteien(cfg, p):
     return ", ".join(namen) or "Leerstand – Kosten trägt der Betreiber"
 
 
-def index():
-    d = daten()
-    res, cfg, b = d["res"], d["cfg"], d["b"]
-    if res is None:
-        return S.page("Übersicht", render_template_string(UEBERSICHT, res_ok=False, fehler=b.get("fehler") or ", ".join(d["info"].get("fehlend", []))))
-    mon = _memo("monate", lambda: monate(res))
-    alle = list(mon.index)
-    jahre = sorted({x.year for x in alle}, reverse=True)
-    try:
-        jahr = int(request.args.get("j") or (pd.Period(request.args["m"], "M").year if request.args.get("m") else jahre[0]))
-    except (ValueError, KeyError):
-        jahr = jahre[0]
-    jahr = jahr if jahr in jahre else jahre[0]
-    perioden = [x for x in alle if x.year == jahr]
-    voll = [x for x in perioden if not mon.loc[x, "vorlaeufig"]]
-    sel = request.args.get("m") or str((voll or perioden)[-1])
-    p = pd.Period(sel, "M") if sel in [str(x) for x in perioden] else (voll or perioden)[-1]
+def kontrollen_fuer(d, mon, p):
+    """Kontrollen eines Monats: [(ok|None, Titel, Text)] sowie Abgleich, Abschluss-Stand und Abweichungen.
+    Verwendet von der Übersicht und vom Aufgaben-Assistenten."""
+    b, res, cfg = d["b"], d["res"], d["cfg"]
     sel = str(p)
-    i = perioden.index(p)
-    k = alle.index(p)
-    vor = mon.iloc[k - 1] if k > 0 else None
-    vor_label = _titel(alle[k - 1]) if k > 0 else ""
-    w = _memo("w", lambda: core.wertschoepfung(res, cfg))
-    wert = w.loc[p, "total_chf"] if p in w.index else None
-
-    # Jahreswerte (bisher)
-    mj = mon.loc[perioden]
-    wj = w[[x.year == jahr for x in w.index]]
-    jk = dict(produktion=float(mj["produktion"].sum()), solar=float(mj["solar"].sum()), verbrauch=float(mj["verbrauch"].sum()),
-              export=float(mj["export"].sum()), tarif_offen=bool(mj["tarif_offen"].any()),
-              export_chf=float(mj["export_chf"].sum()) if mj["export_chf"].notna().any() else None,
-              wert=float(wj["total_chf"].sum()) if len(wj) else 0.0,
-              zeitraum=(f"{_ml(perioden[0])}–{_ml(perioden[-1])} {jahr}" if len(perioden) > 1 else _titel(perioden[0])) + (" (bisher)" if mj["vorlaeufig"].any() or len(perioden) < 12 else ""))
-    jk["autarkie"] = jk["solar"] / jk["verbrauch"] * 100 if jk["verbrauch"] else 0
-    vj = [x for x in alle if x.year == jahr - 1 and x.month in {y.month for y in perioden}]
-    jk["vorjahr"] = float(mon.loc[vj, "produktion"].sum()) if len(vj) == len(perioden) else None
-
-    vorl = {j for j, x in enumerate(perioden) if mon.loc[x, "vorlaeufig"]}
-    chart = diagramme.saeulen([_ml(x) for x in perioden],
-                              [("Solar im Haus", diagramme.FARBEN["solar"], list(mj["solar"])),
-                               ("Rücklieferung", diagramme.FARBEN["rueck"], list(mj["export"])),
-                               ("Netzbezug", diagramme.FARBEN["netz"], list(mj["netz"]))],
-                              vorlaeufig=vorl, aktiv=i, links=[f"?j={jahr}&m={x}#monat" for x in perioden])
-
-    # Kontrollen
     rm = res[res["month"] == p]
     kontrollen = []
     abg = _memo("abg", lambda: core.abgleich(b["res"], b["cfg"])) if b.get("ok") else None
@@ -297,6 +257,57 @@ def index():
                                f"{zst['n_ueberfaellig']} überfällig, CHF {zst['ueberfaellig']:.2f} – siehe «Rechnungen»"))
     except Exception:
         S.log.exception("Zahlungsstand nicht lesbar")
+
+    return kontrollen, abg, a, abw
+
+
+def index():
+    d = daten()
+    res, cfg, b = d["res"], d["cfg"], d["b"]
+    if res is None:
+        return S.page("Übersicht", render_template_string(UEBERSICHT, res_ok=False, fehler=b.get("fehler") or ", ".join(d["info"].get("fehlend", []))))
+    mon = _memo("monate", lambda: monate(res))
+    alle = list(mon.index)
+    jahre = sorted({x.year for x in alle}, reverse=True)
+    try:
+        jahr = int(request.args.get("j") or (pd.Period(request.args["m"], "M").year if request.args.get("m") else jahre[0]))
+    except (ValueError, KeyError):
+        jahr = jahre[0]
+    jahr = jahr if jahr in jahre else jahre[0]
+    perioden = [x for x in alle if x.year == jahr]
+    voll = [x for x in perioden if not mon.loc[x, "vorlaeufig"]]
+    sel = request.args.get("m") or str((voll or perioden)[-1])
+    p = pd.Period(sel, "M") if sel in [str(x) for x in perioden] else (voll or perioden)[-1]
+    sel = str(p)
+    i = perioden.index(p)
+    k = alle.index(p)
+    vor = mon.iloc[k - 1] if k > 0 else None
+    vor_label = _titel(alle[k - 1]) if k > 0 else ""
+    w = _memo("w", lambda: core.wertschoepfung(res, cfg))
+    wert = w.loc[p, "total_chf"] if p in w.index else None
+
+    # Jahreswerte (bisher)
+    mj = mon.loc[perioden]
+    wj = w[[x.year == jahr for x in w.index]]
+    jk = dict(produktion=float(mj["produktion"].sum()), solar=float(mj["solar"].sum()), verbrauch=float(mj["verbrauch"].sum()),
+              export=float(mj["export"].sum()), tarif_offen=bool(mj["tarif_offen"].any()),
+              export_chf=float(mj["export_chf"].sum()) if mj["export_chf"].notna().any() else None,
+              wert=float(wj["total_chf"].sum()) if len(wj) else 0.0,
+              zeitraum=(f"{_ml(perioden[0])}–{_ml(perioden[-1])} {jahr}" if len(perioden) > 1 else _titel(perioden[0])) + (" (bisher)" if mj["vorlaeufig"].any() or len(perioden) < 12 else ""))
+    jk["autarkie"] = jk["solar"] / jk["verbrauch"] * 100 if jk["verbrauch"] else 0
+    vj = [x for x in alle if x.year == jahr - 1 and x.month in {y.month for y in perioden}]
+    jk["vorjahr"] = float(mon.loc[vj, "produktion"].sum()) if len(vj) == len(perioden) else None
+
+    vorl = {j for j, x in enumerate(perioden) if mon.loc[x, "vorlaeufig"]}
+    chart = diagramme.saeulen([_ml(x) for x in perioden],
+                              [("Solar im Haus", diagramme.FARBEN["solar"], list(mj["solar"])),
+                               ("Rücklieferung", diagramme.FARBEN["rueck"], list(mj["export"])),
+                               ("Netzbezug", diagramme.FARBEN["netz"], list(mj["netz"]))],
+                              vorlaeufig=vorl, aktiv=i, links=[f"?j={jahr}&m={x}#monat" for x in perioden])
+
+    # Kontrollen
+    kontrollen, abg, a, abw = kontrollen_fuer(d, mon, p)
+    rm = res[res["month"] == p]
 
     # Verbraucher
     import invoices

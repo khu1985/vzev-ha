@@ -426,3 +426,23 @@ def test_energiefluss_startseite(app):
     w = fluss.werte(r, b["cfg"])
     assert w["haus"] == pytest.approx(sum(v["total"] for v in w["verbraucher"]))
     assert w["solar_haus"] + w["export"] == pytest.approx(w["prod"], rel=1e-6)      # Produktion = im Haus + Rücklieferung
+
+
+def test_aufgaben_assistent(app):
+    server, c, d, quelle = app
+    warten(server)
+    h = c.get("/aufgaben").get_data(as_text=True)
+    assert "Aufgaben" in h and "Primeo-Lastgänge importieren" in h and "Kontrollen prüfen" in h
+    assert "Mai 2026" in h                                              # Lastgänge nur bis April → Mai offen
+    assert re.search(r'class="schritt jetzt".*?class="btn primary" href="[^"]+" data-assistent="1"', h, re.S)  # erster offener Schritt hervorgehoben
+    h = c.get("/aufgaben?m=2026-06").get_data(as_text=True)
+    assert "Quartalsrechnungen erstellen" in h and "Rechnungen versenden" in h and "Zahlungseingang erfassen" in h
+    r = c.post("/aufgaben_erledigt", data={"q": "2026-Q2", "m": "2026-06", "wert": "1"})
+    assert "aufgaben?m=2026-06" in ziel(r)
+    assert "Versendet am" in c.get("/aufgaben?m=2026-06").get_data(as_text=True)
+    c.post("/aufgaben_erledigt", data={"q": "2026-Q2", "m": "2026-06"})
+    assert "Als versendet markieren" in c.get("/aufgaben?m=2026-06").get_data(as_text=True)
+    h = c.get("/?p=monat&m=2026-04").get_data(as_text=True)
+    assert "Nächste Aufgabe:" in h and "März 2026:" in h
+    h = c.get("/tarife").get_data(as_text=True)
+    assert "vzev-assistent" in h                                        # Zurück-Knopf auf allen Seiten vorbereitet
