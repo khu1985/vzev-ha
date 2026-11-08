@@ -148,10 +148,13 @@ def distribute_ev(df, lade, baseline):
     return ev
 
 
-def compute(df, lade, cfg):
+def compute(df, lade, cfg, ev=None):
+    """ev: gemessene Ladestation pro Viertelstunde (Vorschau aus Home Assistant); sonst aus den Ladevorgängen verteilt."""
     df = df.copy()
     rules, tar = cfg["regeln"], cfg["tarife"]
-    df["EV"] = np.minimum(distribute_ev(df, lade, rules["ladestation_grundlast_kwh"]), df["Allg"])
+    if ev is None:
+        ev = distribute_ev(df, lade, rules["ladestation_grundlast_kwh"])
+    df["EV"] = np.minimum(ev, df["Allg"])
     df["AllgC"] = df["Allg"] - df["EV"]
     cons = df["1OG"] + df["2OG"] + df["AllgC"] + df["EV"]
     ratio = np.where(cons > 0, np.minimum(df["Prod"] / cons.replace(0, np.nan), 1.0), 0.0)

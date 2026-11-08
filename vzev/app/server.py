@@ -19,6 +19,7 @@ from werkzeug.utils import secure_filename
 import core
 import invoices
 import seiten
+import uebersicht
 from collector import Collector
 
 DATA = Path(os.environ.get("VZEV_DIR", Path(__file__).parent / "data"))
@@ -75,6 +76,17 @@ def protokoll(n=500):
 def fehler_seit_start():
     return sum(1 for e in protokoll(300) if e["stufe"] in ("ERROR", "CRITICAL") and e["zeit"] >= START)
 
+
+def _version():
+    for p in (Path(__file__).parent / "addon.yaml", Path(__file__).parent.parent / "config.yaml"):
+        try:
+            return str(yaml.safe_load(p.read_text(encoding="utf-8"))["version"])
+        except Exception:
+            continue
+    return "?"
+
+
+VERSION = _version()
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
@@ -222,58 +234,17 @@ button,.btn{min-height:40px;padding:0 16px;border:1px solid #D3D8D2;border-radiu
 input,select,textarea{font:inherit;padding:8px 10px;border:1px solid #D3D8D2;border-radius:8px}textarea{width:100%;font-family:ui-monospace,Menlo,monospace;font-size:12px}
 .msg{padding:12px 16px;border-radius:10px;margin-bottom:16px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
 .kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px}.kpi div:first-child{color:var(--muted);font-size:13px}.kpi div:last-child{font-size:22px;font-weight:600;margin-top:4px}
+.kpi .v{font-size:24px;font-weight:600;margin-top:4px}.kpi .v small{font-size:13px;font-weight:500;color:var(--muted)}.kpi div.s{font-size:12px;font-weight:400;color:var(--muted);margin-top:4px}
 form.inline{display:inline}</style></head><body>
-<header><b>☀ vZEV {{ anlage }}</b><nav>
-{% for href, label in [('./','Übersicht'),('import','Daten importieren'),('rechnungen','Rechnungen'),('abschluss','Abschluss'),('mieter','Mieter'),('tarife','Tarife'),('primeo','Primeo'),('batterie','Batterie'),('sammler','Datensammler'),('einstellungen','Einstellungen'),('protokoll','Protokoll')] %}
+<header><b>☀ vZEV {{ anlage }} <span class="muted" style="font-weight:500" title="Version der App">v{{ version }}</span></b><nav>
+{% for href, label in [('./','Übersicht'),('verlauf','Verlauf'),('import','Daten importieren'),('rechnungen','Rechnungen'),('abschluss','Abschluss'),('mieter','Mieter'),('tarife','Tarife'),('primeo','Primeo'),('batterie','Batterie'),('sammler','Datensammler'),('einstellungen','Einstellungen'),('protokoll','Protokoll')] %}
 <a href="{{ href }}" class="{{ 'on' if label == title else '' }}">{{ label }}{% if label == 'Protokoll' and nfehler %} <span class="pill warn">{{ nfehler }}</span>{% endif %}</a>{% endfor %}</nav></header>
 <main><h1>{{ title }}</h1>{% if msg %}<div class="msg {{ msgclass or 'ok' }}">{{ msg }}</div>{% endif %}{{ body|safe }}</main></body></html>"""
 
 
 def page(title, body, **kw):
     b = config().get("betreiber", {})
-    return render_template_string(BASE, title=title, body=body, anlage=f"{b.get('strasse', '')} {b.get('hausnr', '')}".strip(), msg=request.args.get("msg"), msgclass=request.args.get("c"), nfehler=fehler_seit_start(), **kw)
-
-
-# --- Übersicht ----------------------------------------------------------------
-UEBERSICHT = """
-{% if not b.ok %}<div class="msg warn">Noch keine vollständige Berechnung: {{ b.fehler }}. <a href="import">Dateien importieren</a></div>
-{% else %}
-{% if abw %}<div class="msg warn">Abgeschlossene Monate haben sich verändert: {% for m, t in abw %}{{ m }} ({{ t }}){{ ', ' if not loop.last }}{% endfor %}. Details unter <a href="abschluss">Abschluss</a>.</div>{% endif %}
-<div class="grid" style="margin-bottom:20px">
- <div class="kpi"><div>Daten bis</div><div>{{ b.res.index.max()|d }}</div></div>
- <div class="kpi"><div>Ladestation verteilt</div><div>{{ 'stimmt' if b.ev < 0.01 else 'Abweichung %.2f kWh'|format(b.ev) }}</div></div>
- <div class="kpi"><div>Abgleich Primeo</div><div>{{ 'alles stimmt' if abg.ok.all() else 'Abweichung prüfen' }}</div></div>
- <div class="kpi"><div>Wertschöpfung gesamt</div><div>{{ w.total_chf.sum()|f2 }} CHF</div></div>
-</div>
-<div class="card"><h2>Pro Zähler und Monat</h2><div class="scroll"><table>
-<tr><th>Monat</th>{% for z in zl %}<th>{{ z[1] }} Solar</th><th>Netz HT/NT</th><th>CHF*</th>{% endfor %}</tr>
-{% for m, row in tab %}<tr><td>{{ m }}</td>{% for c in row %}<td>{{ c[0]|f2 }}</td><td>{{ c[1]|f2 }} / {{ c[2]|f2 }}</td><td>{{ c[3]|f2 }}</td>{% endfor %}</tr>{% endfor %}
-</table></div><p class="muted">kWh. * Solar- plus Netzkosten ohne Grundpreis; Allgemein ohne Ladestation, inkl. Standby PV-Anlage.</p></div>
-<div class="card"><h2>Abgleich mit Primeo-Rechnungen</h2><div class="scroll"><table>
-<tr><th>Rechnung</th><th class="l">Position</th><th>Primeo kWh</th><th>Berechnet kWh</th><th>Differenz</th><th></th></tr>
-{% for r in abg.itertuples() %}<tr><td>{{ r.rechnung }}</td><td class="l">{{ r.position }}</td><td>{{ r.primeo_kwh }}</td><td>{{ r.berechnet_kwh|f2 }}</td><td>{{ r.diff|f2 }}</td>
-<td><span class="pill {{ 'ok' if r.ok else 'warn' }}">{{ 'stimmt' if r.ok else 'prüfen' }}</span></td></tr>{% endfor %}</table></div></div>
-<div class="card"><h2>Wertschöpfung Betreiber</h2><div class="scroll"><table>
-<tr><th>Monat</th><th>Rücklieferung</th><th>Verkauf Mieter</th><th>Eigenverbrauch</th><th>Übrige</th><th>Total CHF</th></tr>
-{% for m, r in w.iterrows() %}<tr><td>{{ m.strftime('%m.%Y') }}</td><td>{{ r.export_chf|f2 }}</td><td>{{ r.mieter_chf|f2 }}</td><td>{{ r.eigen_chf|f2 }}</td><td>{{ r.uebrige_chf|f2 }}</td><td><b>{{ r.total_chf|f2 }}</b></td></tr>{% endfor %}
-<tr class="sum"><td>Summe</td><td>{{ w.export_chf.sum()|f2 }}</td><td>{{ w.mieter_chf.sum()|f2 }}</td><td>{{ w.eigen_chf.sum()|f2 }}</td><td>{{ w.uebrige_chf.sum()|f2 }}</td><td>{{ w.total_chf.sum()|f2 }}</td></tr>
-</table></div><p class="muted">Rücklieferung leer = Tarif noch nicht bekannt. Allgemeinstrom zu 50 % als verkauft gerechnet; Leerstand zählt als Eigenverbrauch.</p></div>
-{% endif %}"""
-
-
-@app.route("/")
-def index():
-    b = berechnung()
-    ctx = dict(b=b)
-    if b.get("ok"):
-        res, cfg = b["res"], b["cfg"]
-        zl = [("1OG", "1. OG"), ("2OG", "2. OG"), ("AllgC", "Allgemein"), ("EV", "Ladestation")]
-        sums = {k: core.zaehler_summen(res, k) for k, _ in zl}
-        months = sums["1OG"].index
-        tab = [(m.strftime("%m.%Y"), [(sums[k].loc[m, "solar"], sums[k].loc[m, "ht"], sums[k].loc[m, "nt"],
-                                       sums[k].loc[m, "solar_chf"] + sums[k].loc[m, "netz_chf"]) for k, _ in zl]) for m in months]
-        ctx.update(zl=zl, tab=tab, abg=core.abgleich(res, cfg), w=core.wertschoepfung(res, cfg), abw=seiten.abweichungen(b))
-    return page("Übersicht", render_template_string(UEBERSICHT, **ctx))
+    return render_template_string(BASE, title=title, body=body, anlage=f"{b.get('strasse', '')} {b.get('hausnr', '')}".strip(), msg=request.args.get("msg"), msgclass=request.args.get("c"), nfehler=fehler_seit_start(), version=VERSION, **kw)
 
 
 # --- Import -------------------------------------------------------------------
@@ -535,6 +506,7 @@ def einstellungen():
 
 
 seiten.register(app, sys.modules[__name__])
+uebersicht.register(app, sys.modules[__name__])
 
 # --- Protokoll ----------------------------------------------------------------
 PROT = """
@@ -575,6 +547,6 @@ if __name__ == "__main__":
         collector.start()
     import logging
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    log.info("App gestartet. Daten in %s, %d Dateien im Import", DATA, sum(1 for p in PRIMEO.iterdir() if p.is_file()))
+    log.info("App gestartet (Version %s). Daten in %s, %d Dateien im Import", VERSION, DATA, sum(1 for p in PRIMEO.iterdir() if p.is_file()))
     im_hintergrund_rechnen()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8099)), threaded=True)

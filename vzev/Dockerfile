@@ -10,6 +10,7 @@ RUN apt-get update \
 ENV MPLCONFIGDIR=/tmp/matplotlib PYTHONUNBUFFERED=1
 
 COPY app /app
+COPY config.yaml /app/addon.yaml
 COPY run.sh /run.sh
 RUN chmod a+x /run.sh
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+- Version der App oben neben dem Namen.
+- Übersicht neu: Monat wählen, Kennzahlen (Produktion, Autarkie, Rücklieferung, Wertschöpfung), Diagramm «Energiefluss pro Monat», Kontrollen und Verbraucher des Monats inkl. Grundpreis. Die bisherigen Tabellen sind aufklappbar darunter.
+- Neue Seite «Verlauf»: pro Zähler Kennzahlen, Diagramm Solar/Netz pro Monat und Monatstabelle, beim 1. OG nach Mietverhältnis gruppiert.
+- Vorschau aus Home Assistant: Für die Zeit nach dem letzten Primeo-Lastgang rechnet die App mit den gesammelten Zählerständen (whatwatt, go-e, Solis) und zeigt diese Monate als vorläufig. Wo Primeo-Lastgänge und Zählerstände beide vorliegen, zeigt die Übersicht den Vergleich.
+
 ## 0.2.1
 
 - Schneller: Die eingelesenen Primeo-Lastgänge werden zwischengespeichert. Nach einem Neustart oder einer Änderung an Tarifen, Mietern oder Regeln wird nur noch neu gerechnet, nicht neu eingelesen (im Test 0.2 statt 3.4 Sekunden, auf dem Raspberry Pi entsprechend mehr).
