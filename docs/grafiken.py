@@ -95,9 +95,9 @@ k.append(box(X[3], b["vorschau"], BW, BH, "Vorschau", "vorschau.py · laufender 
 a = {"ueb": 70, "rech": 165, "abs": 410, "prot": 282}
 k.append(box(X[4], a["ueb"], BW, BH, "Übersicht, Wertschöpfung", "uebersicht.py · Kontrollen", "aus"))
 k.append(box(X[4], a["rech"], BW, BH, "Rechnungen, Jahr", "invoices, jahr, zahlungen", "aus"))
-k.append(box(X[4], a["prot"], BW, BH, "Status, Protokoll", "Statusanzeige, vzev.log", "aus"))
+k.append(box(X[4], a["prot"], BW, BH, "Sensoren, Status", "sensor.vzev_*, Protokoll", "aus"))
 k.append(box(X[4], a["abs"], BW, BH, "Abschluss, Korrekturen", "Sperre, Begründungen", "aus"))
-k.append(box(X[4], 530, BW, BH, "Prognose, Strompreise", "Ladefenster, Batterie", "aus"))
+k.append(box(X[4], 530, BW, BH, "Energiefluss, Prognose", "Aufgaben, Ladefenster", "aus"))
 m = BH / 2
 R = lambda i: X[i] + BW
 k += [
@@ -122,8 +122,9 @@ k += [
     pfeil(R(0), q["tarif"] + m, X[1], e["preise"] + m),
     pfeil(R(1), e["preise"] + m - 10, X[2], s["mess"] + m + 12, kurve=1),
     pfeil(R(2), s["mess"] + m + 14, X[4], 530 + m, kurve=1),
+    pfeil(R(3), b["vorschau"] + m + 8, X[4], a["prot"] + m, kurve=1),
 ]
-k.append(f"<text x='20' y='{620}' font-size='12' fill='{MUTED}' {FONT}>Alles läuft im Container der App; die Daten liegen im Konfigurationsordner und sind im Home-Assistant-Backup enthalten. Ins Internet geht nur der Preisabruf.</text>")
+k.append(f"<text x='20' y='{620}' font-size='12' fill='{MUTED}' {FONT}>Alles läuft im Container der App; die Daten liegen im Konfigurationsordner und sind im Home-Assistant-Backup enthalten. Ins Internet geht nur der Preisabruf; die Sensoren gehen zurück an Home Assistant.</text>")
 open(f"{OUT}/architektur.svg", "w").write(svg(W, 640, "".join(k), "Architektur der vZEV-App"))
 
 # --- Monatsprozess: zwei Reihen ------------------------------------------------
@@ -138,8 +139,8 @@ k.append(box(xs[2], y1 - 8, BW, BH + 16, "Kontrollen ok?", "Lücken, Ladestation
 k.append(box(xs[3], y1, BW, BH, "Primeo-Rechnung erfassen", "Netzbezug HT/NT und\nRücklieferung (Seite Primeo)", "app", nr=4))
 k.append(box(xs[0], y2, BW, BH, "Tarife prüfen", "Rückliefertarif eintragen,\nsobald publiziert", "app", nr=5))
 k.append(box(xs[1], y2, BW, BH, "Monat abschliessen", "Werte festhalten,\nÄnderungen gesperrt", "daten", nr=6))
-k.append(box(xs[2], y2, BW, BH, "Rechnungen erstellen", "pro Quartal: Wohnung mit QR,\nAllgemeinstrom gesamt", "aus", nr=7))
-k.append(box(xs[3], y2, BW, BH, "Versenden, Zahlungen", "Allgemeinstrom in die NK-Abrechnung;\nZahlungseingang erfassen", "quelle", nr=8))
+k.append(box(xs[2], y2, BW, BH, "Rechnungen erstellen", "pro Quartal: Wohnung mit QR,\nAllgemeinstrom, Heizung gesamt", "aus", nr=7))
+k.append(box(xs[3], y2, BW, BH, "Versenden, Zahlungen", "Gesamtrechnungen in die NK-Abr.;\nZahlungen, Erinnerung", "quelle", nr=8))
 my1, my2 = y1 + BH / 2, y2 + BH / 2
 k += [pfeil(xs[0] + BW, my1, xs[1], my1), pfeil(xs[1] + BW, my1, xs[2], my1),
       pfeil(xs[2] + BW, my1, xs[3], my1, "ja"),
@@ -147,6 +148,6 @@ k += [pfeil(xs[0] + BW, my1, xs[1], my1), pfeil(xs[1] + BW, my1, xs[2], my1),
       f"<text x='{(xs[1]+xs[2])/2+BW/2}' y='{y1+BH+64}' text-anchor='middle' font-size='11' fill='#B4541A' {FONT}>nein: Datei prüfen, neu hochladen</text>",
       f"<path d='M{xs[3]+BW/2},{y1+BH} V{y2-40} H{xs[0]+BW/2} V{y2}' fill='none' stroke='{MUTED}' stroke-width='1.6' stroke-linejoin='round' marker-end='url(#pf)'/>",
       pfeil(xs[0] + BW, my2, xs[1], my2), pfeil(xs[1] + BW, my2, xs[2], my2, "Quartalsende"), pfeil(xs[2] + BW, my2, xs[3], my2)]
-k.append(f"<text x='30' y='{y2+BH+40}' font-size='12' fill='{MUTED}' {FONT}>Jährlich: Jahresabrechnung (Allgemeinstrom-PDF für die NK-Abrechnung, Excel). Laufend: Zählerstände alle 15 Min., evcc stündlich, Strompreise ab 18 Uhr.</text>")
+k.append(f"<text x='30' y='{y2+BH+40}' font-size='12' fill='{MUTED}' {FONT}>Der Aufgaben-Assistent zeigt pro Monat den nächsten Schritt. Jährlich: Jahresabrechnung (Allgemeinstrom- und Heizungs-PDF, Excel).</text>")
 open(f"{OUT}/prozess-monatlich.svg", "w").write(svg(W, y2 + BH + 60, "".join(k), "Monatlicher Ablauf"))
 print("ok")

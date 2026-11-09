@@ -17,6 +17,8 @@ flowchart TB
         SE["seiten.py<br/>Stammdaten, Abschluss"]
         I["invoices.py, jahr.py<br/>Quartals- und Jahres-PDF, Excel"]
         PZ["preise.py<br/>dynamische Strompreise"]
+        SN["sensoren.py<br/>Kennzahlen als Sensoren"]
+        AF["aufgaben.py, fluss.py, prognose.py<br/>Assistent, Energiefluss, Prognose"]
     end
 
     subgraph Daten["Konfigurationsordner (im Backup)"]
@@ -43,3 +45,6 @@ flowchart TB
     SE <--> Y
     SE <--> AB
     C --> I --> R
+    C & DB --> AF
+    C & DB --> SN -- "sensor.vzev_*" --> HA
+    HA -. "Langzeit-Statistik (WebSocket)" .-> CO
