@@ -512,3 +512,44 @@ def test_sicherung_und_erinnerung(app):
     assert zahlungen.laden()["rechnungen"][key]["erinnerungen"][0]["offen"] == offen
     zahlungen.nachtragen()
     assert not any("Erinnerung_" in x["datei"] for x in zahlungen.laden()["rechnungen"].values())   # kein neuer Registereintrag
+
+
+def test_netzladung_und_jaz(app):
+    server, c, d, quelle = app
+    warten(server)
+    cfg_alt = (d / "vzev.yaml").read_text()
+    try:
+        with server.collector._db() as con:   # April: Wechselrichter meldet nachts (ohne PV) Batterie-Ladung
+            for tag in range(1, 31):
+                pv = gel = 0.0
+                for i in range(96):
+                    t = datetime(2026, 4, tag) + timedelta(minutes=15 * i)
+                    if 9 <= t.hour < 16:
+                        pv += 0.4
+                    elif 1 <= t.hour < 3:
+                        gel += 0.5
+                    con.execute("INSERT OR REPLACE INTO messwerte VALUES (?, ?, ?)", (t.isoformat(timespec="minutes"), "sensor.t_pv", pv))
+                    con.execute("INSERT OR REPLACE INTO messwerte VALUES (?, ?, ?)", (t.isoformat(timespec="minutes"), "sensor.t_gel", gel))
+        h = c.get("/uebersicht?m=2026-04").get_data(as_text=True)
+        assert "Netzladung passt zum Wechselrichter" in h and "Wechselrichter «Batterie geladen»" in h
+        # Wärmepumpe mit Wärme-Sensor → Jahresarbeitszahl
+        y = yaml.safe_load(cfg_alt)
+        y["homeassistant"]["waermepumpen"] = [{"name": "Heizung", "entity": "sensor.t_wp2", "waerme": "sensor.t_wwaerme"}]
+        (d / "vzev.yaml").write_text(yaml.safe_dump(y, allow_unicode=True, sort_keys=False))
+        with server.collector._db() as con:
+            t, a, b = datetime(2026, 4, 1), 10.0, 30.0
+            while t <= datetime(2026, 4, 30, 23, 45):
+                con.execute("INSERT OR REPLACE INTO messwerte VALUES (?, ?, ?)", (t.isoformat(timespec="minutes"), "sensor.t_wp2", a))
+                con.execute("INSERT OR REPLACE INTO messwerte VALUES (?, ?, ?)", (t.isoformat(timespec="minutes"), "sensor.t_wwaerme", b))
+                t, a, b = t + timedelta(minutes=15), a + 0.05, b + 0.2
+        warten(server)
+        h = c.get("/verlauf?z=WP").get_data(as_text=True)
+        assert "Jahresarbeitszahl" in h and "4.00" in h
+        h = c.get("/jahr?j=2026").get_data(as_text=True)
+        assert "Jahresarbeitszahl:</b> Heizung 4.00" in h
+        h = c.get("/einstellungen?tab=zaehler").get_data(as_text=True)
+        assert "Wärmepumpen rückwirkend" in h and "Wärme-Sensor" in h
+        r = c.post("/wp_statistik", data={"ab": "2026-01-01"})
+        assert "Langzeit-Statistik" in ziel(r)            # ohne Home Assistant: verständliche Meldung
+    finally:
+        (d / "vzev.yaml").write_text(cfg_alt)

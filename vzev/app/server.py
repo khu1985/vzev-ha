@@ -139,7 +139,19 @@ _cache = {}
 
 def files_key():
     fs = sorted(p for p in PRIMEO.iterdir() if p.is_file())
-    return tuple((p.name, p.stat().st_mtime) for p in fs) + ((CFG.name, CFG.stat().st_mtime), preise.stand(collector._db))
+    return tuple((p.name, p.stat().st_mtime) for p in fs) + ((CFG.name, CFG.stat().st_mtime), preise.stand(collector._db), wp_stand())
+
+
+def wp_stand():
+    """Beginn der Wärmepumpen-Messwerte: ändert sich, wenn rückwirkend Werte übernommen werden (nicht bei jeder Ablesung)."""
+    try:
+        ents = [w["entity"] for w in (config().get("homeassistant") or {}).get("waermepumpen") or [] if isinstance(w, dict) and w.get("entity")]
+        if not ents:
+            return None
+        with collector._db() as c:
+            return c.execute(f"SELECT MIN(ts), COUNT(DISTINCT entity) FROM messwerte WHERE entity IN ({','.join('?' * len(ents))})", ents).fetchone()
+    except Exception:
+        return None
 
 
 def wp_reihe(cfg):
@@ -781,6 +793,32 @@ Zusätzlich lässt sich hier jederzeit eine vollständige Kopie herunterladen: K
 Zahlungsregister, Abschlüsse und die gesammelten Messwerte.</p>
 <p><a class="btn primary" href="sicherung">Sicherung herunterladen (ZIP)</a></p>
 <p class="muted">Wiederherstellen: Inhalt der ZIP-Datei in den Konfigurationsordner der App kopieren (z. B. mit Samba oder dem File editor) und die App neu starten.</p></div>"""
+
+
+@app.route("/wp_statistik", methods=["POST"])
+def wp_statistik():
+    """Wärmepumpen-Zähler (und Wärme) rückwirkend aus der Langzeit-Statistik von Home Assistant füllen."""
+    import hastatistik
+    import vorschau
+    try:
+        ab = date.fromisoformat(request.form.get("ab") or "")
+        ents = [e for w in vorschau.waermepumpen(config()) for e in (w["entity"], w["waerme"]) if e]
+        if not ents:
+            raise ValueError("keine Wärmepumpen eingerichtet")
+        base, token = collector._ha()
+        if not token:
+            raise ValueError("kein Zugang zu Home Assistant")
+        erg = hastatistik.fuellen(collector._db, base, token, ents, ab)
+        n = sum(x[0] for x in erg.values())
+        txt = "; ".join(f"{e}: {x[0]} Stundenwerte" + (f" {x[1]:%d.%m.%Y}–{x[2]:%d.%m.%Y}" if x[0] else "") for e, x in erg.items())
+        log.info("Wärmepumpen aus Langzeit-Statistik ab %s: %s", ab, txt)
+        if n:
+            im_hintergrund_rechnen("Wärmepumpen rückwirkend")
+        return redirect(f"einstellungen?tab=zaehler&{'' if n else 'c=warn&'}msg="
+                        + (f"{n} Stundenwerte übernommen – Berechnung läuft" if n else f"Keine Statistik gefunden ({txt})"))
+    except Exception as e:
+        log.warning("Langzeit-Statistik: %s", e)
+        return redirect(f"einstellungen?tab=zaehler&c=warn&msg=Langzeit-Statistik: {e}")
 
 
 @app.route("/erinnerung", methods=["POST"])

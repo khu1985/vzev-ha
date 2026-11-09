@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.0
+
+- Kontrolle «Netzladung passt zum Wechselrichter»: Netzbezug der PV-Anlage über der Standby-Grenze (× Wirkungsgrad) gegen «Batterie geladen» des Wechselrichters in den Viertelstunden ohne Sonne – zeigt eine falsche Standby-Grenze oder einen falschen Wirkungsgrad.
+- Wärmepumpen rückwirkend: «Aus Langzeit-Statistik übernehmen» liest die stündlichen Zählerstände aus Home Assistant und füllt die Zeit vor der ersten eigenen Ablesung (eigene Werte bleiben unverändert).
+- Jahresarbeitszahl: optionaler Wärme-Sensor je Wärmepumpe; Arbeitszahl pro Monat im Verlauf, für das Jahr in der Jahresabrechnung und als Sensor `sensor.vzev_jaz_<name>`.
+
 ## 0.13.0
 
 - Sensoren für Home Assistant (wie in der Finanz-App): Produktion, Autarkie, Rücklieferung und Wertschöpfung (Monat, Jahr), offene und überfällige Rechnungen, nächste Aufgabe, PV-Prognose, dynamischer Strompreis, `binary_sensor.vzev_guenstig_laden` und nächstes Ladefenster – für Dashboards und Automationen. Einstellungen und Stand unter Einstellungen → Zähler.

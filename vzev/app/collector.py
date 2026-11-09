@@ -69,7 +69,7 @@ class Collector:
         ids = list((ha.get("zaehler") or {}).values())
         ids += [v for k, v in (ha.get("solis") or {}).items() if v and v.startswith("sensor.")]
         ids += [v for v in (ha.get("kia") or {}).values() if v]
-        ids += [w["entity"] for w in (ha.get("waermepumpen") or []) if isinstance(w, dict) and w.get("entity")]
+        ids += [w[k] for w in (ha.get("waermepumpen") or []) if isinstance(w, dict) for k in ("entity", "waerme") if w.get(k)]
         return sorted(set(ids))
 
     def read_now(self):
@@ -207,6 +207,8 @@ class Collector:
         for w in ha.get("waermepumpen") or []:
             if isinstance(w, dict) and w.get("entity"):
                 zweck.setdefault(w["entity"], f"wärmepumpe · {w.get('name') or ''}")
+                if w.get("waerme"):
+                    zweck.setdefault(w["waerme"], f"wärmepumpe · {w.get('name') or ''} Wärme")
         zeilen = []
         for e in self.entities():
             anzahl, zeit, wert = per.get(e, (0, None, None))

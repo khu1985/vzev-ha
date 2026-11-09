@@ -83,6 +83,7 @@ flowchart TB
 | `vzev/app/core.py` | Lastgänge einlesen (Messpunkt aus dem Dateikopf), Ladestation auf Viertelstunden verteilen, Solar/Netz pro Zähler aufteilen, Netzladung des Speichers und «Speicher NT», Bonus aus dem dynamischen Tarif, Tarife mit Gültig-ab-Datum, Wertschöpfung, Abgleich mit Primeo-Rechnungen |
 | `vzev/app/vorschau.py` | Gleiche Rechnung mit den gesammelten Zählerständen aus Home Assistant für die Zeit nach dem letzten Lastgang |
 | `vzev/app/server.py` | Webserver, Navigation, Statusanzeige, Import, Rechnungen, Datensammler-Seite, Protokoll |
+| `vzev/app/hastatistik.py` | Langzeit-Statistik aus Home Assistant über die WebSocket-API (kleiner Client ohne Zusatzpaket), rückwirkende Wärmepumpen-Werte |
 | `vzev/app/sensoren.py` | Sensoren `sensor.vzev_*` / `binary_sensor.vzev_*` über die REST-API von Home Assistant (alle 15 Minuten und nach jeder Berechnung) |
 | `vzev/app/aufgaben.py` | Aufgaben-Assistent: erkennt pro offenem Monat, Quartal und Jahr, welche Arbeiten erledigt sind, und führt zur passenden Seite |
 | `vzev/app/fluss.py` | Startseite «Energiefluss»: animiertes SVG-Diagramm der Flüsse (PV, Netz, Speicher, Haus, Verbraucher) pro Tag, Monat oder Jahr |
