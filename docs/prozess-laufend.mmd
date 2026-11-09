@@ -4,3 +4,5 @@ flowchart LR
     A --> D["stündlich, 18–21 Uhr alle 15 Min.<br/>Strompreise für morgen bei Primeo abrufen"]
     A --> P["stündlich<br/>PV-Prognose aus Solcast speichern"]
     D & P --> L["Prognose: günstige Ladefenster,<br/>Trefferquote der Vortags-Prognose"]
+    A --> SN["alle 15 Min. und nach jeder Berechnung<br/>Sensoren sensor.vzev_* an Home Assistant"]
+    L --> SN

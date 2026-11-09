@@ -23,6 +23,8 @@ sondern in die Konfiguration der App (Seite «Einstellungen»).
 Die App läuft als Container im Home Assistant und erscheint über Ingress als Seite in der Seitenleiste.
 Alle Daten liegen im Konfigurationsordner der App und sind damit im Home-Assistant-Backup enthalten.
 Ins Internet geht nur der Abruf der dynamischen Strompreise bei Primeo; alles andere bleibt im lokalen Netz.
+Zurück an Home Assistant gehen die Kennzahlen als Sensoren (`sensor.vzev_*`), über dieselbe Schnittstelle wie bei der
+Finanz-App; die Langzeit-Statistik (rückwirkende Wärmepumpen-Werte) liest die App über die WebSocket-API.
 
 ![Architektur](docs/architektur.svg)
 
@@ -48,6 +50,8 @@ flowchart TB
         SE["seiten.py<br/>Stammdaten, Abschluss"]
         I["invoices.py, jahr.py<br/>Quartals- und Jahres-PDF, Excel"]
         PZ["preise.py<br/>dynamische Strompreise"]
+        SN["sensoren.py<br/>Kennzahlen als Sensoren"]
+        AF["aufgaben.py, fluss.py, prognose.py<br/>Assistent, Energiefluss, Prognose"]
     end
 
     subgraph Daten["Konfigurationsordner (im Backup)"]
@@ -74,6 +78,9 @@ flowchart TB
     SE <--> Y
     SE <--> AB
     C --> I --> R
+    C & DB --> AF
+    C & DB --> SN -- "sensor.vzev_*" --> HA
+    HA -. "Langzeit-Statistik (WebSocket)" .-> CO
 ```
 
 </details>
@@ -81,7 +88,7 @@ flowchart TB
 | Datei | Aufgabe |
 |---|---|
 | `vzev/app/core.py` | Lastgänge einlesen (Messpunkt aus dem Dateikopf), Ladestation auf Viertelstunden verteilen, Solar/Netz pro Zähler aufteilen, Netzladung des Speichers und «Speicher NT», Bonus aus dem dynamischen Tarif, Tarife mit Gültig-ab-Datum, Wertschöpfung, Abgleich mit Primeo-Rechnungen |
-| `vzev/app/vorschau.py` | Gleiche Rechnung mit den gesammelten Zählerständen aus Home Assistant für die Zeit nach dem letzten Lastgang |
+| `vzev/app/vorschau.py` | Gleiche Rechnung mit den gesammelten Zählerständen aus Home Assistant für die Zeit nach dem letzten Lastgang; Wärmepumpen-Zähler (Lücken verteilt), Jahresarbeitszahl, Viertelstundenwerte des Wechselrichters |
 | `vzev/app/server.py` | Webserver, Navigation, Statusanzeige, Import, Rechnungen, Datensammler-Seite, Protokoll |
 | `vzev/app/hastatistik.py` | Langzeit-Statistik aus Home Assistant über die WebSocket-API (kleiner Client ohne Zusatzpaket), rückwirkende Wärmepumpen-Werte |
 | `vzev/app/sensoren.py` | Sensoren `sensor.vzev_*` / `binary_sensor.vzev_*` über die REST-API von Home Assistant (alle 15 Minuten und nach jeder Berechnung) |
@@ -89,12 +96,12 @@ flowchart TB
 | `vzev/app/fluss.py` | Startseite «Energiefluss»: animiertes SVG-Diagramm der Flüsse (PV, Netz, Speicher, Haus, Verbraucher) pro Tag, Monat oder Jahr |
 | `vzev/app/uebersicht.py` | Übersicht mit Kennzahlen, Kontrollen (u. a. 80-%-Grenze Solarpreis) und Diagramm; Verlauf pro Zähler; Seite Wertschöpfung |
 | `vzev/app/seiten.py` | Formulare für Mieter, Tarife (inkl. dynamische Strompreise), Primeo, Batterie und Einstellungen (inkl. Speicher und Bonus); Monatsabschluss und Sperre |
-| `vzev/app/invoices.py` | Quartalsrechnungen als PDF: Wohnung mit QR-Einzahlungsschein, Allgemeinstrom als Gesamtrechnung; Spalte «Speicher NT» und Bonus-Zeile, wenn vorhanden |
+| `vzev/app/invoices.py` | Quartalsrechnungen als PDF: Wohnung mit QR-Einzahlungsschein, Allgemeinstrom und Heizung/Warmwasser als Gesamtrechnungen; Spalte «Speicher NT» und Bonus-Zeile, wenn vorhanden; Zahlungserinnerung |
 | `vzev/app/jahr.py` | Jahresabrechnung: Allgemeinstrom-PDF für die Nebenkostenabrechnung, Mieter, Zähler pro Monat, Excel-Export |
-| `vzev/app/collector.py` | Speichert alle 15 Minuten die Zählerstände aus Home Assistant, stündlich die evcc-Ladevorgänge und stösst den Preisabruf an |
+| `vzev/app/collector.py` | Speichert alle 15 Minuten die Zählerstände aus Home Assistant (Zähler, Solis, Wärmepumpen), stündlich die evcc-Ladevorgänge und stösst Preisabruf und PV-Prognose an |
 | `vzev/app/preise.py` | Dynamische Viertelstundenpreise über die Primeo-Schnittstelle abrufen und speichern (Adresse einstellbar) |
 | `vzev/app/prognose.py` | PV-Prognose aus Solcast (Sensoren automatisch finden, Prognose und Vortags-Prognose speichern), Seite «Prognose» mit Ladefenstern und Trefferquote |
-| `vzev/app/zahlungen.py` | Rechnungsregister: Betrag, Fälligkeit, Zahlungen, Status; Übernahme von Zahlungen bei Korrekturen |
+| `vzev/app/zahlungen.py` | Rechnungsregister: Betrag, Fälligkeit, Zahlungen, Status, Erinnerungen; Übernahme von Zahlungen bei Korrekturen |
 | `vzev/app/diagramme.py` | Säulen-, Linien- und Balkendiagramme als SVG ohne externe Bibliothek |
 | `vzev/app/default_config.yaml` | Vorlage für `vzev.yaml` (ohne persönliche Daten) |
 
@@ -153,6 +160,8 @@ flowchart LR
     A --> D["stündlich, 18–21 Uhr alle 15 Min.<br/>Strompreise für morgen bei Primeo abrufen"]
     A --> P["stündlich<br/>PV-Prognose aus Solcast speichern"]
     D & P --> L["Prognose: günstige Ladefenster,<br/>Trefferquote der Vortags-Prognose"]
+    A --> SN["alle 15 Min. und nach jeder Berechnung<br/>Sensoren sensor.vzev_* an Home Assistant"]
+    L --> SN
 ```
 
 </details>
@@ -165,16 +174,18 @@ flowchart LR
 
 ```mermaid
 flowchart TD
+    AS["Aufgaben-Assistent<br/>zeigt pro offenem Monat den nächsten Schritt"] -.-> A
     A["Primeo-Kundenportal: Lastgänge aller 5 Zähler exportieren<br/>go-e: Ladevorgänge exportieren"] --> B["Daten importieren: Dateien hochladen<br/>Zuordnung über die Messpunkt-Nummer, alte Fassung wird ersetzt"]
-    B --> C{"Übersicht: Kontrollen ok?<br/>Lücken, Ladestation, Abgleich"}
+    B --> C{"Übersicht: Kontrollen ok?<br/>Lücken, Ladestation, Abgleich, Wärmepumpen, Netzladung"}
     C -- nein --> B
     C -- ja --> D["Primeo-Rechnung erfassen (Seite «Tarife»)<br/>Netzbezug HT/NT und Rücklieferung für den Abgleich"]
     D --> E["Tarife prüfen<br/>Rückliefertarif des Quartals eintragen, sobald publiziert"]
     E --> F["Abschluss: Monat abschliessen<br/>Werte werden festgehalten und gesperrt"]
-    F --> G["Rechnungen: Quartal erstellen<br/>PDF pro Mietverhältnis + Allgemeinstrom"]
+    F --> G["Rechnungen: Quartal erstellen<br/>PDF pro Mietverhältnis + Allgemeinstrom + Heizung/Warmwasser"]
     G --> H["Rechnungen versenden<br/>Allgemeinstrom in die Nebenkostenabrechnung"]
     H --> Z["Zahlungseingang erfassen<br/>offen, teilweise, überfällig, bezahlt"]
-    Z -. "Jahresende" .-> J["Jahresabrechnung<br/>Allgemeinstrom-PDF für die Nebenkostenabrechnung, Excel"]
+    Z -- überfällig --> ER["Zahlungserinnerung (PDF)<br/>offener Betrag, neue Frist, Einzahlungsschein"]
+    Z -. "Jahresende" .-> J["Jahresabrechnung<br/>Allgemeinstrom- und Heizungs-PDF für die Nebenkostenabrechnung, Excel"]
 ```
 
 </details>
@@ -232,7 +243,10 @@ So fliessen sie ab 2027 in die Abrechnung ein (Entscheid Betreiber):
 | `rechnungen/` | erstellte PDFs, `register.json` (Rechnungen, Fälligkeiten, Zahlungen); ersetzte Fassungen unter `rechnungen/_alt/` |
 | `vzev.log` | Protokoll (auch in der App unter «Protokoll») |
 
-Alles liegt im Konfigurationsordner der App und ist im Home-Assistant-Backup enthalten.
+Alles liegt im Konfigurationsordner der App und ist im Home-Assistant-Backup enthalten. Das Backup läuft im laufenden
+Betrieb (`backup: hot`); Zwischenspeicher (`.cache/`, `*.pkl`) sind ausgenommen. Zusätzlich lädt **Einstellungen →
+Datei vzev.yaml → Sicherung herunterladen** alles als ZIP herunter, die Datenbank als konsistente Kopie
+(SQLite-Sicherungsfunktion). Wiederherstellen: Inhalt in den Konfigurationsordner kopieren, App neu starten.
 
 ## Entwicklung
 
