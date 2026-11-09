@@ -205,6 +205,7 @@ def im_hintergrund_rechnen(grund="Hintergrund"):
             if any(p.is_file() for p in PRIMEO.iterdir()):
                 liste()  # Dateiinfos für «Daten importieren»
                 berechnung(grund)
+                sensoren.aktualisieren()
         except Exception:
             log.exception("Berechnung im Hintergrund fehlgeschlagen")
     threading.Thread(target=lauf, daemon=True).start()
@@ -596,6 +597,9 @@ RECH = """
 {% if r.art != 'allgemein' %}<label class="feld">Fällig <input type="date" name="faellig" value="{{ r.faellig }}"></label>{% endif %}
 <button>Übernehmen</button></form><p class="muted">Ändert das Register (Fälligkeit, Status), nicht das PDF. Fällig leer = Datum + Zahlungsfrist.</p></details>
 {% if r.art == 'allgemein' %}<span class="muted">für die Nebenkostenabrechnung</span>{% else %}
+{% for e in r.erinnerungen or [] %}<div class="muted"><a href="datei?pfad={{ e.datei }}" target="_blank">Erinnerung {{ e.datum|dmy }}</a> (Frist {{ e.frist|dmy }})</div>{% endfor %}
+{% if r.stand == 'überfällig' %}<form class="inline" method="post" action="erinnerung" target="_blank"><input type="hidden" name="key" value="{{ r.key }}">
+<button title="PDF mit offenem Betrag und Einzahlungsschein">{{ 'Erinnerung' if not r.erinnerungen else (r.erinnerungen|length + 1)|string + '. Erinnerung' }} (PDF)</button></form>{% endif %}
 {% for zz in r.zahlungen %}<form class="inline" method="post" action="zahlung_entfernen" onsubmit="return confirm('Zahlung vom {{ zz.datum|dmy }} über CHF {{ zz.betrag|f2 }} entfernen?')">
 <input type="hidden" name="key" value="{{ r.key }}"><input type="hidden" name="index" value="{{ loop.index0 }}">
 <span class="muted">{{ zz.datum|dmy }}: {{ zz.betrag|f2 }}{{ ' · ' ~ zz.notiz if zz.notiz }}</span> <button title="Zahlung entfernen" style="min-height:28px;padding:0 8px">×</button></form><br>{% endfor %}
@@ -770,7 +774,50 @@ def sammler():
 EINST = """
 <div class="card"><h2>Konfiguration (vzev.yaml)</h2>
 <form method="post" action="einstellungen?tab=datei"><textarea name="text" rows="40">{{ text }}</textarea>
-<p><button class="primary">Speichern</button> <span class="muted">Wird vor dem Speichern geprüft; die vorherige Version bleibt als vzev.yaml.bak erhalten.</span></p></form></div>"""
+<p><button class="primary">Speichern</button> <span class="muted">Wird vor dem Speichern geprüft; die vorherige Version bleibt als vzev.yaml.bak erhalten.</span></p></form></div>
+<div class="card"><h2>Datensicherung</h2>
+<p>Alle Daten der App liegen im Konfigurationsordner der App und sind im Backup von Home Assistant enthalten (ohne Zwischenspeicher).
+Zusätzlich lässt sich hier jederzeit eine vollständige Kopie herunterladen: Konfiguration, Lastgänge, Ladevorgänge, Rechnungen,
+Zahlungsregister, Abschlüsse und die gesammelten Messwerte.</p>
+<p><a class="btn primary" href="sicherung">Sicherung herunterladen (ZIP)</a></p>
+<p class="muted">Wiederherstellen: Inhalt der ZIP-Datei in den Konfigurationsordner der App kopieren (z. B. mit Samba oder dem File editor) und die App neu starten.</p></div>"""
+
+
+@app.route("/erinnerung", methods=["POST"])
+def erinnerung():
+    import zahlungen
+    try:
+        rel, offen, frist = zahlungen.erinnerung(request.form["key"])
+        log.info("Zahlungserinnerung %s erstellt: CHF %.2f, Frist %s", rel, offen, frist)
+        return redirect(f"datei?pfad={rel}")
+    except (ValueError, KeyError) as e:
+        return redirect(f"rechnungen?c=warn&msg=Keine Erinnerung: {e}")
+
+
+@app.route("/sicherung")
+def sicherung():
+    """Alle Daten als ZIP; SQLite über die Sicherungsfunktion kopiert, damit laufende Schreibvorgänge nichts verfälschen."""
+    import io
+    import sqlite3
+    import tempfile
+    import zipfile
+    puffer = io.BytesIO()
+    with zipfile.ZipFile(puffer, "w", zipfile.ZIP_DEFLATED) as z, tempfile.TemporaryDirectory() as tmp:
+        for p in sorted(DATA.rglob("*")):
+            rel = p.relative_to(DATA)
+            if not p.is_file() or rel.parts[0] == ".cache" or p.suffix in (".tmp", ".pkl") or p.name.endswith(("-journal", "-wal", "-shm")):
+                continue
+            if p.suffix == ".sqlite":
+                kopie = Path(tmp) / p.name
+                with sqlite3.connect(p) as quelle, sqlite3.connect(kopie) as ziel:
+                    quelle.backup(ziel)
+                z.write(kopie, str(rel))
+            else:
+                z.write(p, str(rel))
+    log.info("Datensicherung heruntergeladen (%.1f MB)", puffer.tell() / 1e6)
+    puffer.seek(0)
+    return send_file(puffer, mimetype="application/zip", as_attachment=True,
+                     download_name=f"vzev-sicherung-{datetime.now():%Y-%m-%d-%H%M}.zip")
 
 
 @app.route("/einstellungen", methods=["GET", "POST"])
@@ -844,6 +891,21 @@ import fluss  # noqa: E402
 fluss.register(app, sys.modules[__name__])
 import aufgaben  # noqa: E402
 aufgaben.register(app, sys.modules[__name__])
+import sensoren  # noqa: E402
+sensoren.register(app, sys.modules[__name__], starten=not os.environ.get("VZEV_KEINE_SENSOREN"))
+
+
+@app.route("/sensoren_schreiben", methods=["POST"])
+def sensoren_schreiben():
+    try:
+        w = sensoren.schreiben()
+        st = sensoren.status()
+        if st["fehler"]:
+            return redirect(f"einstellungen?tab=zaehler&c=warn&msg=Sensoren nicht geschrieben: {st['fehler']}")
+        return redirect(f"einstellungen?tab=zaehler&msg={len(w)} Sensoren geschrieben")
+    except Exception as e:
+        log.exception("Sensoren")
+        return redirect(f"einstellungen?tab=zaehler&c=warn&msg=Sensoren: {e}")
 app.jinja_env.filters["dmy"] = lambda x: "" if not x else f"{str(x)[8:10]}.{str(x)[5:7]}.{str(x)[:4]}"
 
 # --- Protokoll ----------------------------------------------------------------

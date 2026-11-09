@@ -494,3 +494,73 @@ if __name__ == "__main__":
     a = sys.argv
     for name, total, rows in main(a[1], int(a[2]), int(a[3]), a[4], a[5] if len(a) > 5 else None):
         print(f"{name}: CHF {total:.2f}  {rows}")
+
+
+def render_erinnerung(path, cfg, partei, rechnung, frist, stufe=1, heute=None):
+    """Zahlungserinnerung für eine offene Rechnung, mit Einzahlungsschein über den offenen Betrag.
+    rechnung = Zeile aus dem Zahlungsregister (nummer, datum, faellig, betrag, bezahlt, offen, zahlungen)."""
+    heute = heute or date.today()
+    W, H = A4
+    c = canvas.Canvas(str(path), pagesize=A4)
+    c.setTitle(f"Zahlungserinnerung {rechnung['nummer']}")
+    b = cfg["betreiber"]
+    L, R = 20 * mm, W - 20 * mm
+    y = H - 20 * mm
+    c.setFillColor(INK)
+    c.setFont("Helvetica-Bold", 13)
+    c.drawString(L, y, b["name"])
+    c.setFont("Helvetica", 8.5)
+    c.setFillColor(MUTED)
+    c.drawString(L, y - 5 * mm, f"{b['strasse']} {b['hausnr']} · {b['plz']} {b['ort']}")
+    c.drawString(L, y - 9 * mm, f"{b['bank']} · IBAN {iban_fmt(b['iban'])}")
+    c.setStrokeColor(AMBER)
+    c.setLineWidth(1.5)
+    c.line(L, y - 13 * mm, R, y - 13 * mm)
+    ry = H - 52 * mm
+    c.setFillColor(INK)
+    c.setFont("Helvetica", 10)
+    for i, ln in enumerate([partei["name"], f"{partei['strasse']} {partei['hausnr']}", f"{partei['plz']} {partei['ort']}"]):
+        c.drawString(118 * mm, ry - i * 4.6 * mm, ln)
+    c.setFont("Helvetica", 8.5)
+    for i, (k, v) in enumerate([("Datum", de(heute)), ("Rechnung", rechnung["nummer"]), ("vom", de(date.fromisoformat(rechnung["datum"])))]):
+        c.setFillColor(MUTED)
+        c.drawString(L, ry - i * 4.6 * mm, k)
+        c.setFillColor(INK)
+        c.drawString(L + 20 * mm, ry - i * 4.6 * mm, v)
+    ty = H - 82 * mm
+    c.setFont("Helvetica-Bold", 15)
+    c.drawString(L, ty, "Zahlungserinnerung" if stufe == 1 else f"{stufe}. Zahlungserinnerung")
+    c.setFont("Helvetica", 10)
+    anrede = f"Guten Tag {partei['name']}"
+    text = [anrede, "",
+            f"Die Stromabrechnung {rechnung['nummer']} vom {de(date.fromisoformat(rechnung['datum']))} war am "
+            f"{de(date.fromisoformat(rechnung['faellig']))} fällig.",
+            "Nach unseren Unterlagen ist der folgende Betrag noch offen. Möglicherweise hat sich Ihre Zahlung mit",
+            "diesem Schreiben gekreuzt – dann betrachten Sie es bitte als gegenstandslos.", ""]
+    yy = ty - 10 * mm
+    for ln in text:
+        c.drawString(L, yy, ln)
+        yy -= 5 * mm
+    # Aufstellung
+    zeilen = [("Rechnungsbetrag", rechnung["betrag"])]
+    for z in rechnung.get("zahlungen", []):
+        zeilen.append((f"Zahlung vom {de(date.fromisoformat(z['datum']))}", -z["betrag"]))
+    c.setFont("Helvetica", 9.5)
+    for k, v in zeilen:
+        c.drawString(L + 4 * mm, yy, k)
+        c.drawRightString(L + 120 * mm, yy, f"CHF {chf(v)}")
+        yy -= 5.5 * mm
+    c.setStrokeColor(LINE)
+    c.line(L + 4 * mm, yy + 3.5 * mm, L + 120 * mm, yy + 3.5 * mm)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(L + 4 * mm, yy - 1 * mm, "Offener Betrag")
+    c.drawRightString(L + 120 * mm, yy - 1 * mm, f"CHF {chf(rechnung['offen'])}")
+    yy -= 12 * mm
+    c.setFont("Helvetica", 10)
+    for ln in [f"Bitte überweisen Sie den offenen Betrag bis {de(frist)} mit dem Einzahlungsschein unten.",
+               "Bei Fragen zur Abrechnung melden Sie sich gerne.", "", "Freundliche Grüsse", b["name"]]:
+        c.drawString(L, yy, ln)
+        yy -= 5 * mm
+    draw_qr_bill(c, cfg, {"partei": partei}, rechnung["offen"], rechnung["nummer"])
+    c.showPage()
+    c.save()

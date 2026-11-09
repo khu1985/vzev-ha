@@ -121,7 +121,8 @@ def test_formulare_speichern_ohne_werte_zu_aendern(app):
     for url in ["/mieter", "/tarife", "/primeo", "/einstellungen?tab=betreiber", "/einstellungen?tab=zaehler",
                 "/einstellungen?tab=regeln"]:
         h = c.get(url).get_data(as_text=True)
-        form = re.findall(r'<form method="post"[^>]*action="([^"]+)"[^>]*>(.*?)</form>', h, re.S)[-1]
+        form = [f for f in re.findall(r'<form method="post"[^>]*action="([^"]+)"[^>]*>(.*?)</form>', h, re.S)
+                if not f[0].startswith("sensoren_schreiben")][-1]   # Knopf «Jetzt schreiben» ist kein Speicherformular
         daten_ = []
         for m in re.finditer(r'<input ([^>]*)>|<select name="([^"]+)"[^>]*>(.*?)</select>', form[1], re.S):
             if m.group(1):
@@ -446,3 +447,68 @@ def test_aufgaben_assistent(app):
     assert "Nächste Aufgabe:" in h and "März 2026:" in h
     h = c.get("/tarife").get_data(as_text=True)
     assert "vzev-assistent" in h                                        # Zurück-Knopf auf allen Seiten vorbereitet
+
+
+def test_sensoren(app):
+    server, c, d, quelle = app
+    warten(server)
+    import sensoren
+    gesendet = {}
+    w = sensoren.schreiben(senden=lambda e, n: gesendet.__setitem__(e, n), heute=date(2026, 4, 20))
+    assert w and sensoren.status()["fehler"] == ""
+    for e in ("sensor.vzev_produktion_jahr", "sensor.vzev_autarkie_jahr", "sensor.vzev_ruecklieferung_jahr",
+              "sensor.vzev_wertschoepfung_jahr", "sensor.vzev_offene_rechnungen", "sensor.vzev_ueberfaellig",
+              "sensor.vzev_naechste_aufgabe", "sensor.vzev_offene_monate", "sensor.vzev_produktion_monat"):
+        assert e in gesendet, e
+    p = gesendet["sensor.vzev_produktion_jahr"]
+    assert float(p["state"]) > 0 and p["attributes"]["unit_of_measurement"] == "kWh" and p["attributes"]["state_class"] == "total"
+    assert p["attributes"]["friendly_name"] == "vZEV Produktion Jahr"
+    assert 0 < float(gesendet["sensor.vzev_autarkie_jahr"]["state"]) <= 100
+    # ohne Home Assistant: Fehler wird angezeigt, nicht abgestürzt
+    r = c.post("/sensoren_schreiben")
+    assert "Sensoren" in ziel(r)
+    h = c.get("/einstellungen?tab=zaehler").get_data(as_text=True)
+    assert "Sensoren für Home Assistant" in h and "Zuletzt geschrieben" in h
+
+
+def test_sensoren_preise_und_ladefenster(app):
+    server, c, d, quelle = app
+    import prognose
+    import sensoren
+    from test_prognose import solcast_attr
+    heute = date.today()
+    db = server.collector._db
+    prognose.speichern(db, prognose.zerlegen(solcast_attr(heute, 0.2)), jetzt=datetime.now())
+    with db() as con:
+        for i in range(96):
+            t = datetime.combine(heute, datetime.min.time()) + timedelta(minutes=15 * i)
+            preis = 0.10 if t.hour >= 22 or t.hour < 5 else 0.30
+            for typ, v in (("integrated", preis), ("grid_usage", 0.0)):
+                con.execute("INSERT OR REPLACE INTO preise VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            (t.isoformat() + typ, typ, t.isoformat(timespec="minutes"), None, v, None, "test"))
+    gesendet = {}
+    sensoren.schreiben(senden=lambda e, n: gesendet.__setitem__(e, n))
+    assert "sensor.vzev_strompreis" in gesendet and "sensor.vzev_pv_prognose_heute" in gesendet
+    preis = float(gesendet["sensor.vzev_strompreis"]["state"])
+    assert preis in (pytest.approx(10.81), pytest.approx(32.43))           # inkl. MWST
+    assert gesendet["binary_sensor.vzev_guenstig_laden"]["state"] in ("on", "off")
+
+
+def test_sicherung_und_erinnerung(app):
+    server, c, d, quelle = app
+    import io
+    import zipfile
+    import zahlungen
+    r = c.get("/sicherung")
+    assert r.status_code == 200 and r.mimetype == "application/zip"
+    namen = zipfile.ZipFile(io.BytesIO(r.data)).namelist()
+    assert "vzev.yaml" in namen and "messwerte.sqlite" in namen and not any(n.startswith(".cache") for n in namen)
+    zahlungen.nachtragen()
+    reg = zahlungen.laden()
+    key = next(k for k, x in reg["rechnungen"].items() if x["art"] == "wohnung" and x["status"] == "aktiv"
+               and zahlungen.stand(x)["offen"] and zahlungen.stand(x)["offen"] > 0)
+    rel, offen, frist = zahlungen.erinnerung(key, heute=date(2027, 3, 1))
+    assert (server.RECHNUNGEN / rel).read_bytes()[:4] == b"%PDF" and frist == date(2027, 3, 15)
+    assert zahlungen.laden()["rechnungen"][key]["erinnerungen"][0]["offen"] == offen
+    zahlungen.nachtragen()
+    assert not any("Erinnerung_" in x["datei"] for x in zahlungen.laden()["rechnungen"].values())   # kein neuer Registereintrag

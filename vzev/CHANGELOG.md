@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.0
+
+- Sensoren für Home Assistant (wie in der Finanz-App): Produktion, Autarkie, Rücklieferung und Wertschöpfung (Monat, Jahr), offene und überfällige Rechnungen, nächste Aufgabe, PV-Prognose, dynamischer Strompreis, `binary_sensor.vzev_guenstig_laden` und nächstes Ladefenster – für Dashboards und Automationen. Einstellungen und Stand unter Einstellungen → Zähler.
+- Zahlungserinnerung: Bei überfälligen Rechnungen ein PDF mit offenem Betrag, neuer Frist und Einzahlungsschein; im Register vermerkt.
+- Datensicherung: Backup im laufenden Betrieb (`backup: hot`, ohne Zwischenspeicher) und «Sicherung herunterladen» als ZIP.
+
 ## 0.12.0
 
 - Aufgaben-Assistent (Abrechnung → Aufgaben): führt Monat für Monat durch die regelmässigen Arbeiten – Lastgänge und Wallbox-Export importieren, Primeo-Rechnung erfassen, Kontrollen prüfen, Monat abschliessen; am Quartalsende Rechnungen erstellen, versenden und Zahlungen erfassen; am Jahresende die Jahresabrechnung. Erledigte Schritte erkennt die App selbst, «versendet» wird von Hand bestätigt.

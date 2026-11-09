@@ -77,7 +77,8 @@ def nachtragen():
     bekannt = {r["datei"] for r in reg["rechnungen"].values()}
     import re
     fehlend = [p for p in S.RECHNUNGEN.glob("*/*.pdf")  # nur Quartalsordner wie 2026-Q3
-               if re.fullmatch(r"\d{4}-Q[1-4]", p.parent.name) and f"{p.parent.name}/{p.name}" not in bekannt]
+               if re.fullmatch(r"\d{4}-Q[1-4]", p.parent.name) and p.name.startswith("Rechnung_")  # keine Erinnerungen
+               and f"{p.parent.name}/{p.name}" not in bekannt]
     if not fehlend:
         return
     b = S.berechnung() if any(S.PRIMEO.iterdir()) else {}
@@ -176,3 +177,27 @@ def zahlung_entfernen(key, index):
 def register(app, server):
     global S
     S = server
+
+
+def erinnerung(key, heute=None):
+    """Zahlungserinnerung als PDF für eine offene Rechnung; im Register vermerkt. Gibt den Pfad relativ zu rechnungen/ zurück."""
+    import invoices
+    heute = heute or date.today()
+    reg = laden()
+    r = reg["rechnungen"][key]
+    st = stand(r, heute)
+    if r["art"] != "wohnung" or not st["offen"] or st["offen"] <= 0.004:
+        raise ValueError("Für diese Rechnung ist nichts offen")
+    cfg = S.config()
+    partei = next((m for m in cfg.get("mietverhaeltnisse") or [] if m.get("name") == r["partei"]), None)
+    if not partei or not all(partei.get(k) for k in ("strasse", "hausnr", "plz", "ort")):
+        raise ValueError(f"Adresse von {r['partei']} fehlt (Seite «Mieter»)")
+    frist = heute + timedelta(days=int((cfg.get("rechnungen") or {}).get("erinnerung_frist_tage", 14)))
+    stufe = len(r.get("erinnerungen", [])) + 1
+    rel = f"{r['quartal']}/Erinnerung_{r['nummer']}_{heute.isoformat()}{'' if stufe == 1 else f'_{stufe}'}.pdf"
+    pfad = S.RECHNUNGEN / rel
+    pfad.parent.mkdir(parents=True, exist_ok=True)
+    invoices.render_erinnerung(pfad, cfg, partei, st, frist, stufe, heute)
+    r.setdefault("erinnerungen", []).append({"datum": heute.isoformat(), "frist": frist.isoformat(), "datei": rel, "offen": st["offen"]})
+    speichern(reg)
+    return rel, st["offen"], frist

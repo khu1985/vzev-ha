@@ -8,6 +8,7 @@ HIER = Path(__file__).parent
 sys.path.insert(0, str(HIER))
 sys.path.insert(0, str(HIER.parent / "vzev" / "app"))
 os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
+os.environ.setdefault("VZEV_KEINE_SENSOREN", "1")  # kein Hintergrund-Thread in den Tests
 
 import daten  # noqa: E402
 
