@@ -5,6 +5,7 @@ Abgeschlossene Monate sind gesperrt: Änderungen, die sie betreffen würden, wer
 mit Begründung wieder geöffnet wird.
 """
 import json
+import re
 import shutil
 from datetime import date, datetime, timedelta
 
@@ -13,6 +14,7 @@ import yaml
 from flask import redirect, render_template_string, request
 
 import core
+import sensoren
 
 S = None  # server-Modul, wird in register() gesetzt
 
@@ -686,7 +688,15 @@ ab dem Tag, an dem der Datensammler die Sensoren speichert. Faktor: Korrektur, f
 <div class="card"><h2>PV-Prognose (Solcast)</h2><table class="form"><tr><td class="l">Sensoren</td><td class="l">
 <input name="solcast" value="{{ solcast }}" style="width:100%;max-width:520px" placeholder="leer = automatisch finden"></td></tr></table>
 <p class="muted">Leer lassen: Die App nimmt alle Sensoren mit Halbstunden-Prognose («detailedForecast»). Sonst Sensoren mit Komma getrennt, z. B. Prognose heute und morgen.</p></div>
-<p><button class="primary">Speichern</button></p></form>"""
+<div class="card"><h2>Sensoren für Home Assistant</h2><table class="form">
+<tr><td class="l">Liefern</td><td class="l"><label><input type="checkbox" name="sensoren_aktiv" value="1" {{ 'checked' if sens_aktiv }}> Kennzahlen als Sensoren an Home Assistant schreiben</label></td></tr>
+<tr><td class="l">Präfix</td><td class="l"><input name="sensoren_praefix" value="{{ sens_praefix }}" style="width:160px"> <span class="muted">→ sensor.{{ sens_praefix }}_autarkie_jahr …</span></td></tr></table>
+<p class="muted">Für Dashboards, Verlauf und Automationen (z. B. Boiler oder Batterie, wenn binary_sensor.{{ sens_praefix }}_guenstig_laden «an» ist). Alle 15 Minuten und nach jeder Berechnung neu geschrieben.</p></div>
+<p><button class="primary">Speichern</button></p></form>
+<div class="card"><h2>Zuletzt geschrieben</h2>{% if sens.zeit %}<p>{{ sens.zeit|replace('T', ' ') }} · {{ sens.anzahl }} Sensoren{% if sens.fehler %} · <b>Fehler:</b> {{ sens.fehler }}{% endif %}</p>
+{% if sens.werte %}<div class="scroll"><table><tr><th class="l">Entität</th><th>Wert</th></tr>{% for e, w, u in sens.werte %}<tr><td class="l"><code>{{ e }}</code></td><td>{{ w }} {{ u }}</td></tr>{% endfor %}</table></div>{% endif %}
+{% for k, v in sens.bereich_fehler.items() %}<p class="muted">{{ k }}: {{ v }}</p>{% endfor %}{% else %}<p class="muted">Noch nicht geschrieben (startet kurz nach dem Start der App).</p>{% endif %}
+<form method="post" action="sensoren_schreiben" data-busy="Sensoren werden geschrieben …"><button>Jetzt schreiben</button></form></div>"""
 
 PREISKARTE = """<div class="card"><h2>Dynamische Strompreise</h2>
 <p>{{ p.status }}{% if p.letzter %} · zuletzt {{ p.letzter }}{% endif %}{% if p.naechster %} · nächster Abruf {{ p.naechster }}{% endif %}</p>
@@ -777,6 +787,12 @@ def einstellungen_formulare(tab):
                     ha["solcast"] = sc
                 abschnitt_speichern("messpunkte", {r["mp"]: r["z"] for r in mp})
                 abschnitt_speichern("homeassistant", ha)
+                sens = {"aktiv": bool(request.form.get("sensoren_aktiv")),
+                        "praefix": (request.form.get("sensoren_praefix") or "vzev").strip().lower().replace(" ", "_")}
+                if not re.fullmatch(r"[a-z][a-z0-9_]{0,30}", sens["praefix"]):
+                    raise ValueError("Präfix: Kleinbuchstaben, Ziffern und _ (z. B. vzev)")
+                if cfg.get("sensoren") or sens != {"aktiv": True, "praefix": "vzev"}:
+                    abschnitt_speichern("sensoren", sens, "Sensoren für Home Assistant – bearbeitet in der App")
             elif tab == "batterie":
                 f = lambda k: float((request.form.get(k) or "0").replace(",", "."))
                 sp = {"speicher_ab": _d(request.form.get("speicher_ab") or "2027-01-01"),
@@ -815,6 +831,7 @@ def einstellungen_formulare(tab):
         body = render_template_string(ZAEHLER, t_mp=editor("mp", F_MP, [dict(mp=k, z=v) for k, v in (cfg.get("messpunkte") or {}).items()]),
                                       t_ha=editor("ha", F_HA, [dict(z=k, e=v) for k, v in ((cfg.get("homeassistant") or {}).get("zaehler") or {}).items()]),
                                       solcast=", ".join((cfg.get("homeassistant") or {}).get("solcast") or []),
+                                      sens_aktiv=sensoren.einstellungen(cfg)[0], sens_praefix=sensoren.einstellungen(cfg)[1], sens=sensoren.status(),
                                       t_wp=editor("wp", F_WP, list((cfg.get("homeassistant") or {}).get("waermepumpen") or [])),
                                       energie=S.collector.energie_sensoren())
     else:

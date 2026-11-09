@@ -1,5 +1,5 @@
 name: vZEV Abrechnung
-version: "0.12.0"
+version: "0.13.0"
 slug: vzev
 description: vZEV-Abrechnung – Primeo-Lastgänge, Ladestation, Rechnungen mit QR-Einzahlungsschein
 url: https://github.com/khu1985/vzev-ha
@@ -16,6 +16,11 @@ panel_title: vZEV
 homeassistant_api: true
 map:
   - addon_config:rw
+backup: hot
+backup_exclude:
+  - "**/.cache/**"
+  - "**/*.pkl"
+  - "**/*.tmp"
 options:
   evcc_passwort: ""
 schema:

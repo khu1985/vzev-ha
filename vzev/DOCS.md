@@ -84,6 +84,34 @@ Wärmepumpen für Heizung und Warmwasser, die am Allgemeinzähler hängen, werde
 - Gemessen wird ab dem Tag, an dem der Datensammler die Sensoren speichert; davor bleibt der Verbrauch im Allgemeinstrom. Kurze Lücken (bis 4 Stunden) werden gleichmässig verteilt.
 - Die Übersicht prüft, ob die Werte vollständig ankommen.
 
+## Sensoren in Home Assistant
+
+Die App liefert ihre Kennzahlen als Sensoren an Home Assistant – für Dashboards, Verlauf und Automationen. Ein- und
+ausschalten sowie das Präfix (Standard `vzev`) unter **Einstellungen → Zähler → Sensoren für Home Assistant**; dort steht
+auch, was zuletzt geschrieben wurde. Die App schreibt sie beim Start, alle 15 Minuten und nach jeder neuen Berechnung.
+
+| Sensor | Inhalt |
+|---|---|
+| `sensor.vzev_produktion_monat`, `_produktion_jahr` | PV-Produktion in kWh (laufender Monat, Jahr bisher) |
+| `sensor.vzev_autarkie_monat`, `_autarkie_jahr` | Anteil Solarstrom am Verbrauch in % |
+| `sensor.vzev_ruecklieferung_monat`, `_ruecklieferung_jahr` | Rücklieferung in kWh |
+| `sensor.vzev_wertschoepfung_monat`, `_wertschoepfung_jahr` | Wertschöpfung in CHF (Aufteilung als Attribute) |
+| `sensor.vzev_offene_rechnungen`, `_ueberfaellig` | offener Betrag in CHF (Liste als Attribut), Anzahl überfällig |
+| `sensor.vzev_naechste_aufgabe`, `_offene_monate` | nächster Schritt aus dem Aufgaben-Assistenten, Anzahl offener Monate |
+| `sensor.vzev_pv_prognose_heute`, `_pv_prognose_morgen` | Solcast-Prognose in kWh |
+| `sensor.vzev_strompreis` | dynamischer Preis jetzt in Rp./kWh inkl. Konzessionsabgabe und MWST (Tief/Hoch des Tages als Attribute) |
+| `binary_sensor.vzev_guenstig_laden` | «an», solange ein günstiges Ladefenster läuft (wie auf der Seite «Prognose») |
+| `sensor.vzev_naechstes_ladefenster` | Beginn des nächsten Ladefensters (Ende, Preis, fehlende kWh als Attribute) |
+
+Beispiel für eine Automation: Boiler oder Batterie laden, solange `binary_sensor.vzev_guenstig_laden` an ist.
+Preis und Ladefenster gibt es erst, wenn dynamische Preise abgerufen werden.
+
+## Zahlungserinnerung
+
+Bei überfälligen Rechnungen erstellt **Rechnungen → Erinnerung (PDF)** ein Schreiben mit Aufstellung (Rechnung, Zahlungen,
+offener Betrag), neuer Frist (Standard 14 Tage, `rechnungen.erinnerung_frist_tage`) und Einzahlungsschein über den offenen
+Betrag. Jede Erinnerung wird bei der Rechnung vermerkt; weitere zählen als 2., 3. Erinnerung.
+
 ## PV-Prognose
 
 Voraussetzung ist die Solcast-Integration in Home Assistant (HACS «Solcast PV Forecast»). Die App sucht stündlich alle Sensoren mit Halbstunden-Prognose (Attribut `detailedForecast`) und speichert sie in `messwerte.sqlite`. Sollen nur bestimmte Sensoren zählen, unter **Einstellungen → Zähler → PV-Prognose** eintragen.
@@ -102,8 +130,13 @@ Alles liegt im Konfigurationsordner der App (`/addon_configs/…_vzev/`) und ist
 | `primeo/` | importierte Lastgänge und Wallbox-Export; ersetzte Dateien unter `primeo/_entfernt/` |
 | `rechnungen/` | PDFs, `register.json` (Rechnungen und Zahlungen), alte Fassungen unter `_alt/` |
 | `abschluss.json` | abgeschlossene Monate mit festgehaltenen Werten, Korrekturen |
-| `messwerte.sqlite` | Zählerstände, evcc-Ladevorgänge, dynamische Strompreise |
+| `messwerte.sqlite` | Zählerstände, evcc-Ladevorgänge, dynamische Strompreise, PV-Prognosen |
+| `aufgaben.json` | im Assistenten als versendet markierte Rechnungen |
 | `vzev.log` | Protokoll |
+
+Das Backup läuft im laufenden Betrieb (`backup: hot`); Zwischenspeicher (`.cache/`) sind ausgenommen. Zusätzlich lädt
+**Einstellungen → Datei vzev.yaml → Sicherung herunterladen** alles als ZIP herunter (die Datenbank als konsistente Kopie).
+Wiederherstellen: Inhalt in den Konfigurationsordner der App kopieren und die App neu starten.
 
 ## Optionen
 
