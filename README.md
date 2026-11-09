@@ -9,6 +9,12 @@ Monatsabschluss, Jahresabrechnung und dynamische Strompreise (ab 2027 mit Bonus 
 Home Assistant → Einstellungen → Apps → App-Store → ⋮ → Repositories →
 `https://github.com/khu1985/vzev-ha` hinzufügen, dann «vZEV Abrechnung» installieren.
 
+**Vorabversion testen:** Statt der Adresse oben `https://github.com/khu1985/vzev-ha#tests` hinzufügen. Damit
+installiert Home Assistant den Stand des Branches `tests` (siehe [Entwicklung](#entwicklung)). Beide Fassungen lassen
+sich nebeneinander installieren; jede hat ihren eigenen Konfigurationsordner (`/addon_configs/<…>_vzev/`). Zum Testen
+mit echten Daten den Inhalt des Ordners der stabilen Fassung in den der Vorabversion kopieren (Samba, File editor,
+Studio Code Server); die Vorabversion sammelt danach selbst weiter.
+
 Persönliche Daten (Namen, IBAN, Messpunkte, Tarife) gehören nicht in dieses Repository,
 sondern in die Konfiguration der App (Seite «Einstellungen»).
 
@@ -225,6 +231,26 @@ So fliessen sie ab 2027 in die Abrechnung ein (Entscheid Betreiber):
 
 Alles liegt im Konfigurationsordner der App und ist im Home-Assistant-Backup enthalten.
 
+## Entwicklung
+
+| Branch | Zweck | In Home Assistant |
+|---|---|---|
+| `main` | stabile Fassung | `https://github.com/khu1985/vzev-ha` |
+| `tests` | Vorabversion zum Ausprobieren | `https://github.com/khu1985/vzev-ha#tests` |
+
+Ablauf für Änderungen:
+
+1. Änderung auf `tests` committen, Version in `vzev/config.yaml` erhöhen und `vzev/CHANGELOG.md` ergänzen.
+2. GitHub Actions prüfen den Stand (siehe unten).
+3. In Home Assistant die Vorabversion aktualisieren und ausprobieren.
+4. Wenn alles passt, `tests` nach `main` übernehmen (Fast-forward oder Pull Request) – die stabile Fassung erhält das Update.
+
+Home Assistant bietet ein Update nur an, wenn die Version in `vzev/config.yaml` höher ist.
+
+Diagramme: Quellen als Mermaid in `docs/*.mmd`, daraus die SVGs mit
+`for f in docs/*.mmd; do mmdc -i "$f" -o "${f%.mmd}.svg" -b white; done` erzeugen (Architektur und monatlicher
+Prozess als Handzeichnung aus `docs/grafiken.py`).
+
 ## Tests
 
 `tests/` prüft Rechenkern, Rechnungen, Vorschau und Web-App mit erfundenen Daten (keine echten Messpunkte oder Namen).
@@ -232,14 +258,22 @@ Die Werte sind so gewählt, dass sich die Ergebnisse von Hand nachrechnen lassen
 Ladestation vollständig verteilt, Grundpreis nach Miettagen, Sperre abgeschlossener Monate, Speicher NT (zuerst geladen,
 zuerst verbraucht) und Bonus (nie negativ, ohne Preis kein Bonus).
 
-GitHub führt die Tests bei jeder Änderung aus (`.github/workflows/tests.yml`):
+GitHub führt die Tests bei jedem Push auf `main` und `tests` und bei jedem Pull Request aus
+(`.github/workflows/tests.yml`):
 
 - **Wie im Home Assistant:** im gleichen Debian-Basisimage mit den gleichen Paketversionen wie die App (dort läuft z. B. eine ältere pandas-Version)
 - **Neueste Paketversionen:** zeigt früh, wenn künftige Versionen etwas brechen
 - **App-Image bauen:** baut das Docker-Image wie Home Assistant und prüft, dass die App startet
 
-Lokal: `python3 -m pytest tests`. Home Assistant nutzt Python 3.11; der Lauf «Wie im Home Assistant» fängt
-Syntax ab, die erst neuere Python-Versionen kennen.
+Lokal:
+
+```sh
+python3 -m pytest tests
+VZEV_DIR=/tmp/vzev python3 vzev/app/server.py   # App unter http://localhost:8099
+```
+
+Home Assistant nutzt Python 3.11; der Lauf «Wie im Home Assistant» fängt Syntax ab, die erst neuere Python-Versionen
+kennen. Das AppArmor-Profil lässt sich nur in Home Assistant prüfen; nach Änderungen daran zuerst über `tests` ausprobieren.
 
 ## Änderungen
 
