@@ -42,6 +42,15 @@ def _emit(v, ind=""):
     return out
 
 
+def _erster_offener_tag():
+    """Erster Tag nach dem zuletzt abgeschlossenen Monat (sonst 1. Januar des laufenden Jahres)."""
+    m = sorted(abschluss_laden()["monate"])
+    if m:
+        p = pd.Period(m[-1], "M") + 1
+        return p.start_time.date().isoformat()
+    return date(date.today().year, 1, 1).isoformat()
+
+
 def abschnitt_speichern(name, wert, kommentar=None):
     """Ersetzt einen Abschnitt der obersten Ebene in vzev.yaml."""
     text = S.CFG.read_text(encoding="utf-8")
@@ -684,6 +693,7 @@ ZAEHLER = """<form method="post" action="einstellungen?tab=zaehler"><div class="
 <p class="muted">Zählerstände in kWh (oder Wh), die immer weiter steigen – z. B. der Energie-Sensor des Shelly und der Stromverbrauch der Wärmepumpe.
 Ihr Verbrauch wird pro Viertelstunde aus dem Allgemeinstrom herausgerechnet und als «Heizung und Warmwasser» separat abgerechnet,
 ab dem Tag, an dem der Datensammler die Sensoren speichert. Faktor: Korrektur, falls die Wärmepumpe den Strom nur schätzt (z. B. 1.1).
+Wärme-Sensor (optional): erzeugte Wärme in kWh, z. B. von der Wärmepumpe oder einem Wärmezähler – daraus rechnet die App die Jahresarbeitszahl.
 {% if not energie %}Die Liste der Sensoren erscheint, wenn die App im Home Assistant läuft.{% endif %}</p></div>
 <div class="card"><h2>PV-Prognose (Solcast)</h2><table class="form"><tr><td class="l">Sensoren</td><td class="l">
 <input name="solcast" value="{{ solcast }}" style="width:100%;max-width:520px" placeholder="leer = automatisch finden"></td></tr></table>
@@ -693,6 +703,13 @@ ab dem Tag, an dem der Datensammler die Sensoren speichert. Faktor: Korrektur, f
 <tr><td class="l">Präfix</td><td class="l"><input name="sensoren_praefix" value="{{ sens_praefix }}" style="width:160px"> <span class="muted">→ sensor.{{ sens_praefix }}_autarkie_jahr …</span></td></tr></table>
 <p class="muted">Für Dashboards, Verlauf und Automationen (z. B. Boiler oder Batterie, wenn binary_sensor.{{ sens_praefix }}_guenstig_laden «an» ist). Alle 15 Minuten und nach jeder Berechnung neu geschrieben.</p></div>
 <p><button class="primary">Speichern</button></p></form>
+{% if wp_aktiv %}<div class="card"><h2>Wärmepumpen rückwirkend</h2>
+<p>Home Assistant speichert für Energie-Zähler stündliche Werte dauerhaft (Langzeit-Statistik). Daraus füllt die App die Zeit vor ihrer ersten
+eigenen Ablesung – eigene Werte werden nicht überschrieben. Danach wird der Verbrauch auch für diese Zeit aus dem Allgemeinstrom herausgerechnet.</p>
+<form method="post" action="wp_statistik" class="form" data-busy="Statistik wird aus Home Assistant gelesen …"><label>Ab <input type="date" name="ab" value="{{ wp_ab }}"></label>
+<p><button>Aus Langzeit-Statistik übernehmen</button></p></form>
+<p class="muted">Vorgeschlagen ist der erste nicht abgeschlossene Monat. Für abgeschlossene Monate ändert sich damit der Allgemeinstrom: Die Seite «Abschluss»
+meldet dann eine Abweichung, und bereits erstellte Rechnungen müssten korrigiert werden.</p></div>{% endif %}
 <div class="card"><h2>Zuletzt geschrieben</h2>{% if sens.zeit %}<p>{{ sens.zeit|replace('T', ' ') }} · {{ sens.anzahl }} Sensoren{% if sens.fehler %} · <b>Fehler:</b> {{ sens.fehler }}{% endif %}</p>
 {% if sens.werte %}<div class="scroll"><table><tr><th class="l">Entität</th><th>Wert</th></tr>{% for e, w, u in sens.werte %}<tr><td class="l"><code>{{ e }}</code></td><td>{{ w }} {{ u }}</td></tr>{% endfor %}</table></div>{% endif %}
 {% for k, v in sens.bereich_fehler.items() %}<p class="muted">{{ k }}: {{ v }}</p>{% endfor %}{% else %}<p class="muted">Noch nicht geschrieben (startet kurz nach dem Start der App).</p>{% endif %}
@@ -746,7 +763,8 @@ F_MP = [dict(key="mp", label="Messpunkt-Nummer", typ="text", breite=330),
 F_HA = [dict(key="z", label="Zähler", typ="text", breite=120), dict(key="e", label="Entität", typ="text", breite=360)]
 F_WP = [dict(key="name", label="Name", typ="text", breite=140, hinweis="z. B. Heizung"),
         dict(key="entity", label="Energie-Sensor (kWh)", typ="text", breite=360, liste="energie", hinweis="sensor.…"),
-        dict(key="faktor", label="Faktor", typ="zahl", breite=70, hinweis="1")]
+        dict(key="faktor", label="Faktor", typ="zahl", breite=70, hinweis="1"),
+        dict(key="waerme", label="Wärme-Sensor (kWh, optional)", typ="text", breite=300, liste="energie", hinweis="für die Jahresarbeitszahl")]
 
 
 def einstellungen_formulare(tab):
@@ -777,7 +795,10 @@ def einstellungen_formulare(tab):
                     raise ValueError("Jeder Zähler braucht genau eine Messpunkt-Nummer")
                 ha = dict(cfg.get("homeassistant") or {})
                 ha["zaehler"] = {r["z"]: r["e"] for r in lesen("ha", F_HA) if r["z"] and r["e"]}
-                wp = [dict(name=r["name"] or r["entity"], entity=r["entity"].strip(), faktor=r["faktor"] or 1.0) for r in lesen("wp", F_WP) if r["entity"]]
+                wp = [dict(name=r["name"] or r["entity"], entity=r["entity"].strip(), faktor=r["faktor"] or 1.0,
+                           **({"waerme": r["waerme"].strip()} if (r.get("waerme") or "").strip() else {})) for r in lesen("wp", F_WP) if r["entity"]]
+                if any(w.get("waerme") and not w["waerme"].startswith("sensor.") for w in wp):
+                    raise ValueError("Wärmepumpen: Wärme-Sensor muss mit «sensor.» beginnen")
                 if any(not w["entity"].startswith("sensor.") or not 0.5 <= w["faktor"] <= 2 for w in wp):
                     raise ValueError("Wärmepumpen: Sensor muss mit «sensor.» beginnen, Faktor zwischen 0.5 und 2")
                 if wp or ha.get("waermepumpen"):
@@ -831,6 +852,7 @@ def einstellungen_formulare(tab):
         body = render_template_string(ZAEHLER, t_mp=editor("mp", F_MP, [dict(mp=k, z=v) for k, v in (cfg.get("messpunkte") or {}).items()]),
                                       t_ha=editor("ha", F_HA, [dict(z=k, e=v) for k, v in ((cfg.get("homeassistant") or {}).get("zaehler") or {}).items()]),
                                       solcast=", ".join((cfg.get("homeassistant") or {}).get("solcast") or []),
+                                      wp_aktiv=bool((cfg.get("homeassistant") or {}).get("waermepumpen")), wp_ab=_erster_offener_tag(),
                                       sens_aktiv=sensoren.einstellungen(cfg)[0], sens_praefix=sensoren.einstellungen(cfg)[1], sens=sensoren.status(),
                                       t_wp=editor("wp", F_WP, list((cfg.get("homeassistant") or {}).get("waermepumpen") or [])),
                                       energie=S.collector.energie_sensoren())

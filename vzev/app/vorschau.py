@@ -29,11 +29,83 @@ def _deltas(werte, taeglich):
 
 
 def waermepumpen(cfg):
-    """Konfigurierte Unterzähler am Allgemeinzähler: [{name, entity, faktor}]."""
+    """Konfigurierte Unterzähler am Allgemeinzähler: [{name, entity, faktor, waerme}]."""
     out = []
     for w in (cfg.get("homeassistant") or {}).get("waermepumpen") or []:
         if isinstance(w, dict) and w.get("entity"):
-            out.append(dict(name=w.get("name") or w["entity"], entity=w["entity"], faktor=float(w.get("faktor") or 1.0)))
+            out.append(dict(name=w.get("name") or w["entity"], entity=w["entity"], faktor=float(w.get("faktor") or 1.0),
+                            waerme=w.get("waerme") or None))
+    return out
+
+
+EINHEIT_KWH = {"Wh": 0.001, "kWh": 1.0, "MWh": 1000.0, "GJ": 277.778, "MJ": 0.277778}
+
+
+def _reihen(db, eintraege, ab=None):
+    """{name: Zählerstand-Serie in kWh pro Viertelstunde} für [(name, entity, faktor)]."""
+    eintraege = [e for e in eintraege if e[1]]
+    if not eintraege:
+        return None
+    ids = [e for _, e, _ in eintraege]
+    q = f"SELECT ts, entity, wert FROM messwerte WHERE entity IN ({','.join('?' * len(ids))})" + (" AND ts >= ?" if ab else "")
+    with db() as c:
+        roh = pd.read_sql_query(q, c, params=ids + ([str(ab)] if ab else []))
+        einheit = dict(c.execute(f"SELECT entity, einheit FROM entitaeten WHERE entity IN ({','.join('?' * len(ids))})", ids).fetchall())
+    if roh.empty:
+        return None
+    roh["ts"] = pd.to_datetime(roh["ts"])
+    tab = roh.pivot_table(index="ts", columns="entity", values="wert", aggfunc="last")
+    spalten = {}
+    for name, ent, faktor in eintraege:
+        if ent in tab:
+            spalten[name] = verteilen(tab[ent].dropna()) * faktor * EINHEIT_KWH.get(einheit.get(ent) or "kWh", 1.0)
+    return pd.DataFrame(spalten).fillna(0.0) if spalten else None
+
+
+def solis_viertel(db, cfg, von, bis):
+    """PV-Ertrag und Batterie-Ladung laut Wechselrichter (Tageszähler) in kWh pro Viertelstunde, sonst None."""
+    sol = (cfg.get("homeassistant") or {}).get("solis") or {}
+    e = {"pv": sol.get("pv_heute"), "gel": sol.get("batterie_geladen_heute")}
+    if not all(e.values()):
+        return None
+    with db() as c:
+        roh = pd.read_sql_query("SELECT ts, entity, wert FROM messwerte WHERE entity IN (?, ?) AND ts >= ? AND ts <= ?", c,
+                                params=[e["pv"], e["gel"], str(von), str(bis)])
+    if roh.empty:
+        return None
+    roh["ts"] = pd.to_datetime(roh["ts"])
+    tab = roh.pivot_table(index="ts", columns="entity", values="wert", aggfunc="last")
+    if e["pv"] not in tab or e["gel"] not in tab:
+        return None
+    return pd.DataFrame({"pv": _deltas(tab[e["pv"]].dropna(), True), "gel": _deltas(tab[e["gel"]].dropna(), True)}).dropna()
+
+
+def waerme_einzeln(db, cfg, ab=None):
+    """Erzeugte Wärme je Wärmepumpe in kWh pro Viertelstunde (für die Jahresarbeitszahl), sonst None."""
+    return _reihen(db, [(w["name"], w["waerme"], 1.0) for w in waermepumpen(cfg) if w["waerme"]], ab)
+
+
+def jaz(db, cfg, von, bis):
+    """Jahresarbeitszahl je Wärmepumpe im Zeitraum: {name: dict(strom, waerme, jaz, monate=[(periode, strom, waerme)])}.
+    Nur Viertelstunden, in denen beide Zähler Werte haben, damit Lücken das Verhältnis nicht verfälschen."""
+    s = unterzaehler_einzeln(db, cfg, von)
+    w = waerme_einzeln(db, cfg, von)
+    out = {}
+    if s is None or w is None:
+        return out
+    bis_ts = pd.Timestamp(bis) + pd.Timedelta(days=1)
+    for name in w.columns:
+        if name not in s:
+            continue
+        a, b = s[name], w[name]
+        idx = a.index.intersection(b.index)
+        idx = idx[(idx >= pd.Timestamp(von)) & (idx < bis_ts)]
+        if not len(idx):
+            continue
+        a, b = a.reindex(idx), b.reindex(idx)
+        mon = pd.DataFrame({"strom": a.groupby(idx.to_period("M")).sum(), "waerme": b.groupby(idx.to_period("M")).sum()})
+        out[name] = dict(strom=float(a.sum()), waerme=float(b.sum()), jaz=float(b.sum() / a.sum()) if a.sum() > 0.1 else None,
+                         monate=[(p, float(r.strom), float(r.waerme)) for p, r in mon.iterrows()])
     return out
 
 
@@ -55,25 +127,7 @@ def verteilen(stand, max_luecke=16):
 
 def unterzaehler_einzeln(db, cfg, ab=None):
     """kWh pro Viertelstunde je Wärmepumpe (Zählerstand total_increasing × Faktor) als DataFrame, sonst None."""
-    wps = waermepumpen(cfg)
-    if not wps:
-        return None
-    ids = [w["entity"] for w in wps]
-    q = f"SELECT ts, entity, wert FROM messwerte WHERE entity IN ({','.join('?' * len(ids))})" + (" AND ts >= ?" if ab else "")
-    with db() as c:
-        roh = pd.read_sql_query(q, c, params=ids + ([str(ab)] if ab else []))
-    if roh.empty:
-        return None
-    roh["ts"] = pd.to_datetime(roh["ts"])
-    tab = roh.pivot_table(index="ts", columns="entity", values="wert", aggfunc="last")
-    with db() as c:
-        einheit = dict(c.execute(f"SELECT entity, einheit FROM entitaeten WHERE entity IN ({','.join('?' * len(ids))})", ids).fetchall())
-    spalten = {}
-    for w in wps:
-        if w["entity"] not in tab:
-            continue
-        spalten[w["name"]] = verteilen(tab[w["entity"]].dropna()) * w["faktor"] * (0.001 if einheit.get(w["entity"]) == "Wh" else 1.0)
-    return pd.DataFrame(spalten).fillna(0.0) if spalten else None
+    return _reihen(db, [(w["name"], w["entity"], w["faktor"]) for w in waermepumpen(cfg)], ab)
 
 
 def unterzaehler(db, cfg, ab=None):

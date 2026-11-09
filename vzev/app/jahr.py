@@ -48,6 +48,12 @@ def daten(jahr):
                 wp_einzeln = {n: t[n].groupby(t.index.to_period("M")).sum() for n in t.columns}
         except Exception:
             S.log.exception("Wärmepumpen-Zähler nicht lesbar")
+    try:
+        import vorschau
+        wp_jaz = vorschau.jaz(S.collector._db, cfg, start, bis) if mit_wp else {}
+    except Exception:
+        S.log.exception("Jahresarbeitszahl")
+        wp_jaz = {}
     # Mieter
     reg = zahlungen.uebersicht()["zeilen"]
     mieter = []
@@ -87,7 +93,7 @@ def daten(jahr):
         wp_kwh=sum(x["solar"] + x["ht"] + x["nt"] + x["speicher"] for x in wp))
     kennzahlen["autarkie"] = kennzahlen["solar"] / (kennzahlen["solar"] + kennzahlen["netz"]) * 100 if kennzahlen["solar"] + kennzahlen["netz"] else 0
     wp_ab = r.index[r["WP_gemessen"] > 0].min() if mit_wp and (r["WP_gemessen"] > 0).any() else None
-    return b, dict(jahr=jahr, von=start, bis=bis, daten_bis=ende_daten, allg=allg, wp=wp, wp_einzeln=wp_einzeln, wp_ab=wp_ab,
+    return b, dict(jahr=jahr, von=start, bis=bis, daten_bis=ende_daten, allg=allg, wp=wp, wp_einzeln=wp_einzeln, wp_ab=wp_ab, wp_jaz=wp_jaz,
                    mit_wp=mit_wp, mieter=mieter, monate=monate,
                    perioden=perioden, w=w, offen=offen, vorlaeufig=bool(offen) or bis < date(jahr, 12, 31),
                    k=kennzahlen, res=r, cfg=cfg)
@@ -125,7 +131,8 @@ Die Zahlen können sich bis zum Abschluss aller Monate ändern.</div>{% else %}<
 <td>{{ r.solar_chf|f2 }}</td><td>{{ (r.netz_chf + r.speicher_chf)|f2 }}</td><td><b>{{ r.total|f2 }}</b></td></tr>{% endfor %}
 <tr class="sum"><td>Total</td>{% for n in namen %}<td>{{ d.wp_einzeln[n].sum()|f2 }}</td>{% endfor %}<td>{{ d.wp|sum(attribute='solar')|f2 }}</td><td>{{ d.wp|sum(attribute='ht')|f2 }}</td><td>{{ d.wp|sum(attribute='nt')|f2 }}</td>
 <td>{{ d.wp|sum(attribute='solar_chf')|f2 }}</td><td>{{ (d.wp|sum(attribute='netz_chf') + d.wp|sum(attribute='speicher_chf'))|f2 }}</td><td>{{ d.k.wp|f2 }}</td></tr>
-</table></div><p class="muted">Gemessen über Home Assistant{% if d.wp_ab %} ab {{ d.wp_ab.strftime('%d.%m.%Y') }}; davor ist der Verbrauch der Wärmepumpen im Allgemeinstrom enthalten{% endif %}. Solaranteil wie bei allen Zählern pro Viertelstunde.</p></div>{% endif %}
+</table></div><p class="muted">Gemessen über Home Assistant{% if d.wp_ab %} ab {{ d.wp_ab.strftime('%d.%m.%Y') }}; davor ist der Verbrauch der Wärmepumpen im Allgemeinstrom enthalten{% endif %}. Solaranteil wie bei allen Zählern pro Viertelstunde.</p>
+{% if d.wp_jaz %}<p><b>Jahresarbeitszahl:</b> {% for n, j in d.wp_jaz.items() %}{{ n }} {{ '%.2f'|format(j.jaz) if j.jaz else '–' }} ({{ j.waerme|k0 }} kWh Wärme / {{ j.strom|k0 }} kWh Strom){{ ' · ' if not loop.last }}{% endfor %}</p>{% endif %}</div>{% endif %}
 <div class="card"><h2>Mieter {{ jahr }}</h2><div class="scroll"><table>
 <tr><th class="l">Mieter</th><th class="l">Zeitraum</th><th>Verbrauch kWh</th><th>davon Solar</th><th>Berechnet CHF</th><th>In Rechnung gestellt</th><th>Bezahlt</th><th class="l">Rechnungen</th></tr>
 {% for m in d.mieter %}<tr><td class="l">{{ m.name }}</td><td class="l">{{ m.von.strftime('%d.%m.') }}–{{ m.bis.strftime('%d.%m.%Y') }}{{ ' (läuft)' if m.laufend }}</td>

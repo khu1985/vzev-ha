@@ -18,7 +18,7 @@ und getrennt ausgewiesenem Netzstrom aus dem Batteriespeicher.
 
 **Auswertung**
 - **Energiefluss** (Startseite): animiertes Diagramm von PV-Anlage, Netz und Speicher zum Haus und zu den Verbrauchern, für heute, gestern, einen Monat oder ein Jahr. Die Ringe zeigen den Anteil Solar-, Speicher- und Netzstrom; Werte erscheinen per Maus oder Tippen. Speicherwerte stammen vom Wechselrichter, alles andere aus derselben Rechnung wie die Abrechnung.
-- **Übersicht:** Jahr wählen; Produktion, Autarkie, Rücklieferung und Wertschöpfung des Jahres; Diagramm «Energiefluss pro Monat» – ein Klick auf einen Monat zeigt darunter dessen Kennzahlen, Kontrollen (Abgleich mit Primeo, Ladestation, Lücken, Rückliefertarif, 80-%-Grenze Solarpreis, dynamische Preise, Wärmepumpen, Abschluss, offene Rechnungen) und Verbraucher mit Betrag inkl. Grundpreis.
+- **Übersicht:** Jahr wählen; Produktion, Autarkie, Rücklieferung und Wertschöpfung des Jahres; Diagramm «Energiefluss pro Monat» – ein Klick auf einen Monat zeigt darunter dessen Kennzahlen, Kontrollen (Abgleich mit Primeo, Ladestation, Lücken, Rückliefertarif, 80-%-Grenze Solarpreis, dynamische Preise, Wärmepumpen, Netzladung gegen Wechselrichter, Abschluss, offene Rechnungen) und Verbraucher mit Betrag inkl. Grundpreis.
 - **Wertschöpfung:** Ertrag des Betreibers pro Monat nach Quelle (Verkauf an Mieter, Eigenverbrauch, Rücklieferung, Gutschriften), kumuliert, Verwendung des Solarstroms und Wert pro kWh; filterbar nach Jahr.
 - **Verlauf:** pro Zähler Verbrauch, Solar/Netz und Kosten pro Monat, beim 1. OG nach Mietverhältnis gruppiert.
 
@@ -83,6 +83,8 @@ Wärmepumpen für Heizung und Warmwasser, die am Allgemeinzähler hängen, werde
 - Pro Quartal entsteht eine zusätzliche Gesamtrechnung **Heizung und Warmwasser**, in der Jahresabrechnung ein eigenes PDF für die Heiz- und Nebenkostenabrechnung.
 - Gemessen wird ab dem Tag, an dem der Datensammler die Sensoren speichert; davor bleibt der Verbrauch im Allgemeinstrom. Kurze Lücken (bis 4 Stunden) werden gleichmässig verteilt.
 - Die Übersicht prüft, ob die Werte vollständig ankommen.
+- **Rückwirkend:** Unter Einstellungen → Zähler → «Wärmepumpen rückwirkend» übernimmt die App die stündlichen Zählerstände aus der Langzeit-Statistik von Home Assistant für die Zeit vor ihrer ersten eigenen Ablesung. Vorgeschlagen ist der erste nicht abgeschlossene Monat; für abgeschlossene Monate meldet «Abschluss» danach eine Abweichung, weil sich der Allgemeinstrom ändert.
+- **Jahresarbeitszahl:** Mit einem Wärme-Sensor (erzeugte Wärme in kWh, Wh, MWh oder GJ) zeigt der Verlauf die Arbeitszahl pro Monat, die Jahresabrechnung die des Jahres; dazu der Sensor `sensor.vzev_jaz_<name>`.
 
 ## Sensoren in Home Assistant
 
@@ -99,6 +101,7 @@ auch, was zuletzt geschrieben wurde. Die App schreibt sie beim Start, alle 15 Mi
 | `sensor.vzev_offene_rechnungen`, `_ueberfaellig` | offener Betrag in CHF (Liste als Attribut), Anzahl überfällig |
 | `sensor.vzev_naechste_aufgabe`, `_offene_monate` | nächster Schritt aus dem Aufgaben-Assistenten, Anzahl offener Monate |
 | `sensor.vzev_pv_prognose_heute`, `_pv_prognose_morgen` | Solcast-Prognose in kWh |
+| `sensor.vzev_jaz_<name>` | Jahresarbeitszahl der Wärmepumpe im laufenden Jahr (mit Wärme-Sensor) |
 | `sensor.vzev_strompreis` | dynamischer Preis jetzt in Rp./kWh inkl. Konzessionsabgabe und MWST (Tief/Hoch des Tages als Attribute) |
 | `binary_sensor.vzev_guenstig_laden` | «an», solange ein günstiges Ladefenster läuft (wie auf der Seite «Prognose») |
 | `sensor.vzev_naechstes_ladefenster` | Beginn des nächsten Ladefensters (Ende, Preis, fehlende kWh als Attribute) |

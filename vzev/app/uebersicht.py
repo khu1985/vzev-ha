@@ -239,6 +239,25 @@ def kontrollen_fuer(d, mon, p):
             kontrollen.append((abs(gem - abz) <= max(0.5, 0.02 * gem), "Wärmepumpen aus dem Allgemeinstrom herausgerechnet",
                                f"{abz:.1f} von {gem:.1f} kWh gemessen" + (f", erfasst ab {rm.index[vq].min():%d.%m. %H:%M}" if rm.index[vq].min() > rm.index.min() + pd.Timedelta(days=1) else "")
                                + ("" if abs(gem - abz) <= max(0.5, 0.02 * gem) else " – der Rest übersteigt den Allgemeinzähler (Zeitversatz oder falscher Sensor?)")))
+    # Netzladung des Speichers gegen den Wechselrichter: ohne Sonne kann die Batterie nur aus dem Netz laden
+    try:
+        import vorschau
+        sv = vorschau.solis_viertel(S.collector._db, cfg, rm.index.min(), rm.index.max())
+        if sv is not None and len(sv):
+            sp = core.speicher_regeln(cfg)
+            nacht = sv.index[(sv["pv"] < 0.005)].intersection(rm.index)
+            if len(nacht) > 96:
+                gel = float(sv.loc[nacht, "gel"].sum())
+                ueber = float((rm.loc[nacht, "PVA"] - float(sp["pva_standby_max_kwh"])).clip(lower=0).sum())
+                erwartet = ueber * float(sp["speicher_wirkungsgrad"])
+                if gel > 0.5 or ueber > 0.5:
+                    ok = abs(gel - erwartet) <= max(0.5, 0.2 * max(gel, erwartet))
+                    kontrollen.append((ok, "Netzladung passt zum Wechselrichter",
+                                       f"ohne Sonne: Netzbezug PV-Anlage über Standby {ueber:.1f} kWh (× Wirkungsgrad {erwartet:.1f} kWh), "
+                                       f"Wechselrichter «Batterie geladen» {gel:.1f} kWh"
+                                       + ("" if ok else " – Standby-Grenze oder Wirkungsgrad unter Einstellungen → Regeln prüfen")))
+    except Exception:
+        S.log.exception("Kontrolle Netzladung")
     if rm["Laden"].sum() > 0.01:
         kontrollen.append((None, "Speicher aus dem Netz geladen",
                            f"{rm['Laden'].sum():.2f} kWh Netzladung (Kosten Betreiber), davon im Haus als Speicher NT verbraucht: "
@@ -379,6 +398,13 @@ VERLAUF = diagramme.STIL + """
 <tr class="sum"><td class="l">Summe</td><td>{{ tot.verbrauch|f2 }}</td><td>{{ tot.solar|f2 }}</td><td>{{ tot.ht|f2 }}</td><td>{{ tot.nt|f2 }}</td><td>{{ tot.solar_chf|f2 }}</td><td>{{ tot.netz_chf|f2 }}</td>{% if gp %}<td>{{ tot.gp|f2 }}</td>{% endif %}<td>{{ tot.total|f2 }}</td><td>{{ '%.1f %%'|format(tot.autarkie) }}</td><td></td></tr>
 </table></div>{% if gp %}<p class="muted">* Grundpreis Netznutzung anteilig, Messtarif, Konzessionsabgabe{{ ', beim 1. OG anteilig zur Mietdauer' if z == '1OG' }}.</p>{% endif %}
 {% if z == 'EV' %}<p class="muted">Total = was der Solarstrom zum Netztarif gekostet hätte (Ersparnis); Netz CHF = tatsächliche Netzkosten der Ladestation.</p>{% endif %}</div>
+{% if jaz %}<div class="card"><h2>Jahresarbeitszahl</h2><div class="grid" style="margin-bottom:12px">
+{% for n, j in jaz.items() %}<div class="kpi"><div class="t">{{ n }}</div><div class="v">{{ '%.2f'|format(j.jaz) if j.jaz else '–' }}</div>
+<div class="s">{{ j.waerme|k0 }} kWh Wärme aus {{ j.strom|k0 }} kWh Strom</div></div>{% endfor %}</div>
+<div class="scroll"><table class="wide"><tr><th class="l">Monat</th>{% for n in jaz %}<th>{{ n }} Strom</th><th>Wärme</th><th>Arbeitszahl</th>{% endfor %}</tr>
+{% for p in jaz_monate %}<tr><td class="l">{{ p }}</td>{% for n, j in jaz.items() %}{% set m = j.m.get(p) %}
+<td>{{ m[0]|f2 if m else '–' }}</td><td>{{ m[1]|f2 if m else '–' }}</td><td><b>{{ '%.2f'|format(m[1] / m[0]) if m and m[0] > 0.1 else '–' }}</b></td>{% endfor %}</tr>{% endfor %}</table></div>
+<p class="muted">Wärme geteilt durch Strom, nur Viertelstunden mit Werten beider Zähler (seit Messbeginn in Home Assistant). Strom ohne Korrekturfaktor.</p></div>{% endif %}
 {% endif %}"""
 
 
@@ -426,7 +452,20 @@ def verlauf():
         wp_hinweis = (f"Gemessen ab {res.index[gem].min():%d.%m.%Y %H:%M} (Home Assistant). Davor ist der Verbrauch im Allgemeinstrom enthalten."
                       if gem.any() else "Noch keine Werte: Der Datensammler speichert die Wärmepumpen-Zähler ab dem Eintragen alle 15 Minuten; "
                       "die ersten Werte erscheinen nach der zweiten Ablesung. Den Stand siehst du unter «Datensammler».")
-    return S.page("Verlauf", render_template_string(VERLAUF, ok=True, zl=list(alle_z.items()), z=z, wp_hinweis=wp_hinweis, zeilen=zeilen, tot=tot, chart=chart, gp=z in ("1OG", "AllgC")))
+    jaz, jaz_monate = {}, []
+    if z.startswith("WP"):
+        try:
+            import vorschau
+            name = dict(core.wp_namen(cfg)).get(z)
+            alle = vorschau.jaz(S.collector._db, cfg, res.index.min().date(), res.index.max().date())
+            for n, j in alle.items():
+                if name in (None, n):
+                    jaz[n] = dict(j, m={_titel(p): (st, wa) for p, st, wa in j["monate"]})
+            jaz_monate = [_titel(p) for p in sorted({p for j in alle.values() for p, _, _ in j["monate"]})]
+        except Exception:
+            S.log.exception("Jahresarbeitszahl")
+    return S.page("Verlauf", render_template_string(VERLAUF, ok=True, zl=list(alle_z.items()), z=z, wp_hinweis=wp_hinweis, zeilen=zeilen, tot=tot,
+                                                    chart=chart, gp=z in ("1OG", "AllgC"), jaz=jaz, jaz_monate=jaz_monate))
 
 
 # =============================================================================

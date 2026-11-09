@@ -120,6 +120,15 @@ def berechnen(heute=None):
                         {"betrag": z["ueberfaellig"]}))
     sicher(rechnungen)
 
+    def jaz():
+        import re
+        import vorschau
+        for name, j in vorschau.jaz(S.collector._db, cfg, date(heute.year, 1, 1), heute).items():
+            slug = re.sub(r"[^a-z0-9]+", "_", name.lower().replace("ä", "ae").replace("ö", "oe").replace("ü", "ue")).strip("_")
+            s.append(Sensor(f"jaz_{slug}", f"Jahresarbeitszahl {name}", _r(j["jaz"], 2), "", "", "measurement", "mdi:heat-pump",
+                            {"strom_kwh": round(j["strom"], 1), "waerme_kwh": round(j["waerme"], 1), "jahr": heute.year}))
+    sicher(jaz)
+
     def aufgaben():
         import aufgaben as af
         n = af.naechste()
