@@ -6,6 +6,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Nur lesen: die Tests brauchen keine Schreibrechte am Repository
+permissions:
+  contents: read
+
 jobs:
   home-assistant:
     # Gleiche Basis und gleiche Paketversionen wie die App im Home Assistant (Debian bookworm, apt)

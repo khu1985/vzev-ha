@@ -905,6 +905,25 @@ WARTEN = """<div class="card" id="warten" style="text-align:center;padding:40px 
 Die Seite lädt automatisch, sobald alles fertig ist.</p></div>"""
 
 
+# Nur der Ingress-Proxy von Home Assistant darf zugreifen – andere Apps im internen Netz nicht.
+# Gilt nur in Home Assistant (SUPERVISOR_TOKEN gesetzt); lokal zum Entwickeln ist alles offen.
+INGRESS_PROXY = "172.30.32.2"
+
+
+def zugriff_erlaubt(adresse: str | None) -> bool:
+    if not os.environ.get("SUPERVISOR_TOKEN"):
+        return True
+    return adresse in (INGRESS_PROXY, "127.0.0.1", "::1")
+
+
+@app.before_request
+def nur_ingress():
+    if not zugriff_erlaubt(request.remote_addr):
+        log.warning("Zugriff von %s abgelehnt – nur über Home Assistant (Ingress)", request.remote_addr)
+        abort(403)
+    return None
+
+
 @app.before_request
 def auf_berechnung_warten():
     """Seiten mit Berechnung blockieren nicht: kurz warten, sonst Warteseite mit Fortschritt zeigen."""

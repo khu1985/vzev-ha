@@ -553,3 +553,12 @@ def test_netzladung_und_jaz(app):
         assert "Langzeit-Statistik" in ziel(r)            # ohne Home Assistant: verständliche Meldung
     finally:
         (d / "vzev.yaml").write_text(cfg_alt)
+
+
+def test_nur_ingress_in_home_assistant(app, monkeypatch):
+    server, c, d, quelle = app
+    assert c.get("/").status_code != 403                              # lokal: offen
+    monkeypatch.setenv("SUPERVISOR_TOKEN", "x")
+    assert c.get("/", environ_base={"REMOTE_ADDR": "172.30.32.2"}).status_code != 403   # Ingress-Proxy
+    assert c.get("/", environ_base={"REMOTE_ADDR": "172.30.33.7"}).status_code == 403   # andere App
+    assert c.post("einstellungen", environ_base={"REMOTE_ADDR": "172.30.33.7"}).status_code == 403
