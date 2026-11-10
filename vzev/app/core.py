@@ -192,6 +192,7 @@ def load(datadir, cfg, cache_dir=None):
         for c in Path(cache_dir).glob("*.pkl"):
             if c.name.rsplit(".", 3)[0] not in namen:
                 c.unlink(missing_ok=True)
+    LETZTE_PROBLEME[:] = probleme  # für die Vorschläge (nicht verwendete Dateien, übersprungene Zeilen)
     if lade is None:
         raise ValueError("Wallbox-Export (CSV mit «Zaehlerstand Differenz [kWh]») fehlt")
     return df, lade, files
@@ -212,6 +213,7 @@ def distribute_ev(df, lade, baseline):
     return ev
 
 
+LETZTE_PROBLEME = []
 ZAEHLER = ["1OG", "2OG", "AllgC", "EV", "WP"]
 ZL = [("1OG", "1. OG"), ("2OG", "2. OG"), ("AllgC", "Allgemein"), ("EV", "Ladestation"), ("WP", "Wärmepumpen")]
 SPEICHER_STANDARD = {"speicher_ab": "2027-01-01", "pva_standby_max_kwh": 0.05, "speicher_wirkungsgrad": 0.9}

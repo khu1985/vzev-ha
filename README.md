@@ -91,6 +91,7 @@ flowchart TB
 | `vzev/app/vorschau.py` | Gleiche Rechnung mit den gesammelten Zählerständen aus Home Assistant für die Zeit nach dem letzten Lastgang; Wärmepumpen-Zähler (Lücken verteilt), Jahresarbeitszahl, Viertelstundenwerte des Wechselrichters |
 | `vzev/app/server.py` | Webserver, Navigation, Statusanzeige, Import, Rechnungen, Datensammler-Seite, Protokoll |
 | `vzev/app/hastatistik.py` | Langzeit-Statistik aus Home Assistant über die WebSocket-API (kleiner Client ohne Zusatzpaket), rückwirkende Wärmepumpen-Werte |
+| `vzev/app/vorschlaege.py` | Vorschläge für die Weiterentwicklung aus Protokoll, Kontrollen, Import, Korrekturen, Datensammler und Prognose; anonymisiert zum Weitergeben (Text, Datei, GitHub-Issue) |
 | `vzev/app/sensoren.py` | Sensoren `sensor.vzev_*` / `binary_sensor.vzev_*` über die REST-API von Home Assistant (alle 15 Minuten und nach jeder Berechnung) |
 | `vzev/app/aufgaben.py` | Aufgaben-Assistent: erkennt pro offenem Monat, Quartal und Jahr, welche Arbeiten erledigt sind, und führt zur passenden Seite |
 | `vzev/app/fluss.py` | Startseite «Energiefluss»: animiertes SVG-Diagramm der Flüsse (PV, Netz, Speicher, Haus, Verbraucher) pro Tag, Monat oder Jahr |
@@ -239,6 +240,7 @@ So fliessen sie ab 2027 in die Abrechnung ein (Entscheid Betreiber):
 | `primeo/` | importierte Lastgänge und Wallbox-Export; ersetzte Dateien unter `primeo/_entfernt/` |
 | `messwerte.sqlite` | Zählerstände aus Home Assistant, evcc-Ladevorgänge, dynamische Strompreise, PV-Prognosen |
 | `aufgaben.json` | als versendet markierte Rechnungen (Aufgaben-Assistent) |
+| `vorschlaege.json` | ausgeblendete und gemeldete Vorschläge, eigene Ideen |
 | `abschluss.json` | abgeschlossene Monate mit festgehaltenen Werten, Korrekturen |
 | `rechnungen/` | erstellte PDFs, `register.json` (Rechnungen, Fälligkeiten, Zahlungen); ersetzte Fassungen unter `rechnungen/_alt/` |
 | `vzev.log` | Protokoll (auch in der App unter «Protokoll») |

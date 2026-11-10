@@ -562,3 +562,28 @@ def test_nur_ingress_in_home_assistant(app, monkeypatch):
     assert c.get("/", environ_base={"REMOTE_ADDR": "172.30.32.2"}).status_code != 403   # Ingress-Proxy
     assert c.get("/", environ_base={"REMOTE_ADDR": "172.30.33.7"}).status_code == 403   # andere App
     assert c.post("einstellungen", environ_base={"REMOTE_ADDR": "172.30.33.7"}).status_code == 403
+
+
+def test_vorschlaege(app):
+    server, c, d, quelle = app
+    warten(server)
+    server.log.error("Testfehler bei Max Beispiel: Wert 1234 am 05.10.2026")
+    h = c.get("/vorschlaege").get_data(as_text=True)
+    assert "Vorschläge aus deinen Daten" in h and "Weitergeben" in h, __import__("re").sub(r"<[^>]+>", " ", h.split("<main")[-1])[:1500] and 'href="vorschlaege">Vorschläge' in h
+    assert "ERROR: Testfehler bei" in h and "Max Beispiel" not in h.split('id="vs-text"')[1]
+    r = c.post("/vorschlaege", data={"aktion": "idee", "idee": "Export für Max Beispiel als CSV"})
+    assert "Idee gespeichert" in ziel(r)
+    h = c.get("/vorschlaege").get_data(as_text=True)
+    text = h.split('id="vs-text"')[1].split("</textarea>")[0]
+    assert "Export für ‹…› als CSV" in text and "Testdorf" not in text and "Testweg" not in text
+    import re as _re
+    k = _re.search(r'name="sel_([0-9a-f]{12})"', h).group(1)
+    r = c.post("/vorschlaege", data={"aktion": "gemeldet", f"sel_{k}": "1"})
+    assert "als gemeldet markiert" in ziel(r)
+    h = c.get("/vorschlaege").get_data(as_text=True)
+    assert "Ausgeblendet und gemeldet (1)" in h
+    md = c.get("/vorschlaege.md")
+    assert md.status_code == 200 and "Vorschläge aus der vZEV-App" in md.get_data(as_text=True)
+    assert "Max Beispiel" not in md.get_data(as_text=True)
+    c.post("/vorschlaege", data={"aktion": "alle_einblenden"})
+    assert "Ausgeblendet und gemeldet" not in c.get("/vorschlaege").get_data(as_text=True)

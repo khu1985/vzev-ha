@@ -114,7 +114,7 @@ NAVIGATION = [
     ("Auswertung", [("./", "Energiefluss"), ("uebersicht", "Übersicht"), ("verlauf", "Verlauf"), ("wertschoepfung", "Wertschöpfung")]),
     ("Abrechnung", [("aufgaben", "Aufgaben"), ("import", "Daten importieren"), ("rechnungen", "Rechnungen"), ("jahr", "Jahresabrechnung"), ("abschluss", "Abschluss")]),
     ("Stammdaten", [("mieter", "Mieter"), ("tarife", "Tarife"), ("primeo", "Primeo"), ("einstellungen", "Einstellungen")]),
-    ("Anlage", [("prognose", "Prognose"), ("batterie", "Batterie"), ("sammler", "Datensammler"), ("protokoll", "Protokoll")]),
+    ("Anlage", [("prognose", "Prognose"), ("batterie", "Batterie"), ("sammler", "Datensammler"), ("protokoll", "Protokoll"), ("vorschlaege", "Vorschläge")]),
 ]
 
 app = Flask(__name__)
@@ -880,7 +880,7 @@ def einstellungen():
 
 
 # --- Status und Warteseite ------------------------------------------------------
-BRAUCHT_BERECHNUNG = {"index", "uebersicht", "aufgaben", "verlauf", "wertschoepfung", "abschluss", "primeo", "sammler", "import_page", "jahr"}
+BRAUCHT_BERECHNUNG = {"index", "uebersicht", "aufgaben", "vorschlaege", "verlauf", "wertschoepfung", "abschluss", "primeo", "sammler", "import_page", "jahr"}
 
 
 @app.get("/status")
@@ -948,6 +948,8 @@ import fluss  # noqa: E402
 fluss.register(app, sys.modules[__name__])
 import aufgaben  # noqa: E402
 aufgaben.register(app, sys.modules[__name__])
+import vorschlaege  # noqa: E402
+vorschlaege.register(app, sys.modules[__name__])
 import sensoren  # noqa: E402
 sensoren.register(app, sys.modules[__name__], starten=not os.environ.get("VZEV_KEINE_SENSOREN"))
 

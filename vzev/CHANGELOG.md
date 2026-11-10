@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.16.0
+
+- Vorschläge (Anlage → Vorschläge), wie in der Finanz-App: Die App leitet aus den eigenen Daten ab, wo sie besser werden kann – Fehler und Warnungen im Protokoll, Kontrollen, die nicht stimmen, Dateien, die nicht eingelesen werden konnten, Korrekturen nach dem Abschluss, Sensoren ohne Werte, Treffsicherheit der Prognose – plus eigene Ideen. Alles anonymisiert (Namen, Adressen, Messpunkte, Seriennummern, Beträge, Daten); nichts wird automatisch gesendet: kopieren, als Datei herunterladen oder als GitHub-Issue öffnen.
+
 ## 0.15.0
 
 - Sicherheit: Die App beantwortet im Home Assistant nur noch Anfragen über Ingress – andere Apps im internen Netz können sie nicht mehr direkt aufrufen (403).

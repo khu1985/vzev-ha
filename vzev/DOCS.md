@@ -86,6 +86,25 @@ Wärmepumpen für Heizung und Warmwasser, die am Allgemeinzähler hängen, werde
 - **Rückwirkend:** Unter Einstellungen → Zähler → «Wärmepumpen rückwirkend» übernimmt die App die stündlichen Zählerstände aus der Langzeit-Statistik von Home Assistant für die Zeit vor ihrer ersten eigenen Ablesung. Vorgeschlagen ist der erste nicht abgeschlossene Monat; für abgeschlossene Monate meldet «Abschluss» danach eine Abweichung, weil sich der Allgemeinstrom ändert.
 - **Jahresarbeitszahl:** Mit einem Wärme-Sensor (erzeugte Wärme in kWh, Wh, MWh oder GJ) zeigt der Verlauf die Arbeitszahl pro Monat, die Jahresabrechnung die des Jahres; dazu der Sensor `sensor.vzev_jaz_<name>`.
 
+## Vorschläge für die Weiterentwicklung
+
+**Anlage → Vorschläge** zeigt, wo die App mit deinen Daten an Grenzen stösst – als Liste, die du anonymisiert an die
+Entwicklung weitergeben kannst.
+
+| Quelle | Beispiel | Wichtigkeit |
+|---|---|---|
+| Fehler im Protokoll (30 Tage) | «ERROR: Seite ‹…› fehlgeschlagen – KeyError in uebersicht.py:index» | hoch |
+| Kontrollen, die nicht stimmen (12 Monate) | «Abgleich mit Primeo» stimmt nicht (3×) | hoch bis tief |
+| Import | Messpunkt nicht zugeordnet, Datei nicht lesbar, Ladevorgänge ohne Datum | mittel/hoch |
+| Korrekturen | Monate wieder geöffnet, Rechnungen neu erstellt, Rechnungsdatum von Hand geändert | mittel/tief |
+| Datensammler | Sensor ohne Werte (geprüft, aber nicht verfügbar) | mittel |
+| Prognose | Solcast liegt im Mittel mehr als 20 % daneben | tief |
+| eigene Ideen | frei formuliert | mittel |
+
+Namen, Adressen, Messpunkte, Seriennummern in Sensor-IDs, IBAN, E-Mail, Zugangsdaten, Beträge und Daten werden ersetzt.
+Nichts wird automatisch gesendet: Der Text zum Weitergeben lässt sich kopieren, als `vzev-vorschlaege.md`
+herunterladen oder als Entwurf eines GitHub-Issues öffnen. Erledigtes lässt sich ausblenden oder als gemeldet markieren.
+
 ## Sensoren in Home Assistant
 
 Die App liefert ihre Kennzahlen als Sensoren an Home Assistant – für Dashboards, Verlauf und Automationen. Ein- und
