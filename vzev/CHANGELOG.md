@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.15.0
+
+- Sicherheit: Die App beantwortet im Home Assistant nur noch Anfragen über Ingress – andere Apps im internen Netz können sie nicht mehr direkt aufrufen (403).
+- Repository: Tests nur mit Leserechten, Dependabot für GitHub Actions, lokale Werkzeug-Einstellungen und Zugangsdaten (`.claude/settings.local.json`, `.mcp.json`, `.env`, Schlüssel) in `.gitignore`.
+
 ## 0.14.0
 
 - Kontrolle «Netzladung passt zum Wechselrichter»: Netzbezug der PV-Anlage über der Standby-Grenze (× Wirkungsgrad) gegen «Batterie geladen» des Wechselrichters in den Viertelstunden ohne Sonne – zeigt eine falsche Standby-Grenze oder einen falschen Wirkungsgrad.

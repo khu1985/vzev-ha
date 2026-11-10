@@ -1,0 +1,8 @@
+# Sicherheits- und Versionsupdates als Pull Request (wöchentlich).
+# Basis-Images stehen in build.yaml – die liest Dependabot nicht, sie werden von Hand aktualisiert.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

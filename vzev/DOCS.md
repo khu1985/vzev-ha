@@ -148,3 +148,6 @@ Wiederherstellen: Inhalt in den Konfigurationsordner der App kopieren und die Ap
 ## Netzwerk
 
 Die App verbindet sich nur mit Home Assistant, evcc (im lokalen Netz) und der eingestellten Preis-Schnittstelle von Primeo.
+
+Im Home Assistant beantwortet die App nur Anfragen des Ingress-Proxys (172.30.32.2); andere Apps im internen Netz
+erhalten «403». Lokal zum Entwickeln (ohne `SUPERVISOR_TOKEN`) ist sie offen.

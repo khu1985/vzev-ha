@@ -2,3 +2,11 @@
 .pytest_cache/
 __pycache__/
 data/
+# Lokale Werkzeug-Einstellungen und Zugangsdaten nie einchecken
+.claude/settings.local.json
+.mcp.json
+.env
+.env.*
+*.pem
+*.key
+secrets.yaml
