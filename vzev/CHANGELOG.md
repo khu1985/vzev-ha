@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.16.1
+
+- Weniger Last auf dem Home Assistant: Die Statusanzeige offener Browser-Tabs las alle 15 Sekunden die ganze Messwert- und Preistabelle. Jetzt: Index auf Messwerte und Preise, Rechenstand nur alle 20 Sekunden geprüft (nach Änderungen sofort), Abfrage nur noch jede Minute und gar nicht in Hintergrund-Tabs.
+
 ## 0.16.0
 
 - Vorschläge (Anlage → Vorschläge), wie in der Finanz-App: Die App leitet aus den eigenen Daten ab, wo sie besser werden kann – Fehler und Warnungen im Protokoll, Kontrollen, die nicht stimmen, Dateien, die nicht eingelesen werden konnten, Korrekturen nach dem Abschluss, Sensoren ohne Werte, Treffsicherheit der Prognose – plus eigene Ideen. Alles anonymisiert (Namen, Adressen, Messpunkte, Seriennummern, Beträge, Daten); nichts wird automatisch gesendet: kopieren, als Datei herunterladen oder als GitHub-Issue öffnen.

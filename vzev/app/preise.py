@@ -64,6 +64,7 @@ def init(db):
         c.execute("""CREATE TABLE IF NOT EXISTS preise (
             start_utc TEXT, typ TEXT, start_lokal TEXT, ende_lokal TEXT, chf_kwh REAL,
             publiziert TEXT, abgerufen TEXT, PRIMARY KEY (start_utc, typ))""")
+        c.execute("CREATE INDEX IF NOT EXISTS preise_abgerufen ON preise (abgerufen)")
 
 
 def _utc(ts):

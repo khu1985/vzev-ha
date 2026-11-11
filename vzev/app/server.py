@@ -142,6 +142,24 @@ def files_key():
     return tuple((p.name, p.stat().st_mtime) for p in fs) + ((CFG.name, CFG.stat().st_mtime), preise.stand(collector._db), wp_stand())
 
 
+_KEY_KURZ = {"zeit": 0.0, "wert": None}
+KEY_SEKUNDEN = 20
+
+
+def files_key_kurz():
+    """files_key mit kurzem Zwischenspeicher: Statusabfragen offener Browser-Tabs lesen nicht jedes Mal Dateien und
+    Datenbank. Rechnen selbst verwendet immer den frischen Schlüssel."""
+    jetzt = time.time()
+    if _KEY_KURZ["wert"] is None or jetzt - _KEY_KURZ["zeit"] > KEY_SEKUNDEN:
+        _KEY_KURZ.update(zeit=jetzt, wert=files_key())
+    return _KEY_KURZ["wert"]
+
+
+def key_vergessen():
+    """Nach Uploads, gespeicherten Einstellungen u. ä. sofort neu prüfen."""
+    _KEY_KURZ["wert"] = None
+
+
 def wp_stand():
     """Beginn der Wärmepumpen-Messwerte: ändert sich, wenn rückwirkend Werte übernommen werden (nicht bei jeder Ablesung)."""
     try:
@@ -181,7 +199,7 @@ RECHNEN = {"aktiv": False, "start": None, "ende": None, "dauer": None, "grund": 
 def veraltet():
     """True, wenn es Dateien gibt und die gespeicherte Berechnung nicht mehr zu Dateien/Einstellungen passt."""
     try:
-        return any(p.is_file() for p in PRIMEO.iterdir()) and _cache.get("key") != files_key()
+        return any(p.is_file() for p in PRIMEO.iterdir()) and _cache.get("key") != files_key_kurz()
     except OSError:
         return False
 
@@ -425,14 +443,17 @@ a.ver{text-decoration:none}a.ver:hover{text-decoration:underline;color:var(--ink
  var el=document.getElementById('bg'),warten=document.getElementById('warten');
  function zeit(s){return s<60?Math.round(s)+' s':Math.round(s/60)+' min'}
  function poll(){fetch('status',{credentials:'same-origin',cache:'no-store'}).then(function(r){return r.json()}).then(function(s){
-  if(document.body.classList.contains('laedt')){setTimeout(poll,1500);return}
+  if(document.body.classList.contains('laedt')){later(1500);return}
   var t=[];if(s.rechnen.aktiv)t.push('Berechnung läuft ('+zeit(s.rechnen.seit)+')');else if(s.rechnen.veraltet)t.push('Berechnung startet');
   if(s.sammler.aktiv)t.push(s.sammler.aktiv);
   if(t.length){el.className='bg an';el.innerHTML='<span class="spin"></span>'+t.join(' · ')}
   else{el.className='bg';el.textContent='● bereit'+(s.rechnen.letzte?' · gerechnet '+s.rechnen.letzte:'');el.title=s.sammler.naechster?'Nächster Abruf Zählerstände '+s.sammler.naechster:''}
   if(warten&&!s.rechnen.aktiv&&!s.rechnen.veraltet){location.reload();return}
   if(warten&&s.rechnen.aktiv){var w=document.getElementById('wartezeit');if(w)w.textContent=zeit(s.rechnen.seit)}
-  setTimeout(poll,(t.length||warten)?1500:15000)}).catch(function(){setTimeout(poll,15000)})}
+  later((t.length||warten)?1500:60000)}).catch(function(){later(60000)})}
+ // Hintergrund-Tabs fragen nicht nach; beim Zurückkehren sofort aktualisieren
+ var timer=null;function later(ms){clearTimeout(timer);if(!document.hidden)timer=setTimeout(poll,ms)}
+ document.addEventListener('visibilitychange',function(){if(!document.hidden){clearTimeout(timer);poll()}});
  poll();
  function laden(t){el.className='bg an';el.innerHTML='<span class="spin"></span>'+(t||'Seite wird geladen …');document.body.classList.add('laedt')}
  document.addEventListener('submit',function(e){var f=e.target;if(e.defaultPrevented||f.id==='up')return;
@@ -886,13 +907,14 @@ BRAUCHT_BERECHNUNG = {"index", "uebersicht", "aufgaben", "vorschlaege", "verlauf
 @app.get("/status")
 def status():
     jetzt = time.time()
-    if veraltet() and not _rechnen.locked():  # z. B. nach dem Speichern von Einstellungen: gleich im Hintergrund rechnen
+    alt = veraltet()
+    if alt and not _rechnen.locked():  # z. B. nach dem Speichern von Einstellungen: gleich im Hintergrund rechnen
         im_hintergrund_rechnen("Einstellungen geändert")
     hm = lambda t: datetime.fromtimestamp(t).strftime("%H:%M") if t else None
     return {
         "rechnen": {"aktiv": RECHNEN["aktiv"], "seit": (jetzt - RECHNEN["start"]) if RECHNEN["aktiv"] else 0,
                     "grund": RECHNEN["grund"], "letzte": hm(RECHNEN["ende"]), "dauer": RECHNEN["dauer"],
-                    "fehler": RECHNEN["fehler"], "veraltet": veraltet()},
+                    "fehler": RECHNEN["fehler"], "veraltet": alt},
         "sammler": {"aktiv": collector.aktiv, "naechster": collector.naechster.strftime("%H:%M") if collector.naechster else None,
                     "evcc_naechster": collector.evcc_naechster.strftime("%H:%M") if collector.evcc_naechster else None},
     }
@@ -914,6 +936,13 @@ def zugriff_erlaubt(adresse: str | None) -> bool:
     if not os.environ.get("SUPERVISOR_TOKEN"):
         return True
     return adresse in (INGRESS_PROXY, "127.0.0.1", "::1")
+
+
+@app.after_request
+def nach_aenderung(antwort):
+    if request.method == "POST":   # Upload, Einstellungen, Zahlungen …: Rechenstand sofort neu prüfen
+        key_vergessen()
+    return antwort
 
 
 @app.before_request

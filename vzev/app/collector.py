@@ -55,6 +55,8 @@ class Collector:
             c.execute("CREATE TABLE IF NOT EXISTS messwerte (ts TEXT, entity TEXT, wert REAL, PRIMARY KEY (ts, entity))")
             c.execute("CREATE TABLE IF NOT EXISTS entitaeten (entity TEXT PRIMARY KEY, name TEXT, einheit TEXT, zustand TEXT, geprueft TEXT)")
             c.execute("CREATE TABLE IF NOT EXISTS evcc_sessions (id TEXT PRIMARY KEY, daten TEXT, abgerufen TEXT)")
+            # Abfragen je Zähler (Beginn der Messwerte, Wärmepumpen) ohne die ganze Tabelle zu lesen
+            c.execute("CREATE INDEX IF NOT EXISTS messwerte_entity ON messwerte (entity, ts)")
 
     # --- Home Assistant ------------------------------------------------
     def _ha(self):
