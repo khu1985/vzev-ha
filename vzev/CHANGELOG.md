@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.16.2
+
+- Vorschläge: Fehler und Warnungen zählen nur seit dem Start der installierten Version – was ein Update behoben hat, verschwindet sofort statt erst nach 30 Tagen.
+
 ## 0.16.1
 
 - Weniger Last auf dem Home Assistant: Die Statusanzeige offener Browser-Tabs las alle 15 Sekunden die ganze Messwert- und Preistabelle. Jetzt: Index auf Messwerte und Preise, Rechenstand nur alle 20 Sekunden geprüft (nach Änderungen sofort), Abfrage nur noch jede Minute und gar nicht in Hintergrund-Tabs.

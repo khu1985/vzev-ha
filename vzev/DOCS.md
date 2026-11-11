@@ -93,7 +93,7 @@ Entwicklung weitergeben kannst.
 
 | Quelle | Beispiel | Wichtigkeit |
 |---|---|---|
-| Fehler im Protokoll (30 Tage) | «ERROR: Seite ‹…› fehlgeschlagen – KeyError in uebersicht.py:index» | hoch |
+| Fehler im Protokoll seit dem Update (installierte Version; ohne Startzeile 30 Tage) | «ERROR: Seite ‹…› fehlgeschlagen – KeyError in uebersicht.py:index» | hoch |
 | Kontrollen, die nicht stimmen (12 Monate) | «Abgleich mit Primeo» stimmt nicht (3×) | hoch bis tief |
 | Import | Messpunkt nicht zugeordnet, Datei nicht lesbar, Ladevorgänge ohne Datum | mittel/hoch |
 | Korrekturen | Monate wieder geöffnet, Rechnungen neu erstellt, Rechnungsdatum von Hand geändert | mittel/tief |

@@ -118,16 +118,33 @@ def _normalisieren(meldung):
     return (erste[:160] + (f" – {ausnahme}" if ausnahme else "")).strip()
 
 
+def seit_version(eintraege, version, muster):
+    """Zeit des ersten Starts der aktuellen Version (nach dem letzten Start einer anderen Version), sonst None.
+    `eintraege`: Dicts mit zeit/text, neueste zuerst; `muster`: Regex mit einer Gruppe für die Version."""
+    seit, vorher = None, None
+    for e in reversed(eintraege):
+        m = re.search(muster, e["text"])
+        if not m:
+            continue
+        if m.group(1) == version and vorher != version:
+            seit = e["zeit"]
+        vorher = m.group(1)
+    return seit if vorher == version else None
+
+
 def _protokoll(erg, tage=30):
-    grenze = (datetime.now() - timedelta(days=tage)).strftime("%Y-%m-%d")
-    for e in S.protokoll(3000):
-        if e["zeit"][:10] < grenze or e["stufe"] not in ("WARNING", "ERROR", "CRITICAL"):
+    """Warnungen und Fehler seit dem Start der installierten Version – Behobenes aus älteren Versionen zählt nicht."""
+    alle = S.protokoll(20000)
+    seit = seit_version(alle, S.VERSION, r"App gestartet \(Version ([^)]+)\)")
+    grenze = seit or (datetime.now() - timedelta(days=tage)).strftime("%Y-%m-%d")
+    hinweis = f"seit Version {S.VERSION}" if seit else f"im Protokoll der letzten {tage} Tage"
+    for e in alle:
+        if e["zeit"] < grenze or e["stufe"] not in ("WARNING", "ERROR", "CRITICAL"):
             continue
         if "abgelehnt – nur über Home Assistant" in e["text"]:
             continue  # Zugriffsschutz wirkt wie vorgesehen
         gewicht = HOCH if e["stufe"] in ("ERROR", "CRITICAL") or "Traceback" in e["text"] else MITTEL
-        _zaehlen(erg, ("Fehler und Warnungen", f"{e['stufe']}: {_normalisieren(e['text'])}", f"im Protokoll der letzten {tage} Tage"),
-                 gewicht)
+        _zaehlen(erg, ("Fehler und Warnungen", f"{e['stufe']}: {_normalisieren(e['text'])}", hinweis), gewicht)
 
 
 # Kontrollen, die auf eine Grenze der App hinweisen (nicht nur «noch nicht erledigt»)

@@ -587,3 +587,13 @@ def test_vorschlaege(app):
     assert "Max Beispiel" not in md.get_data(as_text=True)
     c.post("/vorschlaege", data={"aktion": "alle_einblenden"})
     assert "Ausgeblendet und gemeldet" not in c.get("/vorschlaege").get_data(as_text=True)
+
+
+def test_vorschlaege_nur_meldungen_der_aktuellen_version(app):
+    import vorschlaege as vs
+    e = lambda zeit, text: {"zeit": zeit, "stufe": "INFO", "text": text}
+    muster = r"App gestartet \(Version ([^)]+)\)"
+    alle = [e("2026-11-01 08:00:00", "App gestartet (Version 1.0)"), e("2026-11-05 08:00:00", "App gestartet (Version 1.1)"),
+            e("2026-11-06 08:00:00", "App gestartet (Version 1.1)")][::-1]      # neueste zuerst
+    assert vs.seit_version(alle, "1.1", muster) == "2026-11-05 08:00:00"   # erster Start dieser Version
+    assert vs.seit_version(alle, "1.2", muster) is None                   # Startzeile fehlt → 30 Tage
