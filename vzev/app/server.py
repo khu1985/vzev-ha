@@ -196,10 +196,11 @@ _rechnen = threading.Lock()
 RECHNEN = {"aktiv": False, "start": None, "ende": None, "dauer": None, "grund": "", "fehler": None}
 
 
-def veraltet():
-    """True, wenn es Dateien gibt und die gespeicherte Berechnung nicht mehr zu Dateien/Einstellungen passt."""
+def veraltet(frisch=True):
+    """True, wenn es Dateien gibt und die gespeicherte Berechnung nicht mehr zu Dateien/Einstellungen passt.
+    frisch=False (nur für die häufige Statusabfrage): Schlüssel aus dem kurzen Zwischenspeicher."""
     try:
-        return any(p.is_file() for p in PRIMEO.iterdir()) and _cache.get("key") != files_key_kurz()
+        return any(p.is_file() for p in PRIMEO.iterdir()) and _cache.get("key") != (files_key() if frisch else files_key_kurz())
     except OSError:
         return False
 
@@ -907,7 +908,7 @@ BRAUCHT_BERECHNUNG = {"index", "uebersicht", "aufgaben", "vorschlaege", "verlauf
 @app.get("/status")
 def status():
     jetzt = time.time()
-    alt = veraltet()
+    alt = veraltet(frisch=False)
     if alt and not _rechnen.locked():  # z. B. nach dem Speichern von Einstellungen: gleich im Hintergrund rechnen
         im_hintergrund_rechnen("Einstellungen geändert")
     hm = lambda t: datetime.fromtimestamp(t).strftime("%H:%M") if t else None
