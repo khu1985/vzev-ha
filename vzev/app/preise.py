@@ -199,7 +199,9 @@ def serie(db, ab=None):
     if not rows:
         return None
     t = pd.DataFrame(rows, columns=["zeit", "typ", "chf"])
-    t["zeit"] = pd.to_datetime(t["zeit"])
+    import core
+    t["zeit"] = core.zeiten(t["zeit"])
+    t = t[t["zeit"].notna()]
     return t.groupby(["zeit", "typ"])["chf"].first().unstack("typ")
 
 

@@ -55,6 +55,16 @@ def read_header(path):
     return cell(3), cell(4)
 
 
+def zeiten(werte):
+    """Gespeicherte Zeitstempel (ISO, mit oder ohne Sekunden, «T» oder Leerzeichen) → DatetimeIndex auf die Minute.
+
+    pandas erkennt das Format an der ersten Zeile; stehen in der Datenbank Zeilen mit und ohne Sekunden
+    (ältere Versionen, nachgetragene Werte), bricht pd.to_datetime sonst mit «unconverted data remains» ab.
+    Unlesbare Werte werden NaT."""
+    s = pd.Series(list(werte), dtype=object).astype(str).str.strip().str.replace(" ", "T", n=1, regex=False).str.slice(0, 16)
+    return pd.DatetimeIndex(pd.to_datetime(s, format="%Y-%m-%dT%H:%M", errors="coerce"))
+
+
 def _als_datum(v):
     if v is None or (not isinstance(v, str) and pd.isna(v)):
         return pd.NaT
@@ -266,7 +276,7 @@ def compute(df, lade, cfg, ev=None, dyn=None, wp=None):
         wp = einzeln.sum(axis=1)
     wp = pd.Series(0.0, index=df.index) if wp is None else wp.reindex(df.index).fillna(0.0).clip(lower=0)
     df["WP_gemessen"] = wp
-    df["WP"] = np.minimum(wp, df["Allg"] - df["EV"])
+    df["WP"] = wp_einpassen(wp.to_numpy(), (df["Allg"] - df["EV"]).to_numpy())
     df["AllgC"] = df["Allg"] - df["EV"] - df["WP"]
     cons = df["1OG"] + df["2OG"] + df["AllgC"] + df["EV"] + df["WP"]
     ratio = np.where(cons > 0, np.minimum(df["Prod"] / cons.replace(0, np.nan), 1.0), 0.0)
@@ -294,13 +304,50 @@ def compute(df, lade, cfg, ev=None, dyn=None, wp=None):
     df["month"] = df.index.to_period("M")
     dynamisch(df, cfg, dyn)
     # Einzelne Wärmepumpen (WP1, WP2 …): Anteil an der gemessenen Summe pro Viertelstunde, gleicher Solaranteil
+    # (verschobene Viertelstunden ohne eigene Messung: Anteil aus der Stunde davor und danach)
+    summe_r = df["WP_gemessen"].rolling(9, center=True, min_periods=1).sum()
     for i, (key, name) in enumerate(wp_namen(cfg), 1):
-        anteil = (einzeln[name] / df["WP_gemessen"].where(df["WP_gemessen"] > 0)).fillna(0.0) \
-            if einzeln is not None and name in einzeln else pd.Series(0.0, index=df.index)
+        if einzeln is not None and name in einzeln:
+            anteil = einzeln[name] / df["WP_gemessen"].where(df["WP_gemessen"] > 0)
+            anteil = anteil.fillna(einzeln[name].rolling(9, center=True, min_periods=1).sum() / summe_r.where(summe_r > 0)).fillna(0.0)
+        else:
+            anteil = pd.Series(0.0, index=df.index)
         for a in ("S", "N", "P", "B"):
             df[f"{a}_{key}"] = df[f"{a}_WP"] * anteil
         df[key] = df["WP"] * anteil
     return df
+
+
+def wp_einpassen(wp, platz, schritte=4):
+    """Gemessene Wärmepumpen-kWh in den Allgemeinzähler einpassen (pro Viertelstunde höchstens dessen Wert).
+
+    Der Unterzähler wird von Home Assistant abgelesen, Primeo misst am Hauptzähler: die Viertelstunden liegen um
+    einige Minuten versetzt. Was in einer Viertelstunde keinen Platz hat, wird darum bis eine Stunde (4 Viertelstunden)
+    davor oder danach verschoben, wo der Allgemeinzähler noch Platz hat – so bleibt die gemessene Energie erhalten.
+    Was auch dort nicht passt, bleibt im Allgemeinstrom (Kontrolle «herausgerechnet» schlägt an)."""
+    wp = np.clip(np.asarray(wp, dtype=float), 0, None)
+    platz = np.clip(np.asarray(platz, dtype=float), 0, None)
+    ein = np.minimum(wp, platz)
+    rest, frei = wp - ein, platz - ein
+    for k in range(1, schritte + 1):
+        for s in (k, -k):  # zuerst die spätere, dann die frühere Viertelstunde
+            if not (rest > 1e-12).any():
+                return ein
+            ziel = np.roll(frei, -s)  # freier Platz in der Viertelstunde i+s
+            if s > 0:
+                ziel[-s:] = 0
+            else:
+                ziel[:-s] = 0
+            m = np.minimum(rest, ziel)
+            rest -= m
+            ein_ziel = np.roll(m, s)  # m[i] landet bei i+s
+            if s > 0:
+                ein_ziel[:s] = 0
+            else:
+                ein_ziel[s:] = 0
+            ein += ein_ziel
+            frei -= ein_ziel
+    return ein
 
 
 def wp_namen(cfg):

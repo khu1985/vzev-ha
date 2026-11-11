@@ -166,6 +166,7 @@ WOCHENTAG = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag
 def _messreihe(db, entity, von, bis, taeglich):
     """kWh pro Viertelstunde aus gespeicherten Zählerständen (Index = Beginn der Viertelstunde)."""
     import pandas as pd
+    import core
     import vorschau
     if not entity:
         return pd.Series(dtype=float)
@@ -174,7 +175,8 @@ def _messreihe(db, entity, von, bis, taeglich):
                         (entity, von.isoformat(), bis.isoformat())).fetchall()
     if not roh:
         return pd.Series(dtype=float)
-    s = pd.Series([w for _, w in roh], index=pd.to_datetime([t for t, _ in roh]))
+    s = pd.Series([w for _, w in roh], index=core.zeiten([t for t, _ in roh]))
+    s = s[s.index.notna()]
     return vorschau._deltas(s[~s.index.duplicated(keep="last")], taeglich)
 
 

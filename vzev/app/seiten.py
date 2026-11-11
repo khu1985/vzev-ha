@@ -175,7 +175,7 @@ def korrektur(monat, art, grund):
     a = abschluss_laden()
     a["korrekturen"].append({"zeit": datetime.now().strftime("%Y-%m-%d %H:%M"), "monat": monat, "art": art, "grund": grund})
     abschluss_speichern(a)
-    S.log.warning("Korrektur %s: %s – %s", monat, art, grund)
+    S.log.info("Korrektur %s: %s", monat, art)  # Grund steht im Abschluss, nicht im Protokoll (Freitext)
 
 
 ZL = core.ZL
@@ -635,7 +635,7 @@ def batterie():
         soc_row = c.execute("SELECT wert FROM messwerte WHERE entity=? ORDER BY ts DESC LIMIT 1", (sol.get("batterie_soc") or "",)).fetchone()
     monate = []
     if len(df):
-        df["tag"] = pd.to_datetime(df["ts"]).dt.date
+        df["tag"] = core.zeiten(df["ts"]).date
         tag = df.groupby(["tag", "entity"])["wert"].max().unstack()
         tag = tag.rename(columns={v: k for k, v in spalten.items() if v})
         tag.index = pd.to_datetime(tag.index)

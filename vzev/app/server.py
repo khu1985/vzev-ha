@@ -205,6 +205,14 @@ def veraltet(frisch=True):
         return False
 
 
+def _stelle(e):
+    """« (datei.py:funktion)» der letzten Stelle im App-Code – damit Meldungen wie «unconverted data remains» zuordenbar sind."""
+    if isinstance(e, SystemExit):
+        return ""
+    eigene = [f for f in traceback.extract_tb(e.__traceback__) if Path(f.filename).parent == Path(__file__).parent]
+    return f" ({Path(eigene[-1].filename).name}:{eigene[-1].name})" if eigene else ""
+
+
 def berechnung(grund="Seitenaufruf"):
     key = files_key()
     if _cache.get("key") == key:
@@ -220,7 +228,7 @@ def berechnung(grund="Seitenaufruf"):
             _cache.update(key=key, ok=True, cfg=cfg, res=res, files=files, ev=ev, lade=lade, fehler=None)
         except BaseException as e:  # SystemExit bei fehlenden Dateien
             _cache.update(key=key, ok=False, fehler=str(e) or traceback.format_exc(limit=1))
-            log.warning("Berechnung nicht möglich: %s", _cache["fehler"])
+            log.warning("Berechnung nicht möglich: %s%s", _cache["fehler"], _stelle(e))
         else:
             if time.time() - t0 > 5:
                 log.info("Berechnung neu erstellt in %.0f s", time.time() - t0)

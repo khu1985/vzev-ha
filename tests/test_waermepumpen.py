@@ -21,16 +21,17 @@ def test_wp_aus_allgemein_herausgerechnet():
     df = _df()
     wp = pd.Series([0.3, 0.3, 0.3, 0.3, 0.3, 0.0, 0.0, 0.0], index=df.index)   # 5. Viertelstunde: mehr als Allgemein
     res = core.compute(df, None, _cfg(), ev=pd.Series(0.0, index=df.index), wp=wp)
-    assert res["WP"].sum() == pytest.approx(1.3)            # 4 × 0.3 + höchstens 0.1
+    assert res["WP"].sum() == pytest.approx(1.5)            # Überschuss der 5. Viertelstunde eine davor/danach eingepasst
     assert res["WP_gemessen"].sum() == pytest.approx(1.5)
-    assert res["AllgC"].sum() == pytest.approx(0.8 + 0.3 - 0.0)  # 4 × 0.2 + 0 + 3 × 0.1
+    assert res["AllgC"].sum() == pytest.approx(2.4 - 1.5)
+    assert (res["WP"] <= res["Allg"] + 1e-12).all()
     # Energieerhaltung: alle Zähler zusammen = Primeo-Zähler
     k = res[[f"{a}_{z}" for z in core.ZAEHLER for a in ("S", "N", "P")]].sum(axis=1) - res["PVA"]
     assert k.sum() == pytest.approx((df["1OG"] + df["2OG"] + df["Allg"]).sum())
     # Solaranteil gleich wie bei allen Zählern
     assert res["S_WP"].iloc[7] == 0 and res["S_AllgC"].iloc[7] > 0
     rows = invoices.lines_for(res, _cfg(), "WP", date(2026, 11, 1), date(2026, 11, 30), grundpreis_ja=False)
-    assert rows[0]["grundpreis"] == 0 and rows[0]["nt"] == pytest.approx(1.3)
+    assert rows[0]["grundpreis"] == 0 and rows[0]["nt"] == pytest.approx(1.5)
 
 
 def test_ohne_wp_unveraendert():

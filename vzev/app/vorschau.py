@@ -53,7 +53,8 @@ def _reihen(db, eintraege, ab=None):
         einheit = dict(c.execute(f"SELECT entity, einheit FROM entitaeten WHERE entity IN ({','.join('?' * len(ids))})", ids).fetchall())
     if roh.empty:
         return None
-    roh["ts"] = pd.to_datetime(roh["ts"])
+    roh["ts"] = core.zeiten(roh["ts"])
+    roh = roh[roh["ts"].notna()]
     tab = roh.pivot_table(index="ts", columns="entity", values="wert", aggfunc="last")
     spalten = {}
     for name, ent, faktor in eintraege:
@@ -73,7 +74,8 @@ def solis_viertel(db, cfg, von, bis):
                                 params=[e["pv"], e["gel"], str(von), str(bis)])
     if roh.empty:
         return None
-    roh["ts"] = pd.to_datetime(roh["ts"])
+    roh["ts"] = core.zeiten(roh["ts"])
+    roh = roh[roh["ts"].notna()]
     tab = roh.pivot_table(index="ts", columns="entity", values="wert", aggfunc="last")
     if e["pv"] not in tab or e["gel"] not in tab:
         return None
@@ -169,7 +171,8 @@ def berechnen(db, cfg, ab=None, res_primeo=None):
     if roh.empty:
         info["fehlend"] = ["noch keine Zählerstände gespeichert"]
         return None, info
-    roh["ts"] = pd.to_datetime(roh["ts"])
+    roh["ts"] = core.zeiten(roh["ts"])
+    roh = roh[roh["ts"].notna()]
     tab = roh.pivot_table(index="ts", columns="entity", values="wert", aggfunc="last")
     spalten = {}
     for k, (e, taeglich) in quellen.items():

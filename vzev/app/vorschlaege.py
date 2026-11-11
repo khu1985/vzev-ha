@@ -143,6 +143,8 @@ def _protokoll(erg, tage=30):
             continue
         if "abgelehnt – nur über Home Assistant" in e["text"]:
             continue  # Zugriffsschutz wirkt wie vorgesehen
+        if e["text"].startswith("Korrektur "):
+            continue  # gewollte Aktion (ältere Versionen protokollierten sie als Warnung, mit Freitext)
         gewicht = HOCH if e["stufe"] in ("ERROR", "CRITICAL") or "Traceback" in e["text"] else MITTEL
         _zaehlen(erg, ("Fehler und Warnungen", f"{e['stufe']}: {_normalisieren(e['text'])}", hinweis), gewicht)
 

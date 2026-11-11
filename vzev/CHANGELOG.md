@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.16.3
+
+Behebt, was die «Vorschläge» der eigenen Anlage gemeldet haben:
+
+- Berechnung: Messwerte und Preise mit gemischten Zeitstempeln (mit und ohne Sekunden) brachen die Berechnung ab («unconverted data remains»). Zeitstempel werden jetzt einheitlich auf die Minute gelesen. Scheitert die Berechnung trotzdem, nennt das Protokoll die Stelle im Code.
+- Wärmepumpen: Der Unterzähler aus Home Assistant und der Allgemeinzähler von Primeo liegen um einige Minuten versetzt. Was in einer Viertelstunde keinen Platz hat, wird bis eine Stunde davor oder danach eingepasst, statt im Allgemeinstrom zu bleiben. Monate vor der ersten Messung gelten nicht mehr als Fehler, sondern zeigen, ab wann gemessen wird und wie ältere Werte nachgeholt werden.
+- Datensammler: Antwortet Home Assistant nicht rechtzeitig (Neustart, Backup), wird einmal mit mehr Geduld wiederholt; einzelne Aussetzer sind eine Warnung, erst eine Stunde ohne Werte ein Fehler.
+- Sensoren für Home Assistant: Ein kurzer Ausfall (502 Bad Gateway beim Neustart) wird erst gemeldet, wenn das Schreiben länger als 10 Minuten scheitert.
+- Korrekturen nach dem Abschluss stehen als Info im Protokoll, ohne den frei eingegebenen Grund (der bleibt im Abschluss).
+
 ## 0.16.2
 
 - Vorschläge: Fehler und Warnungen zählen nur seit dem Start der installierten Version – was ein Update behoben hat, verschwindet sofort statt erst nach 30 Tagen.

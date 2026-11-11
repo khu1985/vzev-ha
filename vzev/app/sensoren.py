@@ -214,10 +214,13 @@ def schreiben(senden=None, heute=None):
     _letzter.update(zeit=datetime.now().isoformat(timespec="seconds"), anzahl=0 if fehler else len(werte), fehler=fehler,
                     werte=[(x.entity_id(praefix), x.nutzlast()["state"], x.einheit) for x in werte])
     if fehler:
-        if _letzter.get("gemeldet") != fehler:
+        # Home Assistant startet neu (502 Bad Gateway, keine Verbindung): erst melden, wenn es auch beim nächsten Mal scheitert
+        seit = _letzter.setdefault("fehler_seit", time.time())
+        if _letzter.get("gemeldet") != fehler and time.time() - seit >= 600:
             log.warning("Sensoren nicht geschrieben: %s", fehler)
             _letzter["gemeldet"] = fehler
     else:
+        _letzter.pop("fehler_seit", None)
         if _letzter.get("gemeldet") is not None or not _letzter.get("einmal"):
             log.info("%d Sensoren an Home Assistant geschrieben (%s_*)", len(werte), praefix)
         _letzter.update(gemeldet=None, einmal=True)

@@ -140,7 +140,7 @@ Regeln, die in `vzev.yaml` einstellbar sind:
 - **Allgemeinstrom** wird als Gesamtrechnung gestellt (Weiterverrechnung in der Nebenkostenabrechnung). Nur für die Wertschöpfung gilt er zu einem einstellbaren Anteil (Standard 50 %) als an die Mieter verkauft.
 - **Leerstand** zählt als Eigenverbrauch des Betreibers; der Grundpreis wird nach Miettagen aufgeteilt.
 - **Ladestation** gehört dem Betreiber; ihr Solarstrom zählt als Eigenverbrauch.
-- **Wärmepumpen** (Heizung, Warmwasser) am Allgemeinzähler: aus Home-Assistant-Zählerständen pro Viertelstunde herausgerechnet (höchstens bis zum Allgemeinzähler), eigene Gesamtrechnung «Heizung und Warmwasser» für die Heiz- und Nebenkostenabrechnung.
+- **Wärmepumpen** (Heizung, Warmwasser) am Allgemeinzähler: aus Home-Assistant-Zählerständen pro Viertelstunde herausgerechnet (höchstens bis zum Allgemeinzähler, Zeitversatz bis eine Stunde ausgeglichen), eigene Gesamtrechnung «Heizung und Warmwasser» für die Heiz- und Nebenkostenabrechnung.
 - **Rücklieferung** ohne bekannten Tarif bleibt offen und wird in der Wertschöpfung nicht geschätzt.
 - **Speicher** (ab einstellbarem Datum, Standard 01.01.2027): Netzbezug am Zähler der PV-Anlage über der Standby-Grenze ist Netzladung und geht auf den Betreiber. Wird dieser Netzstrom später im Haus verbraucht, erscheint er als «Speicher NT» zum vZEV-Preis statt als Solarstrom.
 - **Bonus dynamischer Tarif** (Standard ab 01.01.2027): Die Rechnung bleibt bei HT/NT; der Vorteil gegenüber dem dynamischen Preis pro Viertelstunde wird gutgeschrieben, pro Monat nie negativ.

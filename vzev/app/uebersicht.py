@@ -233,7 +233,11 @@ def kontrollen_fuer(d, mon, p):
     if _mit_wp(cfg):
         gem, abz = float(rm["WP_gemessen"].sum()), float(rm["WP"].sum())
         vq = rm["WP_gemessen"] > 0
-        if gem <= 0:
+        erste = _memo("wp_erste", lambda: res.index[res["WP_gemessen"] > 0].min())
+        if gem <= 0 and not pd.isna(erste) and p.end_time < erste:
+            kontrollen.append((None, "Wärmepumpen erfasst", f"Messung beginnt erst am {erste:%d.%m.%Y} – ältere Werte lassen sich "
+                               "unter «Zähler → Wärmepumpen rückwirkend» aus der Langzeit-Statistik von Home Assistant holen"))
+        elif gem <= 0:
             kontrollen.append((False, "Wärmepumpen erfasst", "keine Werte in diesem Monat – Sensoren unter «Datensammler» prüfen; ihr Verbrauch bleibt im Allgemeinstrom"))
         else:
             kontrollen.append((abs(gem - abz) <= max(0.5, 0.02 * gem), "Wärmepumpen aus dem Allgemeinstrom herausgerechnet",

@@ -89,8 +89,18 @@ class Collector:
         ts = ts - timedelta(minutes=ts.minute % 15)
         rows, fehlt, meta = [], [], []
         jetzt = datetime.now().isoformat(timespec="seconds")
-        for eid in self.entities():
-            r = requests.get(f"{base}/states/{eid}", headers={"Authorization": f"Bearer {token}"}, timeout=10)
+        ents = self.entities()
+        for eid in ents:
+            r = None
+            for versuch in (1, 2):  # Home Assistant ist kurz ausgelastet (Neustart, Backup): einmal mit mehr Geduld wiederholen
+                try:
+                    r = requests.get(f"{base}/states/{eid}", headers={"Authorization": f"Bearer {token}"}, timeout=10 * versuch)
+                    break
+                except (requests.Timeout, requests.ConnectionError) as e:
+                    fehler = e
+            if r is None:
+                fehlt.append(f"{eid} (keine Antwort)")
+                continue
             if r.status_code != 200:
                 fehlt.append(f"{eid} (HTTP {r.status_code})")
                 continue
@@ -101,6 +111,8 @@ class Collector:
                 rows.append((ts.isoformat(timespec="minutes"), eid, float(j["state"])))
             except (ValueError, KeyError, TypeError):
                 fehlt.append(f"{eid} ({j.get('state')})")  # unavailable/unknown
+        if ents and not rows and all(f.endswith("(keine Antwort)") for f in fehlt):
+            raise ConnectionError(f"Home Assistant antwortet nicht ({type(fehler).__name__})")
         meldung = ", ".join(fehlt)
         if meldung != getattr(self, "_fehlt", ""):  # nur Änderungen protokollieren
             if fehlt:
@@ -231,9 +243,17 @@ class Collector:
                 self.read_now()
                 self.last_error = None
             except Exception as e:  # weiterlaufen, Fehler anzeigen
-                if self.last_error is None or str(e) not in self.last_error:
-                    log.error("Datensammler: %s", e)
+                self.fehlversuche = getattr(self, "fehlversuche", 0) + 1
+                # einzelne Aussetzer (Home Assistant startet neu) nur als Warnung, erst eine Stunde ohne Werte als Fehler
+                if self.fehlversuche == 4:
+                    log.error("Datensammler: seit einer Stunde keine Werte – %s", e)
+                elif self.last_error is None:
+                    log.warning("Datensammler: %s (nächster Versuch in 15 Minuten)", e)
                 self.last_error = f"{datetime.now():%d.%m. %H:%M}: {e}"
+            else:
+                if getattr(self, "fehlversuche", 0) >= 4:
+                    log.info("Datensammler: Home Assistant liefert wieder Werte")
+                self.fehlversuche = 0
             if tick % 4 == 0:
                 try:
                     self.fetch_evcc()
