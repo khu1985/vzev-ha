@@ -302,7 +302,8 @@ def _einheiten(cfg):
 
 
 def _mieter_am(liste, d):
-    return sorted((m["einheit"], m["name"], m.get("strasse"), m.get("hausnr"), m.get("plz"), m.get("ort"))
+    # ohne Namen: eine Korrektur der Schreibweise ändert keinen Betrag und ist auch in abgeschlossenen Monaten erlaubt
+    return sorted((m["einheit"], _d(m["von"]), m.get("strasse"), m.get("hausnr"), m.get("plz"), m.get("ort"))
                   for m in liste if _d(m["von"]) <= d and (not m.get("bis") or d <= _d(m["bis"])))
 
 
@@ -360,6 +361,7 @@ def mieter():
                 return redirect("mieter?c=warn&msg=" + _sperrtext(d))
             abschnitt_speichern("mietverhaeltnisse", neu, "Mietverhältnisse – bearbeitet in der App, Bis leer = läuft noch")
             S.log.info("Mietverhältnisse gespeichert (%d Einträge)", len(neu))
+            S.zahlungen.umbenennen(alt, neu)  # bestehende Rechnungen im Zahlungsregister auf den neuen Namen
             return redirect("mieter?msg=Gespeichert")
         except ValueError as e:
             return redirect(f"mieter?c=warn&msg=Nicht gespeichert: {e}")

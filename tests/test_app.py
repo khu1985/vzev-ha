@@ -618,3 +618,33 @@ def test_mieter_vorname_nachname(app):
     assert "vorname" not in [m for m in neu if m["name"] == "Erika Muster"][0]  # eindeutig: nur «name»
     daten_[1] = ("m.vorname", "")
     assert "Vorname, Nachname" in ziel(c.post("/mieter", data=MultiDict(daten_)))
+
+
+def test_namenskorrektur_im_abgeschlossenen_monat(app):
+    server, c, d, quelle = app
+    warten(server)
+    for monat, datum in (("2026-03", "2026-04-05"), ("2026-04", "2026-05-02")):
+        c.post("/abschluss", data={"monat": monat, "aktion": "schliessen", "datum": datum})  # (falls noch offen)
+    c.post("/rechnungen", data={"jahr": "2026", "quartal": "2", "datum": "2026-05-05", "grund": "Test"})
+    import core
+    cfg = yaml.safe_load((d / "vzev.yaml").read_text())
+    max_alt = [m for m in cfg["mietverhaeltnisse"] if str(m["von"]) == "2026-04-10"][0]["name"]
+    assert max_alt in {r["partei"] for r in server.zahlungen.uebersicht()["zeilen"]}
+    daten_ = []
+    for m in cfg["mietverhaeltnisse"]:
+        vor, nach = core.namen(m)
+        if str(m["von"]) == "2026-04-10":
+            vor = "Maximilian"
+        daten_ += [("m.einheit", m["einheit"]), ("m.vorname", vor), ("m.nachname", nach), ("m.von", str(m["von"])),
+                   ("m.bis", str(m["bis"] or "")), ("m.strasse", m.get("strasse") or ""), ("m.hausnr", str(m.get("hausnr") or "")),
+                   ("m.plz", str(m.get("plz") or "")), ("m.ort", m.get("ort") or "")]
+    from werkzeug.datastructures import MultiDict
+    r = c.post("/mieter", data=MultiDict(daten_))
+    assert "Gespeichert" in ziel(r), ziel(r)
+    neu = [m for m in yaml.safe_load((d / "vzev.yaml").read_text())["mietverhaeltnisse"] if str(m["von"]) == "2026-04-10"][0]["name"]
+    assert neu.startswith("Maximilian ")
+    parteien = {r["partei"] for r in server.zahlungen.uebersicht()["zeilen"]}
+    assert neu in parteien and max_alt not in parteien
+    # Daten in einem abgeschlossenen Monat ändern bleibt gesperrt
+    daten_[12] = ("m.von", "2026-04-20")
+    assert "abgeschlossenen Monat" in ziel(c.post("/mieter", data=MultiDict(daten_)))

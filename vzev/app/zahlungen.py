@@ -46,6 +46,28 @@ def _voller_name(cfg, kurz):
     return kurz
 
 
+def umbenennen(alt, neu):
+    """Namenskorrektur auf der Seite «Mieter»: Rechnungen im Register (Zahlungen, Erinnerungen) auf den neuen Namen.
+    Gleiches Mietverhältnis = gleiche Einheit und gleiches «Von»."""
+    def schluessel(m):
+        return (m.get("einheit"), str(m.get("von")))
+    neue = {schluessel(m): m.get("name") for m in neu}
+    karte = {m["name"]: neue[schluessel(m)] for m in alt
+             if m.get("name") and neue.get(schluessel(m)) and neue[schluessel(m)] != m["name"]}
+    if not karte:
+        return 0
+    reg = laden()
+    n = 0
+    for r in reg["rechnungen"].values():
+        if r.get("partei") in karte:
+            r["partei"] = karte[r["partei"]]
+            n += 1
+    if n:
+        speichern(reg)
+        S.log.info("Zahlungsregister: Name in %d Rechnungen nachgeführt", n)
+    return n
+
+
 def registrieren(quartal, made, rechnungsdatum, cfg):
     """Nach dem Erstellen: neue Rechnungen eintragen, Zahlungen alter Fassungen übernehmen."""
     reg = laden()

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.16.5
+
+- Mieter: Namensänderungen wurden abgelehnt, sobald das Mietverhältnis einen abgeschlossenen Monat berührte («Nicht gespeichert: … abgeschlossenen Monat»). Eine Korrektur von Vor- oder Nachname ändert keinen Betrag und ist jetzt immer erlaubt; Einheit, Daten und Adresse bleiben in abgeschlossenen Monaten gesperrt.
+- Bestehende Rechnungen im Zahlungsregister werden auf den neuen Namen nachgeführt, damit Zahlungen und Erinnerungen weiter zugeordnet werden. Bereits erstellte PDF bleiben unverändert (bei Bedarf das Quartal unter «Abschluss» korrigieren).
+
 ## 0.16.4
 
 - Mieternamen einheitlich: Die Seite «Mieter» hat getrennte Felder für Vorname und Nachname (beide nötig). In der App – Übersicht, Rechnungen und Zahlungen, Aufgaben, Jahresübersicht, Sensoren für Home Assistant – steht nur der Vorname. Rechnungen, Zahlungserinnerungen, Jahresabrechnung (PDF) und Excel verwenden Vor- und Nachname.

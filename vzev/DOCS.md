@@ -56,7 +56,7 @@ Am einfachsten über **Abrechnung → Aufgaben**: Der Assistent zeigt für jeden
 
 ## Korrekturen
 
-- Änderungen an Tarifen, Mietern oder Erträgen, die einen abgeschlossenen Monat betreffen, lehnt die App ab. Zuerst den Monat unter **Abschluss** mit Begründung wieder öffnen (rückwärts, der Reihe nach).
+- Änderungen an Tarifen, Mietern oder Erträgen, die einen abgeschlossenen Monat betreffen, lehnt die App ab (ausgenommen die Korrektur eines Mieternamens). Zuerst den Monat unter **Abschluss** mit Begründung wieder öffnen (rückwärts, der Reihe nach).
 - Ändern sich abgeschlossene Monate durch eine ersetzte Datei oder eine geänderte Regel, warnen Übersicht und Abschluss. Mit **Neue Werte übernehmen** und Begründung wird der Monat neu festgehalten.
 - Rechnungen eines Quartals mit abgeschlossenen Monaten lassen sich nur mit Begründung neu erstellen. Die alten PDFs bleiben unter `rechnungen/_alt`, bereits erfasste Zahlungen gehen auf die neue Rechnung über.
 - Alle Korrekturen stehen unter **Abschluss → Korrekturen und Abschlüsse** und im **Protokoll**.
