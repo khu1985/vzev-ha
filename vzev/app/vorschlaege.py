@@ -67,15 +67,17 @@ def _muster(text):
 
 def private_texte(cfg):
     """Persönliche Zeichenketten aus vzev.yaml: Betreiber, Mieter, Adressen, Bank, Messpunkte, Zugangsdaten."""
+    import core
     gefunden = set()
     b = cfg.get("betreiber") or {}
     for k in ("name", "strasse", "ort", "bank", "iban", "email", "telefon"):
         if b.get(k):
             gefunden.add(str(b[k]))
     for m in cfg.get("mietverhaeltnisse") or []:
-        for k in ("name", "strasse", "ort", "email", "telefon"):
+        for k in ("name", "vorname", "nachname", "strasse", "ort", "email", "telefon"):
             if m.get(k):
                 gefunden.add(str(m[k]))
+        gefunden.update(x for x in core.namen(m) if len(x) > 1)  # in der App steht oft nur der Vorname
     gefunden.update(str(k) for k in (cfg.get("messpunkte") or {}))
     for k in ("url", "benutzer", "passwort", "token"):
         for abschnitt in ("evcc", "homeassistant"):

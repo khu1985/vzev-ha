@@ -322,6 +322,7 @@ def f2(x):
 
 
 app.jinja_env.filters["f2"] = f2
+app.jinja_env.filters["vorname"] = lambda n: core.vorname(config(), n)  # Anzeige: Vorname; Schreiben: voller Name
 app.jinja_env.filters["d"] = lambda t: "" if t is None else pd.Timestamp(t).strftime("%d.%m.%Y")
 
 # --- Layout -------------------------------------------------------------------
@@ -629,7 +630,7 @@ RECH = """
 <tr><th class="l">Rechnung</th><th class="l">Partei</th><th>Datum</th><th>Fällig</th><th>Betrag</th><th>Bezahlt</th><th>Offen</th><th class="l">Status</th><th class="l">Zahlung</th></tr>
 {% for r in z.zeilen if r.stand != 'ersetzt' %}<tr>
 <td class="l"><a href="datei?pfad={{ r.datei }}" target="_blank">{{ r.nummer }}</a></td>
-<td class="l">{{ r.partei }}</td><td>{{ r.datum|dmy }}</td><td>{{ r.faellig|dmy if r.art != 'allgemein' else '–' }}</td>
+<td class="l">{{ r.partei|vorname }}</td><td>{{ r.datum|dmy }}</td><td>{{ r.faellig|dmy if r.art != 'allgemein' else '–' }}</td>
 <td><b>{{ r.betrag|f2 if r.betrag is not none else '?' }}</b></td><td>{{ r.bezahlt|f2 if r.art != 'allgemein' else '–' }}</td>
 <td>{{ r.offen|f2 if r.art != 'allgemein' and r.offen is not none else '–' }}</td>
 <td class="l"><span class="pill {{ {'bezahlt':'ok','überzahlt':'warn','überfällig':'warn','teilweise':'warn','intern':'','offen':''}[r.stand] }}">{{ r.stand }}</span>{% if r.nachgetragen %} <span class="muted" title="Vor dem Zahlungsregister erstellt; Betrag aus der aktuellen Berechnung, Datum der Datei">nachgetragen</span>{% endif %}</td>
@@ -654,7 +655,7 @@ RECH = """
 {% set ersetzt = z.zeilen|selectattr('stand', 'equalto', 'ersetzt')|list %}
 {% if ersetzt %}<details style="margin-top:12px"><summary class="muted">{{ ersetzt|length }} ersetzte Fassung{{ 'en' if ersetzt|length != 1 }}</summary><div class="scroll"><table>
 <tr><th class="l">Rechnung</th><th class="l">Partei</th><th>Datum</th><th>Betrag</th><th>Ersetzt am</th></tr>
-{% for r in ersetzt %}<tr><td class="l">{{ r.nummer }}</td><td class="l">{{ r.partei }}</td><td>{{ r.datum|dmy }}</td><td>{{ r.betrag|f2 if r.betrag is not none else '?' }}</td><td>{{ r.ersetzt_am }}</td></tr>{% endfor %}
+{% for r in ersetzt %}<tr><td class="l">{{ r.nummer }}</td><td class="l">{{ r.partei|vorname }}</td><td>{{ r.datum|dmy }}</td><td>{{ r.betrag|f2 if r.betrag is not none else '?' }}</td><td>{{ r.ersetzt_am }}</td></tr>{% endfor %}
 </table></div></details>{% endif %}
 <p class="muted">Bei einer Korrektur übernimmt die neue Rechnung die bereits erfassten Zahlungen. Die alten PDFs liegen unter rechnungen/_alt.</p>
 <style>details.datum-aendern{margin-bottom:8px}details.datum-aendern summary{cursor:pointer;color:var(--muted);font-size:13px}

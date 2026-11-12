@@ -110,11 +110,12 @@ def berechnen(heute=None):
     sicher(wert)
 
     def rechnungen():
+        import core
         import zahlungen
         z = zahlungen.uebersicht()
         offen = [r for r in z["zeilen"] if r["stand"] in ("offen", "teilweise", "überfällig")]
         s.append(Sensor("offene_rechnungen", "Offene Rechnungen", _r(z["offen"], 2), "CHF", "monetary", "total", "mdi:receipt-text-clock",
-                        {"anzahl": len(offen), "liste": [{"nummer": r["nummer"], "partei": r["partei"], "offen": r["offen"],
+                        {"anzahl": len(offen), "liste": [{"nummer": r["nummer"], "partei": core.vorname(S.config(), r["partei"]), "offen": r["offen"],
                                                           "faellig": r["faellig"], "stand": r["stand"]} for r in offen[:10]]}))
         s.append(Sensor("ueberfaellig", "Überfällige Rechnungen", z["n_ueberfaellig"], "", "", "measurement", "mdi:alert-circle",
                         {"betrag": z["ueberfaellig"]}))

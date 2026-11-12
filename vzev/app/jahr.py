@@ -67,7 +67,7 @@ def daten(jahr):
         kurz = m["name"].split(" ")[-1]
         rech = [x for x in reg if x["art"] == "wohnung" and x["stand"] != "ersetzt" and x["quartal"].startswith(str(jahr))
                 and (x["partei"] == m["name"] or x["partei"] == kurz)]
-        mieter.append(dict(name=m["name"], einheit=m["einheit"], von=von, bis=mbis, laufend=mb is None or mb > bis,
+        mieter.append(dict(name=m["name"], vorname=core.namen(m)[0] or m["name"], einheit=m["einheit"], von=von, bis=mbis, laufend=mb is None or mb > bis,
                            kwh=sum(x["solar"] + x["ht"] + x["nt"] for x in rows), solar=sum(x["solar"] for x in rows),
                            betrag=round(sum(x["total"] for x in rows), 2),
                            gestellt=round(sum(x["betrag"] or 0 for x in rech), 2), bezahlt=round(sum(x["bezahlt"] for x in rech), 2),
@@ -135,7 +135,7 @@ Die Zahlen können sich bis zum Abschluss aller Monate ändern.</div>{% else %}<
 {% if d.wp_jaz %}<p><b>Jahresarbeitszahl:</b> {% for n, j in d.wp_jaz.items() %}{{ n }} {{ '%.2f'|format(j.jaz) if j.jaz else '–' }} ({{ j.waerme|k0 }} kWh Wärme / {{ j.strom|k0 }} kWh Strom){{ ' · ' if not loop.last }}{% endfor %}</p>{% endif %}</div>{% endif %}
 <div class="card"><h2>Mieter {{ jahr }}</h2><div class="scroll"><table>
 <tr><th class="l">Mieter</th><th class="l">Zeitraum</th><th>Verbrauch kWh</th><th>davon Solar</th><th>Berechnet CHF</th><th>In Rechnung gestellt</th><th>Bezahlt</th><th class="l">Rechnungen</th></tr>
-{% for m in d.mieter %}<tr><td class="l">{{ m.name }}</td><td class="l">{{ m.von.strftime('%d.%m.') }}–{{ m.bis.strftime('%d.%m.%Y') }}{{ ' (läuft)' if m.laufend }}</td>
+{% for m in d.mieter %}<tr><td class="l">{{ m.vorname }}</td><td class="l">{{ m.von.strftime('%d.%m.') }}–{{ m.bis.strftime('%d.%m.%Y') }}{{ ' (läuft)' if m.laufend }}</td>
 <td>{{ m.kwh|f2 }}</td><td>{{ m.solar|f2 }}</td><td><b>{{ m.betrag|f2 }}</b></td><td>{{ m.gestellt|f2 }}</td><td>{{ m.bezahlt|f2 }}</td><td class="l muted">{{ m.rechnungen|join(', ') or '–' }}</td></tr>
 {% else %}<tr><td class="l" colspan="8">Keine Mietverhältnisse in {{ jahr }}.</td></tr>{% endfor %}</table></div>
 <p class="muted">«Berechnet» = aktueller Stand aus den Lastgängen inkl. Grundpreis; «In Rechnung gestellt» = Summe der erstellten Quartalsrechnungen. Unterschiede entstehen, solange Quartale noch offen sind oder Rechnungen vor einer Korrektur erstellt wurden.</p></div>

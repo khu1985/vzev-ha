@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.16.4
+
+- Mieternamen einheitlich: Die Seite «Mieter» hat getrennte Felder für Vorname und Nachname (beide nötig). In der App – Übersicht, Rechnungen und Zahlungen, Aufgaben, Jahresübersicht, Sensoren für Home Assistant – steht nur der Vorname. Rechnungen, Zahlungserinnerungen, Jahresabrechnung (PDF) und Excel verwenden Vor- und Nachname.
+- Bestehende Einträge bleiben gültig: Der letzte Teil des Namens gilt als Nachname. Einen mehrteiligen Nachnamen (z. B. «van …») einmal auf der Seite «Mieter» korrigieren.
+
 ## 0.16.3
 
 Behebt, was die «Vorschläge» der eigenen Anlage gemeldet haben:

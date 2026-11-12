@@ -11,7 +11,7 @@ und getrennt ausgewiesenem Netzstrom aus dem Batteriespeicher.
 1. **Einstellungen → Betreiber und Rechnungen:** Name, Adresse, Bank und IBAN (erscheinen auf den Rechnungen und im QR-Einzahlungsschein), vZEV-Start, Zahlungsfrist.
 2. **Einstellungen → Zähler:** die fünf Primeo-Messpunkte (1. OG, 2. OG, Allgemein, Netzbezug PV-Anlage, Produktion), die Energie-Sensoren in Home Assistant und – falls vorhanden – die Wärmepumpen am Allgemeinzähler.
 3. **Tarife:** Solarpreis, Netzstrom HT/NT, Rücklieferung und Grundpreis, jeweils mit «Gültig ab». Neue Preise (z. B. ab 01.01.2027) als neue Zeile eintragen, die alten bleiben für frühere Monate gültig.
-4. **Mieter:** Mietverhältnisse mit Von/Bis.
+4. **Mieter:** Mietverhältnisse mit Vorname, Nachname und Von/Bis.
 5. **Daten importieren:** Lastgänge aller Zähler aus dem Primeo-Kundenportal (.xlsx) und den Wallbox-Export (.csv) hochladen.
 
 ## Seiten
@@ -29,7 +29,7 @@ und getrennt ausgewiesenem Netzstrom aus dem Batteriespeicher.
 - **Abschluss:** Monate der Reihe nach abschliessen (mit Abschlussdatum). Danach sind Änderungen an Tarifen, Mietern und Erträgen für diesen Monat gesperrt.
 
 **Stammdaten**
-- **Mieter:** Mietverhältnisse mit Historie.
+- **Mieter:** Mietverhältnisse mit Historie. In der App steht nur der Vorname; Rechnungen, Zahlungserinnerungen, Jahresabrechnung und Excel verwenden Vor- und Nachname.
 - **Tarife:** Tarife mit Gültig-ab-Datum und **Dynamische Strompreise** (Verlauf heute/morgen, Schnittstelle einstellen).
 - **Primeo:** Primeo-Rechnungen für den Abgleich, manuelle Erträge.
 - **Einstellungen:** Betreiber, Zähler, Regeln (Aufteilung sowie Speicher und Bonus dynamischer Tarif) und die Datei `vzev.yaml` direkt.

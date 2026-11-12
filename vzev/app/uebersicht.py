@@ -177,7 +177,7 @@ def _parteien(cfg, p):
             continue
         mv, mb = seiten._d(m["von"]), seiten._d(m.get("bis"))
         if mv <= bis and (mb is None or mb >= von):
-            namen.append(m["name"] + (f" (ab {mv:%d.%m.})" if mv > von else "") + (f" (bis {mb:%d.%m.})" if mb and mb < bis else ""))
+            namen.append((core.namen(m)[0] or m["name"]) + (f" (ab {mv:%d.%m.})" if mv > von else "") + (f" (bis {mb:%d.%m.})" if mb and mb < bis else ""))
     return ", ".join(namen) or "Leerstand – Kosten trägt der Betreiber"
 
 

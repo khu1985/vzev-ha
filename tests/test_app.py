@@ -287,7 +287,7 @@ def test_jahresabrechnung(app):
     warten(server)
     h = c.get("/jahr?j=2026").get_data(as_text=True)
     assert "Allgemeinstrom 01.03.–30.04.2026" in h and "Mieter 2026" in h and "Vorläufig" in h
-    assert "Erika Muster" in h and "Max Beispiel" in h
+    assert "<td class=\"l\">Erika</td>" in h and "<td class=\"l\">Max</td>" in h  # App: Vorname
     b = server.berechnung()
     import invoices
     from datetime import date
@@ -597,3 +597,24 @@ def test_vorschlaege_nur_meldungen_der_aktuellen_version(app):
             e("2026-11-06 08:00:00", "App gestartet (Version 1.1)")][::-1]      # neueste zuerst
     assert vs.seit_version(alle, "1.1", muster) == "2026-11-05 08:00:00"   # erster Start dieser Version
     assert vs.seit_version(alle, "1.2", muster) is None                   # Startzeile fehlt → 30 Tage
+
+
+def test_mieter_vorname_nachname(app):
+    server, c, d, quelle = app
+    h = c.get("/mieter").get_data(as_text=True)
+    assert re.search(r'name="m\.vorname"[^>]*value="Erika"', h) and re.search(r'name="m\.nachname"[^>]*value="Muster"', h)
+    cfg = yaml.safe_load((d / "vzev.yaml").read_text())
+    daten_ = []
+    for m in cfg["mietverhaeltnisse"]:
+        vor, nach = ("Max", "van Beispiel") if m["name"] == "Max Beispiel" else m["name"].split(" ", 1)
+        daten_ += [("m.einheit", m["einheit"]), ("m.vorname", vor), ("m.nachname", nach), ("m.von", str(m["von"])),
+                   ("m.bis", str(m["bis"] or "")), ("m.strasse", m.get("strasse") or ""), ("m.hausnr", str(m.get("hausnr") or "")),
+                   ("m.plz", str(m.get("plz") or "")), ("m.ort", m.get("ort") or "")]
+    from werkzeug.datastructures import MultiDict
+    assert "Gespeichert" in ziel(c.post("/mieter", data=MultiDict(daten_)))
+    neu = yaml.safe_load((d / "vzev.yaml").read_text())["mietverhaeltnisse"]
+    mx = [m for m in neu if m["name"].startswith("Max")][0]
+    assert mx["name"] == "Max van Beispiel" and mx["vorname"] == "Max" and mx["nachname"] == "van Beispiel"
+    assert "vorname" not in [m for m in neu if m["name"] == "Erika Muster"][0]  # eindeutig: nur «name»
+    daten_[1] = ("m.vorname", "")
+    assert "Vorname, Nachname" in ziel(c.post("/mieter", data=MultiDict(daten_)))

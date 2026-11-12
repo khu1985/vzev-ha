@@ -10,6 +10,8 @@ from datetime import date, datetime
 import pandas as pd
 from flask import redirect, render_template_string, request
 
+import core
+
 S = None
 MONATE = ["", "Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"]
 
@@ -116,7 +118,7 @@ def schritte_monat(d, mon, p, abschluss, zst, st):
         sch.append(dict(gruppe=f"Quartal {p.month // 3}/{p.year}", titel="Zahlungseingang erfassen", ok=bool(wohnungen) and not offen,
                         link="rechnungen", knopf="Zahlungen erfassen",
                         text=("Alle Rechnungen bezahlt." if wohnungen and not offen else "Eingegangene Zahlungen bei der Rechnung eintragen.")
-                        + (" Offen: " + ", ".join(f"{z['partei']} CHF {z['offen']:.2f}" + (" (überfällig)" if z["stand"] == "überfällig" else "") for z in offen) if offen else ""),
+                        + (" Offen: " + ", ".join(f"{core.vorname(cfg, z['partei'])} CHF {z['offen']:.2f}" + (" (überfällig)" if z["stand"] == "überfällig" else "") for z in offen) if offen else ""),
                         optional=True))
     if p.month == 12:
         pdf = S.RECHNUNGEN / "jahr" / f"Allgemeinstrom_{p.year}.pdf"

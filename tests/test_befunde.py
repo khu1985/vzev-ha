@@ -36,3 +36,14 @@ def test_wp_einpassen_nicht_weiter_als_eine_stunde():
 def test_wp_einpassen_ohne_ueberschuss_unveraendert():
     wp = np.array([0.2, 0.3, 0.1])
     assert np.allclose(core.wp_einpassen(wp, np.array([1, 1, 1.0])), wp)
+
+
+def test_namen_und_vorname():
+    assert core.namen({"name": "Erika Muster"}) == ("Erika", "Muster")
+    assert core.namen({"name": "Anna Maria Muster"}) == ("Anna Maria", "Muster")
+    assert core.namen({"name": "Jan van Beispiel", "vorname": "Jan", "nachname": "van Beispiel"}) == ("Jan", "van Beispiel")
+    cfg = {"mietverhaeltnisse": [{"name": "Erika Muster"}, {"name": "Jan van Beispiel", "vorname": "Jan", "nachname": "van Beispiel"}]}
+    assert core.vorname(cfg, "Erika Muster") == "Erika"
+    assert core.vorname(cfg, "Muster") == "Erika"           # Nachname aus dem Dateinamen der Rechnung
+    assert core.vorname(cfg, "Jan van Beispiel") == "Jan"
+    assert core.vorname(cfg, "Unbekannt") == "Unbekannt"

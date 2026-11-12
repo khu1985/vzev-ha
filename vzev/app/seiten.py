@@ -288,7 +288,7 @@ MIETER = """
 def _mieter_felder(cfg):
     einheiten = _einheiten(cfg)
     return [dict(key="einheit", label="Einheit", typ="auswahl", opts=list(einheiten.items())),
-            dict(key="name", label="Mieter", typ="text", breite=220),
+            dict(key="vorname", label="Vorname", typ="text", breite=110), dict(key="nachname", label="Nachname", typ="text", breite=120),
             dict(key="von", label="Von", typ="datum"), dict(key="bis", label="Bis", typ="datum"),
             dict(key="strasse", label="Strasse", typ="text", breite=150), dict(key="hausnr", label="Nr.", typ="text", breite=50),
             dict(key="plz", label="PLZ", typ="text", breite=60), dict(key="ort", label="Ort", typ="text", breite=110)]
@@ -319,7 +319,7 @@ def _historie(cfg):
             von, bis = _d(m["von"]), _d(m.get("bis"))
             if von > cur:
                 perioden.append(dict(leer=True, name="Leerstand", von=cur, bis=von - timedelta(days=1)))
-            perioden.append(dict(leer=False, name=m["name"], von=von, bis=bis))
+            perioden.append(dict(leer=False, name=core.namen(m)[0] or m["name"], voll=m["name"], von=von, bis=bis))
             cur = (bis + timedelta(days=1)) if bis else None
             if cur is None:
                 break
@@ -327,7 +327,7 @@ def _historie(cfg):
             perioden.append(dict(leer=True, name="Leerstand", von=cur, bis=None))
         for p in perioden:
             p["tage"] = max(1, ((p["bis"] or ende) - p["von"]).days + 1)
-            p["text"] = f"{p['name']}: {p['von']:%d.%m.%Y} – {p['bis'].strftime('%d.%m.%Y') if p['bis'] else 'offen'}"
+            p["text"] = f"{p.get('voll', p['name'])}: {p['von']:%d.%m.%Y} – {p['bis'].strftime('%d.%m.%Y') if p['bis'] else 'offen'}"
         out.append((e, perioden))
     return out
 
@@ -340,8 +340,12 @@ def mieter():
             neu = lesen("m", felder)
             b = cfg.get("betreiber", {})
             for i, m in enumerate(neu, 1):
-                if not (m["einheit"] and m["name"] and m["von"]):
-                    raise ValueError(f"Zeile {i}: Einheit, Mieter und Von sind nötig")
+                m["vorname"], m["nachname"] = (m["vorname"] or "").strip(), (m["nachname"] or "").strip()
+                if not (m["einheit"] and m["vorname"] and m["nachname"] and m["von"]):
+                    raise ValueError(f"Zeile {i}: Einheit, Vorname, Nachname und Von sind nötig")
+                m["name"] = f"{m['vorname']} {m['nachname']}"  # voller Name für Rechnungen und Schreiben
+                if core.namen({"name": m["name"]}) == (m["vorname"], m["nachname"]):
+                    del m["vorname"], m["nachname"]  # eindeutig aus «name» ablesbar – nur bei mehrteiligem Nachnamen getrennt speichern
                 if m["bis"] and m["bis"] < m["von"]:
                     raise ValueError(f"Zeile {i}: «Bis» liegt vor «Von»")
                 for k in ("strasse", "hausnr", "plz", "ort"):
@@ -359,7 +363,8 @@ def mieter():
             return redirect("mieter?msg=Gespeichert")
         except ValueError as e:
             return redirect(f"mieter?c=warn&msg=Nicht gespeichert: {e}")
-    rows = [dict(m, von=_d(m["von"]), bis=_d(m.get("bis"))) for m in cfg.get("mietverhaeltnisse") or []]
+    rows = [dict(m, von=_d(m["von"]), bis=_d(m.get("bis")), vorname=core.namen(m)[0], nachname=core.namen(m)[1])
+            for m in cfg.get("mietverhaeltnisse") or []]
     return S.page("Mieter", render_template_string(MIETER, historie=_historie(cfg), einheiten=_einheiten(cfg),
                                                    tabelle=editor("m", felder, rows)))
 

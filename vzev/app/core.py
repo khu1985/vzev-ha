@@ -318,6 +318,29 @@ def compute(df, lade, cfg, ev=None, dyn=None, wp=None):
     return df
 
 
+def namen(m):
+    """(Vorname, Nachname) eines Mietverhältnisses. Ältere Einträge haben nur «name»: der letzte Teil ist der Nachname."""
+    vor, nach = str(m.get("vorname") or "").strip(), str(m.get("nachname") or "").strip()
+    if vor or nach:
+        return vor, nach
+    teile = str(m.get("name") or "").split()
+    return (" ".join(teile[:-1]), teile[-1]) if len(teile) > 1 else ("", teile[0] if teile else "")
+
+
+def vorname(cfg, name):
+    """Anzeige in der App: nur der Vorname. «name» ist der volle Name (oder der Nachname aus einem Dateinamen).
+    Schreiben (Rechnungen, Mahnungen, Jahresabrechnung) verwenden weiterhin den vollen Namen."""
+    if not name:
+        return name
+    for m in (cfg or {}).get("mietverhaeltnisse") or []:
+        voll = str(m.get("name") or "")
+        if name == voll or name == (voll.split()[-1] if voll.split() else ""):
+            v, n = namen(m)
+            return v or n or name
+    teile = str(name).split()
+    return teile[0] if len(teile) > 1 else name
+
+
 def wp_einpassen(wp, platz, schritte=4):
     """Gemessene Wärmepumpen-kWh in den Allgemeinzähler einpassen (pro Viertelstunde höchstens dessen Wert).
 
