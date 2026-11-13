@@ -590,6 +590,7 @@ def test_vorschlaege(app):
     assert "<h2>Leistung</h2>" in h and "Ladezeiten und Rechenzeiten dieser Version" in h
     assert "### Leistung (Messwerte dieser Version)" in md.get_data(as_text=True) and "</span>vorschlaege</td>" in h
     assert (d / "leistung.json").exists()
+    assert 'id="vs-kopieren"' in h and "execCommand('copy')" in h  # Kopieren auch im Home-Assistant-Fenster
     c.post("/vorschlaege", data={"aktion": "alle_einblenden"})
     assert "Ausgeblendet und gemeldet" not in c.get("/vorschlaege").get_data(as_text=True)
 

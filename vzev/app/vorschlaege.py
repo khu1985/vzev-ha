@@ -322,7 +322,9 @@ def sammeln():
         except Exception as e:  # noqa: BLE001 – eine Quelle darf die anderen nicht verhindern
             _zaehlen(erg, ("Fehler und Warnungen", f"Vorschläge: Quelle «{quelle.__name__.strip('_')}» fehlgeschlagen – {type(e).__name__}", ""), MITTEL)
     private = private_texte(S.config())
-    liste = [Vorschlag(bereich, anonymisieren(titel, private), anonymisieren(detail, private), anzahl, gewicht)
+    # Leistung: von der App selbst erzeugte Namen und Zeiten – nichts Persönliches, die Zahlen braucht es zum Verbessern
+    liste = [Vorschlag(bereich, titel, detail, anzahl, gewicht) if bereich == "Leistung" else
+             Vorschlag(bereich, anonymisieren(titel, private), anonymisieren(detail, private), anzahl, gewicht)
              for (bereich, titel, detail), (anzahl, gewicht) in erg.items()]
     eigene = {}
     for i in laden()["ideen"]:
@@ -394,10 +396,25 @@ Alles ist <b>anonymisiert</b> – Namen, Adressen, Messpunkte, Seriennummern, Be
 <p class="muted">Namen, Beträge und Daten werden beim Weitergeben ersetzt – schreib trotzdem nichts Persönliches hinein.</p></div>
 {{ leistung_karte|safe }}
 <div class="card"><h2>Weitergeben</h2><textarea id="vs-text" class="bericht" readonly>{{ text }}</textarea>
-<p style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" onclick="navigator.clipboard.writeText(document.getElementById('vs-text').value);this.textContent='Kopiert'">Kopieren</button>
+<p style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" id="vs-kopieren">Kopieren</button>
 <a class="btn" href="vorschlaege.md">Herunterladen (.md)</a>
 <a class="btn primary" href="{{ link }}" target="_blank" rel="noopener">Als GitHub-Issue öffnen</a></p>
 <p class="muted">Das Issue öffnet sich auf GitHub als Entwurf; abgeschickt wird erst, wenn du dort auf «Create» klickst.</p></div>
+<script>
+// Kopieren: im Fenster von Home Assistant (iframe) ist die Zwischenablage-API oft gesperrt – zuerst execCommand
+// (geht bei einem Klick auch im iframe), dann die API; sonst den Text markieren, damit man selbst kopieren kann.
+document.getElementById('vs-kopieren').addEventListener('click', function(){
+  var b = this, el = document.getElementById('vs-text'), t = el.value, alt = 'Kopieren';
+  function zeigen(s){ b.textContent = s; setTimeout(function(){ b.textContent = alt; }, 4000); }
+  function markieren(){ el.focus(); el.select(); zeigen('Markiert – jetzt kopieren (Strg+C)'); }
+  var ok = false;
+  try { el.focus(); el.select(); el.setSelectionRange(0, t.length); ok = document.execCommand('copy'); } catch (x) { ok = false; }
+  if (ok) { el.setSelectionRange(0, 0); el.blur(); zeigen('Kopiert ✓'); return; }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(t).then(function(){ zeigen('Kopiert ✓'); }, markieren);
+  } else { markieren(); }
+});
+</script>
 """
 
 

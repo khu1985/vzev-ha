@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.17.1
+
+Schneller, nach den ersten Messwerten der Leistung:
+
+- Übersicht, Startseite, Aufgaben und Sensoren: Der Vergleich Home Assistant / Primeo (eine ganze zweite Vorschau über alle Zählerstände) wurde bei jeder neuen Ablesung, also alle 15 Minuten, neu gerechnet. Er hängt nur an den Lastgängen und wird jetzt erst nach einer neuen Berechnung erneuert.
+- Vorschau aus Home Assistant etwa dreimal schneller: HT/NT-Muster aus den Lastgängen ohne Python-Schleife je Zeitpunkt (und zwischengespeichert), Zählerstände ohne Schleife auf Viertelstunden verteilt.
+- Kontrolle «Netzladung» liest die Wechselrichterwerte pro Monat nur einmal; die JAZ wird zwischengespeichert, bis neue Zählerstände der Wärmepumpen kommen.
+- Vorschläge: Im Bereich «Leistung» bleiben die gemessenen Zeiten stehen (bisher als ‹Zahl› anonymisiert).
+- Vorschläge: «Kopieren» funktioniert jetzt auch im Fenster von Home Assistant; geht es nicht, wird der Text markiert.
+
 ## 0.17.0
 
 - **Leistung messen** (Anlage → Vorschläge): Ladezeit jeder Seite und Aktion, Rechenzeit der grossen Berechnungen (Laden und Rechnen aller Zähler, Übersicht und Kontrollen, Rechnungen, Jahresabrechnung, Wärmepumpen, Prognose, Sensoren) und des Datensammlers, dazu System (Kerne, Last, Arbeitsspeicher) und Datenmengen – pro Version, mit dem Vergleich zur Vorversion. Langsame Stellen werden zu Vorschlägen im Bereich «Leistung», die Messwerte stehen im Text zum Weitergeben. Gespeichert in `leistung.json` (nur Zeiten und Mengen).

@@ -42,18 +42,33 @@ def daten():
             res = res_v.assign(quelle="ha")
         else:
             res = None
-        vgl = []
-        if res_p is not None:  # Kontrolle: Zeitraum, für den es Primeo-Lastgänge und Zählerstände gibt
-            try:
-                with S.collector._db() as c:
-                    erster = c.execute("SELECT MIN(ts) FROM messwerte").fetchone()[0]
-                if erster and pd.Timestamp(erster) < res_p.index.max():
-                    res_k, _ = vorschau.berechnen(S.collector._db, cfg, None, res_p)
-                    vgl = vorschau.vergleich(res_k, res_p)
-            except Exception:
-                S.log.exception("Vergleich Home Assistant / Primeo fehlgeschlagen")
-        _vcache.update(key=key, res=res, info=info, vergleich=vgl, memo={})
+        _vcache.update(key=key, res=res, info=info, vergleich=_vergleich(cfg, res_p, b.get("key")), memo={})
     return dict(b=b, cfg=cfg, res=_vcache["res"], info=_vcache["info"], vergleich=_vcache["vergleich"])
+
+
+_VGL = {}
+
+
+def _vergleich(cfg, res_p, b_key):
+    """Kontrolle Home Assistant / Primeo für den Zeitraum, in dem beides vorliegt. Hängt nur an den Lastgängen (und den
+    Zählerständen davor): neu nur nach einer neuen Berechnung, nicht bei jeder neuen Ablesung (spart eine ganze Vorschau)."""
+    if res_p is None:
+        return []
+    try:
+        with S.collector._db() as c:
+            erster, bis_primeo = c.execute("SELECT MIN(ts), COUNT(*) FROM messwerte WHERE ts <= ?",
+                                           (res_p.index.max().isoformat(timespec="minutes"),)).fetchone()
+        key = (b_key, erster, bis_primeo)
+        if _VGL.get("key") != key:
+            vgl = []
+            if erster and pd.Timestamp(erster) < res_p.index.max():
+                res_k, _ = vorschau.berechnen(S.collector._db, cfg, None, res_p)
+                vgl = vorschau.vergleich(res_k, res_p)
+            _VGL.update(key=key, vgl=vgl)
+        return _VGL["vgl"]
+    except Exception:
+        S.log.exception("Vergleich Home Assistant / Primeo fehlgeschlagen")
+        return []
 
 
 def _memo(name, fn):
@@ -246,7 +261,7 @@ def kontrollen_fuer(d, mon, p):
     # Netzladung des Speichers gegen den Wechselrichter: ohne Sonne kann die Batterie nur aus dem Netz laden
     try:
         import vorschau
-        sv = vorschau.solis_viertel(S.collector._db, cfg, rm.index.min(), rm.index.max())
+        sv = _memo(("solis", sel), lambda: vorschau.solis_viertel(S.collector._db, cfg, rm.index.min(), rm.index.max()))
         if sv is not None and len(sv):
             sp = core.speicher_regeln(cfg)
             nacht = sv.index[(sv["pv"] < 0.005)].intersection(rm.index)

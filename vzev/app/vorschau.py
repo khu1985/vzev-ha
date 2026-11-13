@@ -87,7 +87,22 @@ def waerme_einzeln(db, cfg, ab=None):
     return _reihen(db, [(w["name"], w["waerme"], 1.0) for w in waermepumpen(cfg) if w["waerme"]], ab)
 
 
+_JAZ = {}
+
+
 def jaz(db, cfg, von, bis):
+    ids = sorted({w[k] for w in waermepumpen(cfg) for k in ("entity", "waerme") if w.get(k)})
+    with db() as c:
+        stand = c.execute(f"SELECT MAX(ts), COUNT(*) FROM messwerte WHERE entity IN ({','.join('?' * len(ids))})", ids).fetchone() if ids else None
+    key = (str(von), str(bis), tuple(ids), tuple((w["name"], w["faktor"]) for w in waermepumpen(cfg)), stand)
+    if key not in _JAZ:
+        if len(_JAZ) > 8:
+            _JAZ.clear()
+        _JAZ[key] = _jaz(db, cfg, von, bis)
+    return _JAZ[key]
+
+
+def _jaz(db, cfg, von, bis):
     """Jahresarbeitszahl je Wärmepumpe im Zeitraum: {name: dict(strom, waerme, jaz, monate=[(periode, strom, waerme)])}.
     Nur Viertelstunden, in denen beide Zähler Werte haben, damit Lücken das Verhältnis nicht verfälschen."""
     s = unterzaehler_einzeln(db, cfg, von)
@@ -119,11 +134,15 @@ def verteilen(stand, max_luecke=16):
     if len(stand) < 2:
         return pd.Series(dtype=float)
     t = stand.index[:-1]
-    n = np.maximum(1, np.round((stand.index[1:] - t) / VIERTEL).astype(int))
+    n = np.maximum(1, np.round(np.asarray((stand.index[1:] - t) / VIERTEL, dtype=float)).astype(int))
     diff = np.diff(stand.to_numpy())
     ok = (diff >= 0) & (n <= max_luecke)
-    zeiten = np.concatenate([t[i] + np.arange(n[i]) * VIERTEL for i in np.flatnonzero(ok)]) if ok.any() else []
-    werte = np.repeat(diff[ok] / n[ok], n[ok])
+    if not ok.any():
+        return pd.Series(dtype=float)
+    anz = n[ok]
+    versatz = np.arange(anz.sum()) - np.repeat(np.cumsum(anz) - anz, anz)  # 0, 1, … innerhalb jeder Lücke
+    zeiten = np.repeat(t[ok].to_numpy(), anz) + versatz * np.timedelta64(15, "m")
+    werte = np.repeat(diff[ok] / anz, anz)
     return pd.Series(werte, index=pd.DatetimeIndex(zeiten)).groupby(level=0).sum()
 
 
@@ -138,21 +157,31 @@ def unterzaehler(db, cfg, ab=None):
     return None if t is None else t.sum(axis=1)
 
 
+_TARIFMUSTER = {}
+
+
 def tarifmuster(res):
-    """HT/NT nach Wochentag und Uhrzeit, so wie Primeo es in den Lastgängen verwendet."""
+    """HT/NT nach Wochentag und Uhrzeit, so wie Primeo es in den Lastgängen verwendet: {(Wochentag, Stunde, Minute): Tarif}.
+    Zwischengespeichert pro Berechnung (gleiche Lastgänge → gleiches Muster)."""
     if res is None or "tarif" not in res:
         return None
     t = res["tarif"].dropna()
-    key = list(zip(t.index.dayofweek, t.index.hour, t.index.minute))
-    return pd.Series(t.values, index=pd.MultiIndex.from_tuples(key)).groupby(level=[0, 1, 2]).agg(lambda x: x.value_counts().index[0])
+    if not len(t):
+        return None
+    schluessel = (len(t), t.index[0], t.index[-1], int((t == "HT").sum()))
+    if _TARIFMUSTER.get("key") != schluessel:
+        g = pd.DataFrame({"d": t.index.dayofweek, "h": t.index.hour, "m": t.index.minute, "t": t.to_numpy()})
+        n = g.groupby(["d", "h", "m", "t"], sort=False).size().reset_index(name="n")
+        n = n.sort_values("n", ascending=False, kind="stable").drop_duplicates(["d", "h", "m"])  # häufigster Tarif je Zeitpunkt
+        _TARIFMUSTER.update(key=schluessel, muster={(int(d), int(h), int(m)): v for d, h, m, v in zip(n["d"], n["h"], n["m"], n["t"])})
+    return _TARIFMUSTER["muster"]
 
 
 def _tarif(index, muster):
     if muster is None:  # Rückfall: HT Mo–Fr 07–20 Uhr
         ht = (index.dayofweek < 5) & (index.hour >= 7) & (index.hour < 20)
         return pd.Series(np.where(ht, "HT", "NT"), index=index)
-    key = list(zip(index.dayofweek, index.hour, index.minute))
-    return pd.Series([muster.get(k, "NT") for k in key], index=index)
+    return pd.Series([muster.get(k, "NT") for k in zip(index.dayofweek, index.hour, index.minute)], index=index)
 
 
 def berechnen(db, cfg, ab=None, res_primeo=None):
