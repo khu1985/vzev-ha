@@ -115,28 +115,34 @@ def test_warteseite_bei_laufender_berechnung(app):
     assert b'id="warten"' not in c.get("/").data
 
 
+def formular(c, url):
+    """Das Speicherformular einer Seite so auslesen, wie der Browser es senden würde: (Ziel, [(Name, Wert)])."""
+    h = c.get(url).get_data(as_text=True)
+    form = [f for f in re.findall(r'<form method="post"[^>]*action="([^"]+)"[^>]*>(.*?)</form>', h, re.S)
+            if not f[0].startswith("sensoren_schreiben")][-1]   # Knopf «Jetzt schreiben» ist kein Speicherformular
+    daten_ = []
+    for m in re.finditer(r'<input ([^>]*)>|<select name="([^"]+)"[^>]*>(.*?)</select>', form[1], re.S):
+        if m.group(1):
+            a = m.group(1)
+            n = re.search(r'name="([^"]+)"', a)
+            if not n or ('type="checkbox"' in a and "checked" not in a):
+                continue  # wie der Browser: nur angehakte Checkboxen werden gesendet
+            v = re.search(r'value="([^"]*)"', a)
+            daten_.append((n.group(1), (v.group(1) if v else "").replace("&#39;", "'").replace("&amp;", "&")))
+        else:
+            sel = re.search(r'<option value="([^"]*)" selected', m.group(3))
+            daten_.append((m.group(2), sel.group(1) if sel else ""))
+    return form[0], daten_
+
+
 def test_formulare_speichern_ohne_werte_zu_aendern(app):
     server, c, d, quelle = app
     vorher = yaml.safe_load((d / "vzev.yaml").read_text())
     for url in ["/mieter", "/tarife", "/primeo", "/einstellungen?tab=betreiber", "/einstellungen?tab=zaehler",
                 "/einstellungen?tab=regeln"]:
-        h = c.get(url).get_data(as_text=True)
-        form = [f for f in re.findall(r'<form method="post"[^>]*action="([^"]+)"[^>]*>(.*?)</form>', h, re.S)
-                if not f[0].startswith("sensoren_schreiben")][-1]   # Knopf «Jetzt schreiben» ist kein Speicherformular
-        daten_ = []
-        for m in re.finditer(r'<input ([^>]*)>|<select name="([^"]+)"[^>]*>(.*?)</select>', form[1], re.S):
-            if m.group(1):
-                a = m.group(1)
-                n = re.search(r'name="([^"]+)"', a)
-                if not n or ('type="checkbox"' in a and "checked" not in a):
-                    continue  # wie der Browser: nur angehakte Checkboxen werden gesendet
-                v = re.search(r'value="([^"]*)"', a)
-                daten_.append((n.group(1), (v.group(1) if v else "").replace("&#39;", "'").replace("&amp;", "&")))
-            else:
-                sel = re.search(r'<option value="([^"]*)" selected', m.group(3))
-                daten_.append((m.group(2), sel.group(1) if sel else ""))
+        ziel_, daten_ = formular(c, url)
         from werkzeug.datastructures import MultiDict
-        r = c.post("/" + form[0], data=MultiDict(daten_))
+        r = c.post("/" + ziel_, data=MultiDict(daten_))
         assert "Gespeichert" in ziel(r), (url, ziel(r))
     nachher = yaml.safe_load((d / "vzev.yaml").read_text())
     import json
@@ -654,3 +660,22 @@ def test_namenskorrektur_im_abgeschlossenen_monat(app):
     # Daten in einem abgeschlossenen Monat ändern bleibt gesperrt
     daten_[12] = ("m.von", "2026-04-20")
     assert "abgeschlossenen Monat" in ziel(c.post("/mieter", data=MultiDict(daten_)))
+
+
+def test_waermepumpen_eingabe_abgesichert(app):
+    server, c, d, quelle = app
+    from werkzeug.datastructures import MultiDict
+    ziel_, daten_ = formular(c, "/einstellungen?tab=zaehler")
+    basis = [(k, v) for k, v in daten_ if not k.startswith("wp.")]
+
+    def senden(*zeilen):
+        wp = []
+        for name, entity, waerme in zeilen:
+            wp += [("wp.name", name), ("wp.entity", entity), ("wp.faktor", "1.0"), ("wp.waerme", waerme)]
+        return ziel(c.post("/" + ziel_, data=MultiDict(basis + wp)))
+    assert "jeder Name nur einmal" in senden(("Heizung", "sensor.shelly_a_energie", ""), ("Heizung", "sensor.shelly_b_energie", ""))
+    assert "misst wohl Wärme" in senden(("Heizung", "sensor.buderus_gateway_1_erzeugte_warme_gesamt", ""))
+    assert "Gespeichert" in senden(("Heizung", "sensor.shelly_a_energie", "sensor.buderus_gateway_1_erzeugte_warme_gesamt"),
+                                   ("Warmwasser", "sensor.shelly_b_energy", ""))
+    wp = yaml.safe_load((d / "vzev.yaml").read_text())["homeassistant"]["waermepumpen"]
+    assert wp[0]["waerme"].endswith("erzeugte_warme_gesamt") and [w["name"] for w in wp] == ["Heizung", "Warmwasser"]

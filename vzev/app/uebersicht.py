@@ -255,9 +255,21 @@ def kontrollen_fuer(d, mon, p):
         elif gem <= 0:
             kontrollen.append((False, "Wärmepumpen erfasst", "keine Werte in diesem Monat – Sensoren unter «Datensammler» prüfen; ihr Verbrauch bleibt im Allgemeinstrom"))
         else:
-            kontrollen.append((abs(gem - abz) <= max(0.5, 0.02 * gem), "Wärmepumpen aus dem Allgemeinstrom herausgerechnet",
+            ok = abs(gem - abz) <= max(0.5, 0.02 * gem)
+            allg = float(rm["Allg"].sum())
+            if ok:
+                warum = ""
+            elif gem > allg:
+                warum = (f" – mehr als der ganze Allgemeinstrom ({allg:.0f} kWh): wahrscheinlich ein Wärme- statt ein Stromsensor "
+                         "eingetragen (Einstellungen → Zähler → Wärmepumpen)")
+            else:
+                ueber = (rm["WP_gemessen"] - (rm["Allg"] - rm["EV"])).clip(lower=0)
+                lade = float(ueber[rm["EV"] > 0].sum() / ueber.sum()) if ueber.sum() > 0 else 0.0
+                warum = (f" – {gem - abz:.1f} kWh übrig, davon {lade * (gem - abz):.1f} kWh in Viertelstunden mit Laden der Ladestation"
+                         if lade >= 0.2 else f" – {gem - abz:.1f} kWh übrig, kaum während Ladevorgängen (Zeitversatz oder Sensor misst mehr als die Wärmepumpe?)")
+            kontrollen.append((ok, "Wärmepumpen aus dem Allgemeinstrom herausgerechnet",
                                f"{abz:.1f} von {gem:.1f} kWh gemessen" + (f", erfasst ab {rm.index[vq].min():%d.%m. %H:%M}" if rm.index[vq].min() > rm.index.min() + pd.Timedelta(days=1) else "")
-                               + ("" if abs(gem - abz) <= max(0.5, 0.02 * gem) else " – der Rest übersteigt den Allgemeinzähler (Zeitversatz oder falscher Sensor?)")))
+                               + warum))
     # Netzladung des Speichers gegen den Wechselrichter: ohne Sonne kann die Batterie nur aus dem Netz laden
     try:
         import vorschau

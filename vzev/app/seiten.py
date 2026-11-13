@@ -768,6 +768,10 @@ F_MP = [dict(key="mp", label="Messpunkt-Nummer", typ="text", breite=330),
         dict(key="z", label="Zähler", typ="auswahl", opts=[("1OG", "Verbrauch 1. OG"), ("2OG", "Verbrauch 2. OG"), ("Allg", "Allgemein (inkl. Ladestation)"),
                                                           ("PVA", "Netzbezug PV-Anlage"), ("Prod", "Produktion PV-Anlage")])]
 F_HA = [dict(key="z", label="Zähler", typ="text", breite=120), dict(key="e", label="Entität", typ="text", breite=360)]
+# Sensor-IDs, die erzeugte Wärme statt Strom messen (Buderus «erzeugte_warme», «heat_generated», «waermemenge» …);
+# «warmwasser» und «heatpump» bleiben erlaubt.
+WAERME_SENSOR = re.compile(r"(w(a|ae|ä)rme(?!pumpe)(?!_?pump)|heat_?(generated|produced|output|energy)|thermal)", re.I)
+
 F_WP = [dict(key="name", label="Name", typ="text", breite=140, hinweis="z. B. Heizung"),
         dict(key="entity", label="Energie-Sensor (kWh)", typ="text", breite=360, liste="energie", hinweis="sensor.…"),
         dict(key="faktor", label="Faktor", typ="zahl", breite=70, hinweis="1"),
@@ -808,6 +812,16 @@ def einstellungen_formulare(tab):
                     raise ValueError("Wärmepumpen: Wärme-Sensor muss mit «sensor.» beginnen")
                 if any(not w["entity"].startswith("sensor.") or not 0.5 <= w["faktor"] <= 2 for w in wp):
                     raise ValueError("Wärmepumpen: Sensor muss mit «sensor.» beginnen, Faktor zwischen 0.5 und 2")
+                namen = [w["name"].strip().lower() for w in wp]
+                if len(set(namen)) != len(namen):
+                    raise ValueError("Wärmepumpen: jeder Name nur einmal – Strom und Wärme derselben Pumpe in eine Zeile "
+                                     "(Wärme ins Feld «Wärme-Sensor»)")
+                if len({w["entity"] for w in wp}) != len(wp):
+                    raise ValueError("Wärmepumpen: derselbe Energie-Sensor steht in mehreren Zeilen")
+                waerme_als_strom = [w["entity"] for w in wp if WAERME_SENSOR.search(w["entity"])]
+                if waerme_als_strom:
+                    raise ValueError(f"Wärmepumpen: «{waerme_als_strom[0]}» misst wohl Wärme, nicht Strom – ins Feld «Wärme-Sensor» "
+                                     "der Pumpe eintragen; als Energie-Sensor den Stromzähler (z. B. Shelly)")
                 if wp or ha.get("waermepumpen"):
                     ha["waermepumpen"] = wp
                 sc = [x.strip() for x in (request.form.get("solcast") or "").split(",") if x.strip()]

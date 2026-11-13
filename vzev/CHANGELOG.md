@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.17.2
+
+- Wärmepumpen und Ladestation: Die Ladevorgänge sind nur als Summe bekannt und wurden auf den ganzen Allgemeinstrom verteilt – auch auf den Verbrauch der Wärmepumpe, die zur gleichen Zeit lief. Für die gemessene Wärmepumpe blieb dann kein Platz, ein Teil blieb im Allgemeinstrom. Jetzt hat die gemessene Wärmepumpe Vorrang; die Ladevorgänge werden auf den übrigen Allgemeinstrom verteilt (kWh pro Ladevorgang unverändert).
+- Kontrolle «Wärmepumpen herausgerechnet» schlüsselt einen Rest auf (wie viel davon während Ladevorgängen) und meldet klar, wenn mehr gemessen wird als der ganze Allgemeinstrom (wahrscheinlich ein Wärme- statt Stromsensor).
+- Einstellungen → Zähler → Wärmepumpen: Jeder Name und jeder Energie-Sensor nur einmal; ein Sensor für erzeugte Wärme (z. B. Buderus «erzeugte_warme») als Energie-Sensor wird abgelehnt, mit Hinweis aufs Feld «Wärme-Sensor».
+
 ## 0.17.1
 
 Schneller, nach den ersten Messwerten der Leistung:

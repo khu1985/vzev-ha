@@ -71,3 +71,18 @@ def test_einzelne_waermepumpen():
         assert (res[f"{a}_WP1"] + res[f"{a}_WP2"]).sum() == pytest.approx(res[f"{a}_WP"].sum())
     assert res["WP1"].sum() == pytest.approx(2 * res["WP2"].sum())
     assert res["WP2"].iloc[4] == pytest.approx(0.1 / 3)   # Viertelstunde mit gekapptem Wert: anteilig
+
+
+def test_ladestation_laesst_platz_fuer_gemessene_wp():
+    """Ladevorgänge sind nur als Summe bekannt: verteilt wird auf den Allgemeinstrom ohne die gemessene Wärmepumpe."""
+    idx = pd.date_range("2026-11-02 00:00", periods=8, freq="15min")
+    df = pd.DataFrame({"1OG": 0.1, "2OG": 0.1, "Allg": [2.0, 2.5, 2.5, 2.0, 2.0, 0.1, 0.1, 0.1], "PVA": 0.0,
+                       "Prod": 0.0, "tarif": "NT"}, index=idx)
+    wp = pd.Series([0.0, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0], index=idx)   # Wärmepumpe läuft während des Ladens
+    lade = pd.DataFrame({"Start": [idx[0]], "Ende": [idx[4]], "kwh": [9.0]})
+    cfg = _cfg()
+    cfg["regeln"]["ladestation_grundlast_kwh"] = 0.0
+    res = core.compute(df, lade, cfg, wp=wp)
+    assert res["EV"].sum() == pytest.approx(9.0)        # Ladevorgang bleibt vollständig
+    assert res["WP"].tolist() == pytest.approx(wp.tolist())  # Wärmepumpe in ihrer Viertelstunde, nichts verschoben
+    assert (res["AllgC"] >= -1e-12).all()

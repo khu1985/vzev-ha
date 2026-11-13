@@ -267,14 +267,16 @@ def compute(df, lade, cfg, ev=None, dyn=None, wp=None):
     später aus diesem Vorrat im Haus verbraucht wird, ist «Netzstrom aus Speicher» (P_…) statt Solarstrom (S_…)."""
     df = df.copy()
     rules, tar = cfg["regeln"], cfg["tarife"]
-    if ev is None:
-        ev = distribute_ev(df, lade, rules["ladestation_grundlast_kwh"])
-    df["EV"] = np.minimum(ev, df["Allg"])
     einzeln = None
     if isinstance(wp, pd.DataFrame):  # je Wärmepumpe eine Spalte (Name) → Summe, Aufteilung unten
         einzeln = wp.reindex(df.index).fillna(0.0).clip(lower=0)
         wp = einzeln.sum(axis=1)
     wp = pd.Series(0.0, index=df.index) if wp is None else wp.reindex(df.index).fillna(0.0).clip(lower=0)
+    if ev is None:
+        # Ladevorgänge kennen nur ihre Summe; verteilt wird auf den Allgemeinstrom ohne die gemessenen Wärmepumpen –
+        # sonst bekäme die Ladestation den Verbrauch der Wärmepumpe zugeteilt, und für diese bliebe kein Platz.
+        ev = distribute_ev(df.assign(Allg=(df["Allg"] - wp).clip(lower=0)), lade, rules["ladestation_grundlast_kwh"])
+    df["EV"] = np.minimum(ev, df["Allg"])
     df["WP_gemessen"] = wp
     df["WP"] = wp_einpassen(wp.to_numpy(), (df["Allg"] - df["EV"]).to_numpy())
     df["AllgC"] = df["Allg"] - df["EV"] - df["WP"]

@@ -77,9 +77,9 @@ Die App holt die Viertelstundenpreise über die Primeo-Schnittstelle (Standard: 
 
 ## Wärmepumpen
 
-Wärmepumpen für Heizung und Warmwasser, die am Allgemeinzähler hängen, werden unter **Einstellungen → Zähler → Wärmepumpen** mit ihrem Energie-Sensor eingetragen (Zählerstand in kWh oder Wh, z. B. Shelly-Energie oder Stromverbrauch der Wärmepumpe). Schätzt die Wärmepumpe ihren Stromverbrauch nur, gleicht ein **Faktor** die Abweichung aus.
+Wärmepumpen für Heizung und Warmwasser, die am Allgemeinzähler hängen, werden unter **Einstellungen → Zähler → Wärmepumpen** mit ihrem Energie-Sensor eingetragen (Zählerstand in kWh oder Wh, z. B. Shelly-Energie oder Stromverbrauch der Wärmepumpe). Schätzt die Wärmepumpe ihren Stromverbrauch nur, gleicht ein **Faktor** die Abweichung aus. Pro Wärmepumpe eine Zeile: Strom als Energie-Sensor, erzeugte Wärme (z. B. Buderus «erzeugte Wärme gesamt») im Feld **Wärme-Sensor** derselben Zeile – nie als eigene Zeile.
 
-- Der Verbrauch wird pro Viertelstunde aus dem Allgemeinstrom herausgerechnet und bekommt den gleichen Solaranteil wie alle Zähler. Weil Home Assistant und Primeo einige Minuten versetzt messen, wird ein Überschuss bis eine Stunde davor oder danach eingepasst; nur was auch dort keinen Platz hat, bleibt im Allgemeinstrom (Kontrolle «herausgerechnet»).
+- Der Verbrauch wird pro Viertelstunde aus dem Allgemeinstrom herausgerechnet und bekommt den gleichen Solaranteil wie alle Zähler. Die Ladevorgänge der Ladestation (nur als Summe bekannt) werden auf den Allgemeinstrom ohne die gemessenen Wärmepumpen verteilt. Weil Home Assistant und Primeo einige Minuten versetzt messen, wird ein Überschuss bis eine Stunde davor oder danach eingepasst; nur was auch dort keinen Platz hat, bleibt im Allgemeinstrom (Kontrolle «herausgerechnet»).
 - Pro Quartal entsteht eine zusätzliche Gesamtrechnung **Heizung und Warmwasser**, in der Jahresabrechnung ein eigenes PDF für die Heiz- und Nebenkostenabrechnung.
 - Gemessen wird ab dem Tag, an dem der Datensammler die Sensoren speichert; davor bleibt der Verbrauch im Allgemeinstrom. Kurze Lücken (bis 4 Stunden) werden gleichmässig verteilt.
 - Die Übersicht prüft, ob die Werte vollständig ankommen.
