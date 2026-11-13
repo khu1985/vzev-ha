@@ -23,7 +23,7 @@ HOCH, MITTEL, TIEF = 3, 2, 1
 PRIO_TEXT = {HOCH: "hoch", MITTEL: "mittel", TIEF: "tief"}
 ISSUE_MAX = 6000
 REPOSITORY = "https://github.com/khu1985/vzev-ha"
-BEREICHE = ["Fehler und Warnungen", "Kontrollen", "Import", "Korrekturen", "Datensammler", "Prognose", "Eigene Ideen"]
+BEREICHE = ["Fehler und Warnungen", "Leistung", "Kontrollen", "Import", "Korrekturen", "Datensammler", "Prognose", "Eigene Ideen"]
 S = None
 
 
@@ -262,6 +262,12 @@ def _prognose(erg):
 
 # ---------------------------------------------------------------- Status und eigene Ideen
 
+def _leistung(erg):
+    import leistung
+    for titel, detail, gewicht in leistung.vorschlaege():
+        _zaehlen(erg, ("Leistung", titel, detail), gewicht)
+
+
 def _datei():
     return S.DATA / "vorschlaege.json"
 
@@ -310,7 +316,7 @@ def idee_loeschen(iid):
 def sammeln():
     """Alle Vorschläge, bereits anonymisiert, wichtigste zuerst."""
     erg = {}
-    for quelle in (_protokoll, _kontrollen, _import, _korrekturen, _datensammler, _prognose):
+    for quelle in (_protokoll, _kontrollen, _import, _korrekturen, _datensammler, _prognose, _leistung):
         try:
             quelle(erg)
         except Exception as e:  # noqa: BLE001 – eine Quelle darf die anderen nicht verhindern
@@ -327,7 +333,7 @@ def sammeln():
     return liste
 
 
-def bericht(vorschlaege, version):
+def bericht(vorschlaege, version, leistung=None):
     kopf = [f"Vorschläge aus der vZEV-App {version}", "",
             "_Automatisch abgeleitet und anonymisiert (keine Namen, Adressen, Messpunkte, Beträge oder Daten)._", ""]
     teile = []
@@ -338,7 +344,10 @@ def bericht(vorschlaege, version):
             d = f" – {v.detail}" if v.detail else ""
             teile.append(f"- [{PRIO_TEXT[v.gewicht]}] {v.titel}{n}{d}")
         teile.append("")
-    return "\n".join(kopf + (teile or ["Keine Vorschläge."])).strip() + "\n"
+    teile = teile or ["Keine Vorschläge.", ""]
+    if leistung:
+        teile += ["### Leistung (Messwerte dieser Version)", "", "```", *leistung, "```", ""]
+    return "\n".join(kopf + teile).strip() + "\n"
 
 
 def issue_link(text, version):
@@ -360,7 +369,8 @@ SEITE = """
  <div class="kpi"><div class="t">ausgeblendet</div><div class="v">{{ ausgeblendet }}</div></div>
 </div>
 <div class="card"><p>Die App leitet aus deinen Daten ab, wo sie besser werden kann: Fehler im Protokoll, Kontrollen, die nicht stimmen,
-Dateien, die sie nicht einlesen konnte, Korrekturen nach dem Abschluss, Sensoren ohne Werte und die Treffsicherheit der Prognose.
+Dateien, die sie nicht einlesen konnte, Korrekturen nach dem Abschluss, Sensoren ohne Werte, die Treffsicherheit der Prognose
+und die eigene Leistung (langsame Seiten und Berechnungen, knapper Speicher).
 Alles ist <b>anonymisiert</b> – Namen, Adressen, Messpunkte, Seriennummern, Beträge und Daten sind ersetzt.
 <b>Nichts wird automatisch gesendet:</b> Unten steht genau der Text, den du kopieren, herunterladen oder als GitHub-Issue öffnen kannst.</p></div>
 <div class="card"><h2>Vorschläge aus deinen Daten</h2>
@@ -382,6 +392,7 @@ Alles ist <b>anonymisiert</b> – Namen, Adressen, Messpunkte, Seriennummern, Be
 <textarea name="idee" rows="3" style="width:100%" placeholder="Was fehlt dir, was stört dich?"></textarea>
 <p><button class="primary" name="aktion" value="idee">Hinzufügen</button></p></form>
 <p class="muted">Namen, Beträge und Daten werden beim Weitergeben ersetzt – schreib trotzdem nichts Persönliches hinein.</p></div>
+{{ leistung_karte|safe }}
 <div class="card"><h2>Weitergeben</h2><textarea id="vs-text" class="bericht" readonly>{{ text }}</textarea>
 <p style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" onclick="navigator.clipboard.writeText(document.getElementById('vs-text').value);this.textContent='Kopiert'">Kopieren</button>
 <a class="btn" href="vorschlaege.md">Herunterladen (.md)</a>
@@ -396,11 +407,21 @@ def seite():
     st = laden()["status"]
     sichtbar = [v for v in alle if v.schluessel not in st]
     weg = [(v, st[v.schluessel]["status"]) for v in alle if v.schluessel in st]
-    text = bericht(sichtbar, S.VERSION)
+    import leistung
+    text = bericht(sichtbar, S.VERSION, _leistung_text())
     return S.page("Vorschläge", render_template_string(
         SEITE, sichtbar=sichtbar, weg=weg, hoch=sum(1 for v in sichtbar if v.gewicht == HOCH),
         gemeldet=sum(1 for _, s in weg if s == "gemeldet"), ausgeblendet=sum(1 for _, s in weg if s == "ausgeblendet"),
-        ideen=laden()["ideen"], text=text, link=issue_link(text, S.VERSION), prio=PRIO_TEXT))
+        ideen=laden()["ideen"], text=text, link=issue_link(text, S.VERSION), prio=PRIO_TEXT, leistung_karte=leistung.karte()))
+
+
+def _leistung_text():
+    import leistung
+    try:
+        return leistung.bericht_text()
+    except Exception:  # noqa: BLE001 – der Bericht soll auch ohne Messwerte entstehen
+        S.log.exception("Vorschläge: Leistung nicht ausgewertet")
+        return None
 
 
 def aktion():
@@ -431,7 +452,7 @@ def aktion():
 def herunterladen():
     from flask import Response
     st = laden()["status"]
-    text = bericht([v for v in sammeln() if v.schluessel not in st], S.VERSION)
+    text = bericht([v for v in sammeln() if v.schluessel not in st], S.VERSION, _leistung_text())
     return Response(text.encode("utf-8"), mimetype="text/markdown; charset=utf-8",
                     headers={"Content-Disposition": 'attachment; filename="vzev-vorschlaege.md"'})
 

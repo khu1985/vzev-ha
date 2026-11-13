@@ -585,6 +585,11 @@ def test_vorschlaege(app):
     md = c.get("/vorschlaege.md")
     assert md.status_code == 200 and "Vorschläge aus der vZEV-App" in md.get_data(as_text=True)
     assert "Max Beispiel" not in md.get_data(as_text=True)
+    # Leistung: Seitenaufrufe werden gemessen, Karte und Messwerte im Text
+    h = c.get("/vorschlaege").get_data(as_text=True)
+    assert "<h2>Leistung</h2>" in h and "Ladezeiten und Rechenzeiten dieser Version" in h
+    assert "### Leistung (Messwerte dieser Version)" in md.get_data(as_text=True) and "</span>vorschlaege</td>" in h
+    assert (d / "leistung.json").exists()
     c.post("/vorschlaege", data={"aktion": "alle_einblenden"})
     assert "Ausgeblendet und gemeldet" not in c.get("/vorschlaege").get_data(as_text=True)
 

@@ -238,9 +238,11 @@ class Collector:
     # --- Schleife ------------------------------------------------------
     def loop(self):
         tick = 0
+        import leistung
         while True:
             try:
-                self.read_now()
+                with leistung.Stoppuhr("hintergrund", "Datensammler ablesen"):
+                    self.read_now()
                 self.last_error = None
             except Exception as e:  # weiterlaufen, Fehler anzeigen
                 self.fehlversuche = getattr(self, "fehlversuche", 0) + 1

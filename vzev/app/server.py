@@ -989,6 +989,8 @@ import aufgaben  # noqa: E402
 aufgaben.register(app, sys.modules[__name__])
 import vorschlaege  # noqa: E402
 vorschlaege.register(app, sys.modules[__name__])
+import leistung  # noqa: E402
+leistung.register(app, sys.modules[__name__], starten=not os.environ.get("VZEV_KEINE_SENSOREN"))
 import sensoren  # noqa: E402
 sensoren.register(app, sys.modules[__name__], starten=not os.environ.get("VZEV_KEINE_SENSOREN"))
 
@@ -1056,5 +1058,6 @@ if __name__ == "__main__":
     import logging
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     log.info("App gestartet (Version %s). Daten in %s, %d Dateien im Import", VERSION, DATA, sum(1 for p in PRIMEO.iterdir() if p.is_file()))
+    log.debug("Leistung: %d Berechnungen werden gemessen", leistung.instrumentieren())
     im_hintergrund_rechnen("App-Start")
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8099)), threaded=True)

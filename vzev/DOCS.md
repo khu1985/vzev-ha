@@ -99,11 +99,27 @@ Entwicklung weitergeben kannst.
 | Korrekturen | Monate wieder geöffnet, Rechnungen neu erstellt, Rechnungsdatum von Hand geändert | mittel/tief |
 | Datensammler | Sensor ohne Werte (geprüft, aber nicht verfügbar) | mittel |
 | Prognose | Solcast liegt im Mittel mehr als 20 % daneben | tief |
+| Leistung (siehe unten) | Seite «verlauf» lädt langsam, «core.compute» ist langsamer geworden | mittel/hoch |
 | eigene Ideen | frei formuliert | mittel |
 
 Namen, Adressen, Messpunkte, Seriennummern in Sensor-IDs, IBAN, E-Mail, Zugangsdaten, Beträge und Daten werden ersetzt.
 Nichts wird automatisch gesendet: Der Text zum Weitergeben lässt sich kopieren, als `vzev-vorschlaege.md`
 herunterladen oder als Entwurf eines GitHub-Issues öffnen. Erledigtes lässt sich ausblenden oder als gemeldet markieren.
+
+**Leistung.** Die App misst laufend, pro Version:
+
+| Was | Beispiel |
+|---|---|
+| Ladezeit jeder Seite und Aktion | «verlauf» Ø 420 ms, längster 1,2 s |
+| Rechenzeit der grossen Berechnungen | Berechnung aller Zähler (Laden, Rechnen), Übersicht und Kontrollen, Rechnungen, Jahresabrechnung, Wärmepumpen und JAZ, Prognose, Sensoren |
+| Hintergrundaufgaben | Datensammler ablesen |
+| System und Daten | Kerne, Last, freier Arbeitsspeicher, Speicher der App, Grösse von Datenbank, Dateien und Zwischenspeicher, Anzahl Messwerte, Preise und Prognosen |
+
+Die Karte «Leistung» auf der Seite Vorschläge zeigt alles mit Ampel und dem Mittel der Vorversion. Daraus entstehen
+Vorschläge im Bereich «Leistung»: Seiten oder Aktionen ab 1,5 s im Mittel, Berechnungen ab 0,8 s, alles, was gegenüber
+der Vorversion deutlich langsamer wurde, eine Gesamtberechnung über einer Minute, Datenbank oder Zwischenspeicher über
+200 MB, knapper Arbeitsspeicher oder hohe Last. Die Messwerte (nur Zeiten und Mengen, keine Inhalte) stehen im Text zum
+Weitergeben und werden in `leistung.json` gespeichert (die letzten fünf Versionen).
 
 ## Sensoren in Home Assistant
 

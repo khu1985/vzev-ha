@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.17.0
+
+- **Leistung messen** (Anlage → Vorschläge): Ladezeit jeder Seite und Aktion, Rechenzeit der grossen Berechnungen (Laden und Rechnen aller Zähler, Übersicht und Kontrollen, Rechnungen, Jahresabrechnung, Wärmepumpen, Prognose, Sensoren) und des Datensammlers, dazu System (Kerne, Last, Arbeitsspeicher) und Datenmengen – pro Version, mit dem Vergleich zur Vorversion. Langsame Stellen werden zu Vorschlägen im Bereich «Leistung», die Messwerte stehen im Text zum Weitergeben. Gespeichert in `leistung.json` (nur Zeiten und Mengen).
+
 ## 0.16.5
 
 - Mieter: Namensänderungen wurden abgelehnt, sobald das Mietverhältnis einen abgeschlossenen Monat berührte («Nicht gespeichert: … abgeschlossenen Monat»). Eine Korrektur von Vor- oder Nachname ändert keinen Betrag und ist jetzt immer erlaubt; Einheit, Daten und Adresse bleiben in abgeschlossenen Monaten gesperrt.
