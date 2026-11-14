@@ -998,7 +998,7 @@ sensoren.register(app, sys.modules[__name__], starten=not os.environ.get("VZEV_K
 @app.route("/sensoren_schreiben", methods=["POST"])
 def sensoren_schreiben():
     try:
-        w = sensoren.schreiben()
+        w = sensoren.schreiben(alle=True)
         st = sensoren.status()
         if st["fehler"]:
             return redirect(f"einstellungen?tab=zaehler&c=warn&msg=Sensoren nicht geschrieben: {st['fehler']}")

@@ -198,22 +198,39 @@ def _senden_ha(entity_id, nutzlast):
     r.raise_for_status()
 
 
-def schreiben(senden=None, heute=None):
+_GESENDET = {}           # entity_id → zuletzt an Home Assistant gesendete Nutzlast
+_ALLE_SPAETESTENS = 3600  # Home Assistant vergisst per API gesetzte Zustände beim Neustart: spätestens stündlich alle senden
+PARALLEL = 4
+
+
+def schreiben(senden=None, heute=None, alle=False):
+    """Sensoren an Home Assistant. Gesendet wird nur, was sich geändert hat (gleichzeitig, bis PARALLEL Anfragen);
+    alle Sensoren bei «Jetzt schreiben», nach einem Fehler und spätestens stündlich."""
     aktiv, praefix = einstellungen(S.config())
     if not aktiv:
         _letzter.update(zeit=datetime.now().isoformat(timespec="seconds"), anzahl=0, fehler="ausgeschaltet", werte=[])
         return []
+    eigen = senden is not None  # Tests und Aufrufer mit eigener Zustellung: immer alle
     senden = senden or _senden_ha
     werte = berechnen(heute)
+    jetzt = time.time()
+    alle = alle or eigen or _letzter.get("fehler") or jetzt - _letzter.get("alle_zeit", 0) >= _ALLE_SPAETESTENS
+    auftraege = [(x.entity_id(praefix), x.nutzlast()) for x in werte]
+    if not alle:
+        auftraege = [(e, n) for e, n in auftraege if _GESENDET.get(e) != n]
     fehler = ""
-    for x in werte:
-        try:
-            senden(x.entity_id(praefix), x.nutzlast())
-        except Exception as e:
-            fehler = str(e)
-            break
+    if auftraege:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=min(PARALLEL, len(auftraege))) as pool:
+            ergebnisse = list(pool.map(lambda a: _zustellen(senden, *a), auftraege))
+        fehler = next((f for f in ergebnisse if f), "")
+        for (e, n), f in zip(auftraege, ergebnisse):
+            if not f and not eigen:
+                _GESENDET[e] = n
+    if alle and not fehler:
+        _letzter["alle_zeit"] = jetzt
     _letzter.update(zeit=datetime.now().isoformat(timespec="seconds"), anzahl=0 if fehler else len(werte), fehler=fehler,
-                    werte=[(x.entity_id(praefix), x.nutzlast()["state"], x.einheit) for x in werte])
+                    gesendet=len(auftraege), werte=[(x.entity_id(praefix), x.nutzlast()["state"], x.einheit) for x in werte])
     if fehler:
         # Home Assistant startet neu (502 Bad Gateway, keine Verbindung): erst melden, wenn es auch beim nächsten Mal scheitert
         seit = _letzter.setdefault("fehler_seit", time.time())
@@ -226,6 +243,14 @@ def schreiben(senden=None, heute=None):
             log.info("%d Sensoren an Home Assistant geschrieben (%s_*)", len(werte), praefix)
         _letzter.update(gemeldet=None, einmal=True)
     return werte
+
+
+def _zustellen(senden, entity, nutzlast):
+    try:
+        senden(entity, nutzlast)
+        return ""
+    except Exception as e:  # noqa: BLE001
+        return str(e) or type(e).__name__
 
 
 def status():

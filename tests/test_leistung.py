@@ -60,3 +60,36 @@ def test_stoppuhr():
     with le.Stoppuhr("hintergrund", "Datensammler ablesen"):
         pass
     assert le._WERTE[("hintergrund", "Datensammler ablesen")][0] == 1
+
+
+def test_sensoren_nur_geaenderte(monkeypatch):
+    import sensoren
+    werte = [sensoren.Sensor("a", "A", 1, "kWh"), sensoren.Sensor("b", "B", 2, "kWh")]
+    monkeypatch.setattr(sensoren, "berechnen", lambda heute=None: list(werte))
+    monkeypatch.setattr(sensoren, "einstellungen", lambda cfg: (True, "vzev"))
+    monkeypatch.setattr(sensoren, "S", types.SimpleNamespace(config=lambda: {}))
+    monkeypatch.setattr(sensoren, "_GESENDET", {})
+    monkeypatch.setattr(sensoren, "_letzter", {"zeit": None, "anzahl": 0, "fehler": "", "werte": []})
+    gesendet = []
+    monkeypatch.setattr(sensoren, "_senden_ha", lambda e, n: gesendet.append(e))
+    sensoren.schreiben()
+    assert sorted(gesendet) == ["sensor.vzev_a", "sensor.vzev_b"]
+    gesendet.clear()
+    werte[1] = sensoren.Sensor("b", "B", 3, "kWh")
+    sensoren.schreiben()
+    assert gesendet == ["sensor.vzev_b"] and sensoren.status()["gesendet"] == 1 and sensoren.status()["anzahl"] == 2
+    gesendet.clear()
+    sensoren.schreiben(alle=True)                       # «Jetzt schreiben»
+    assert len(gesendet) == 2
+    gesendet.clear()
+    sensoren._letzter["alle_zeit"] -= 4000              # spätestens stündlich alle (Home Assistant vergisst beim Neustart)
+    sensoren.schreiben()
+    assert len(gesendet) == 2
+
+
+def test_sensoren_nicht_als_langsam(tmp_path, monkeypatch):
+    monkeypatch.setattr(le, "S", _server(tmp_path, "2.0.0"))
+    le._WERTE.clear()
+    for _ in range(5):
+        le.erfassen("funktion", "sensoren.schreiben", 4000)
+    assert not [t for t, _, _ in le.vorschlaege() if "sensoren" in t]

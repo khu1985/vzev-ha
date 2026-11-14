@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.17.3
+
+- Sensoren für Home Assistant: Gesendet wird nur, was sich geändert hat, und gleichzeitig statt nacheinander. Alle Sensoren gehen weiterhin bei «Jetzt schreiben», nach einem Fehler und spätestens stündlich (Home Assistant vergisst so gesetzte Werte beim Neustart). «Zuletzt geschrieben» zeigt, wie viele davon geändert waren.
+- Vorschläge: Die Sensoren laufen im Hintergrund und erscheinen nicht mehr als «langsam»; ihre Zeiten stehen weiter in der Karte «Leistung».
+
 ## 0.17.2
 
 - Wärmepumpen und Ladestation: Die Ladevorgänge sind nur als Summe bekannt und wurden auf den ganzen Allgemeinstrom verteilt – auch auf den Verbrauch der Wärmepumpe, die zur gleichen Zeit lief. Für die gemessene Wärmepumpe blieb dann kein Platz, ein Teil blieb im Allgemeinstrom. Jetzt hat die gemessene Wärmepumpe Vorrang; die Ladevorgänge werden auf den übrigen Allgemeinstrom verteilt (kWh pro Ladevorgang unverändert).

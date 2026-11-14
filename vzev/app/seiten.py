@@ -717,7 +717,7 @@ eigenen Ablesung – eigene Werte werden nicht überschrieben. Danach wird der V
 <p><button>Aus Langzeit-Statistik übernehmen</button></p></form>
 <p class="muted">Vorgeschlagen ist der erste nicht abgeschlossene Monat. Für abgeschlossene Monate ändert sich damit der Allgemeinstrom: Die Seite «Abschluss»
 meldet dann eine Abweichung, und bereits erstellte Rechnungen müssten korrigiert werden.</p></div>{% endif %}
-<div class="card"><h2>Zuletzt geschrieben</h2>{% if sens.zeit %}<p>{{ sens.zeit|replace('T', ' ') }} · {{ sens.anzahl }} Sensoren{% if sens.fehler %} · <b>Fehler:</b> {{ sens.fehler }}{% endif %}</p>
+<div class="card"><h2>Zuletzt geschrieben</h2>{% if sens.zeit %}<p>{{ sens.zeit|replace('T', ' ') }} · {{ sens.anzahl }} Sensoren{% if sens.gesendet is not none and sens.gesendet < sens.anzahl %} (davon {{ sens.gesendet }} geändert und gesendet){% endif %}{% if sens.fehler %} · <b>Fehler:</b> {{ sens.fehler }}{% endif %}</p>
 {% if sens.werte %}<div class="scroll"><table><tr><th class="l">Entität</th><th>Wert</th></tr>{% for e, w, u in sens.werte %}<tr><td class="l"><code>{{ e }}</code></td><td>{{ w }} {{ u }}</td></tr>{% endfor %}</table></div>{% endif %}
 {% for k, v in sens.bereich_fehler.items() %}<p class="muted">{{ k }}: {{ v }}</p>{% endfor %}{% else %}<p class="muted">Noch nicht geschrieben (startet kurz nach dem Start der App).</p>{% endif %}
 <form method="post" action="sensoren_schreiben" data-busy="Sensoren werden geschrieben …"><button>Jetzt schreiben</button></form></div>"""
