@@ -86,6 +86,35 @@ Wärmepumpen für Heizung und Warmwasser, die am Allgemeinzähler hängen, werde
 - **Rückwirkend:** Unter Einstellungen → Zähler → «Wärmepumpen rückwirkend» übernimmt die App die stündlichen Zählerstände aus der Langzeit-Statistik von Home Assistant für die Zeit vor ihrer ersten eigenen Ablesung. Vorgeschlagen ist der erste nicht abgeschlossene Monat; für abgeschlossene Monate meldet «Abschluss» danach eine Abweichung, weil sich der Allgemeinstrom ändert.
 - **Jahresarbeitszahl:** Mit einem Wärme-Sensor (erzeugte Wärme in kWh, Wh, MWh oder GJ) zeigt der Verlauf die Arbeitszahl pro Monat, die Jahresabrechnung die des Jahres; dazu der Sensor `sensor.vzev_jaz_<name>`.
 
+## Nebenkostenabrechnung
+
+**Abrechnung → Nebenkosten** rechnet die Neben- und Betriebskosten nach Mietvertrag ab (Abrechnungsperiode 1.7.–30.6.).
+Verrechnet werden dürfen nur die im Mietvertrag aufgeführten Kosten, zu den tatsächlichen Kosten (Art. 257a/b OR, VMWG).
+
+- **Grundlagen** (einmal): Fläche jeder Wohnung, Personen bei selbst bewohnten Wohnungen, pro Mietverhältnis Personen und
+  Akonto pro Monat (aus dem Mietvertrag), Grundanteil der Heizung (Standard 30 % nach m², Rest nach Wärmezähler) und
+  Honorar für die Abrechnung (Standard 3 % der Nebenkosten, oder ein fester Betrag nach m²). Optional die Sensoren der
+  Wärmezähler – der Datensammler liest sie dann mit.
+- **Kosten** pro Periode: Strom der Wärmepumpen (Heizung, Warmwasser) und Allgemeinstrom kommen aus der App (einzeln
+  abwählbar). Übrige Kosten mit Kategorie und Beleg erfassen, z. B. Wartung Heizung, Wasser/Abwasser, Kehricht,
+  Hauswartung, Treppenhausreinigung, Antenne, Einstellplatz-Anteil aus der Abrechnung der Nachbarliegenschaft.
+- **Wärmezähler**: Stand am 1.7. und 30.6. für den Gesamtzähler und die Wohnungen mit eigenem Zähler (von Hand oder aus
+  Home Assistant). Wohnungen ohne eigenen Zähler teilen sich den Rest nach m².
+
+| Kategorie | Verteilung |
+|---|---|
+| Heizung | Grundanteil nach m², Rest nach Wärmezähler |
+| Warmwasser, Wasser/Abwasser | nach Personen × Tage |
+| Übrige Neben- und Betriebskosten | nach m² |
+| Direkt | ganz einer Wohnung |
+
+Innerhalb einer Wohnung zählt jedes Mietverhältnis nach Tagen; Tage ohne Mieter (Leerstand, selbst bewohnt) trägt der
+Vermieter. Die Tabelle «Verteilung» zeigt jederzeit den Stand. Nach dem 30.6. – sobald die Lastgänge bis Ende Juni da sind
+und keine Hinweise offen – erstellt **Abrechnungen erstellen** je Mietverhältnis ein PDF mit Positionen, Schlüssel,
+Honorar, Akonto und Saldo. Eine Nachzahlung kommt mit Einzahlungsschein ins Zahlungsregister (Rechnungen, Erinnerungen),
+ein Guthaben steht als Hinweis auf der Abrechnung. «Vorschau als PDF» geht jederzeit. Alle Angaben, Beträge und Belege
+liegen nur im Datenordner (`nebenkosten.json`, `nebenkosten/`).
+
 ## Vorschläge für die Weiterentwicklung
 
 **Anlage → Vorschläge** zeigt, wo die App mit deinen Daten an Grenzen stösst – als Liste, die du anonymisiert an die

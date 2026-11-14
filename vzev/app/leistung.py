@@ -36,6 +36,7 @@ FUNKTIONEN = [
     ("vorschau", "berechnen"), ("vorschau", "unterzaehler"), ("vorschau", "waermepumpen"), ("vorschau", "jaz"),
     ("prognose", "treffer"), ("prognose", "ueblicher_verbrauch"), ("preise", "serie"),
     ("hastatistik", "fuellen"), ("sensoren", "berechnen"), ("sensoren", "schreiben"), ("vorschlaege", "sammeln"),
+    ("nebenkosten", "abrechnen"),
 ]
 LANGSAM_SEITE_MS = 1500
 LANGSAM_FUNKTION_MS = 800

@@ -72,6 +72,10 @@ class Collector:
         ids += [v for k, v in (ha.get("solis") or {}).items() if v and v.startswith("sensor.")]
         ids += [v for v in (ha.get("kia") or {}).values() if v]
         ids += [w[k] for w in (ha.get("waermepumpen") or []) if isinstance(w, dict) for k in ("entity", "waerme") if w.get(k)]
+        try:
+            ids += list(getattr(self, "zusatz", lambda: [])())  # z. B. Wärmezähler der Nebenkosten
+        except Exception as e:  # noqa: BLE001
+            log.debug("Zusätzliche Sensoren: %s", e)
         return sorted(set(ids))
 
     def read_now(self):

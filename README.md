@@ -92,6 +92,7 @@ flowchart TB
 | `vzev/app/server.py` | Webserver, Navigation, Statusanzeige, Import, Rechnungen, Datensammler-Seite, Protokoll |
 | `vzev/app/hastatistik.py` | Langzeit-Statistik aus Home Assistant über die WebSocket-API (kleiner Client ohne Zusatzpaket), rückwirkende Wärmepumpen-Werte |
 | `vzev/app/vorschlaege.py` | Vorschläge für die Weiterentwicklung aus Protokoll, Kontrollen, Import, Korrekturen, Datensammler, Prognose und Leistung; anonymisiert zum Weitergeben (Text, Datei, GitHub-Issue) |
+| `vzev/app/nebenkosten.py` | Nebenkostenabrechnung 1.7.–30.6.: Kosten mit Belegen und aus der App (Wärmepumpen, Allgemeinstrom), Verteilung nach m², Personen, Wärmezähler, Tagen; Honorar, Akonto, PDF mit QR-Einzahlungsschein, Zahlungsregister |
 | `vzev/app/leistung.py` | Leistung messen: Ladezeiten der Seiten, Rechenzeiten der Berechnungen, Hintergrundaufgaben, System und Datenmengen – pro Version mit Vergleich zur Vorversion |
 | `vzev/app/sensoren.py` | Sensoren `sensor.vzev_*` / `binary_sensor.vzev_*` über die REST-API von Home Assistant (alle 15 Minuten und nach jeder Berechnung) |
 | `vzev/app/aufgaben.py` | Aufgaben-Assistent: erkennt pro offenem Monat, Quartal und Jahr, welche Arbeiten erledigt sind, und führt zur passenden Seite |
@@ -242,6 +243,7 @@ So fliessen sie ab 2027 in die Abrechnung ein (Entscheid Betreiber):
 | `messwerte.sqlite` | Zählerstände aus Home Assistant, evcc-Ladevorgänge, dynamische Strompreise, PV-Prognosen |
 | `aufgaben.json` | als versendet markierte Rechnungen (Aufgaben-Assistent) |
 | `vorschlaege.json` | ausgeblendete und gemeldete Vorschläge, eigene Ideen |
+| `nebenkosten.json`, `nebenkosten/` | Grundlagen der Nebenkostenabrechnung (Flächen, Personen, Akonto, Honorar), Kosten und Wärmezählerstände pro Periode, Belege |
 | `leistung.json` | Leistungsmessungen der letzten fünf Versionen (nur Zeiten und Mengen) |
 | `abschluss.json` | abgeschlossene Monate mit festgehaltenen Werten, Korrekturen |
 | `rechnungen/` | erstellte PDFs, `register.json` (Rechnungen, Fälligkeiten, Zahlungen); ersetzte Fassungen unter `rechnungen/_alt/` |

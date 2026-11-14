@@ -274,14 +274,14 @@ def donuts_png(rows):
 
 
 # --- Swiss QR ---------------------------------------------------------------
-def qr_payload(cfg, inv, amount, nummer):
+def qr_payload(cfg, inv, amount, nummer, zweck="Stromabrechnung"):
     b, p = cfg["betreiber"], inv["partei"]
     lines = ["SPC", "0200", "1", b["iban"].replace(" ", ""),
              "S", b["name"], b["strasse"], b["hausnr"], b["plz"], b["ort"], "CH",
              "", "", "", "", "", "", "",
              f"{amount:.2f}", "CHF",
              "S", p["name"], p["strasse"], p["hausnr"], p["plz"], p["ort"], "CH",
-             "NON", "", f"Stromabrechnung {nummer}", "EPD"]
+             "NON", "", f"{zweck} {nummer}", "EPD"]
     return "\r\n".join(lines)
 
 
@@ -290,7 +290,7 @@ def iban_fmt(iban):
     return " ".join(i[k:k + 4] for k in range(0, len(i), 4))
 
 
-def draw_qr_bill(c, cfg, inv, amount, nummer):
+def draw_qr_bill(c, cfg, inv, amount, nummer, zweck="Stromabrechnung"):
     W = A4[0]
     top = 105 * mm
     c.setStrokeColor(black)
@@ -339,7 +339,7 @@ def draw_qr_bill(c, cfg, inv, amount, nummer):
     c.drawString(x0, top - 9 * mm, "Zahlteil")
     size = 46 * mm
     qx, qy = x0, top - 17 * mm - size
-    w = QrCodeWidget(qr_payload(cfg, inv, amount, nummer), barLevel="M")
+    w = QrCodeWidget(qr_payload(cfg, inv, amount, nummer, zweck), barLevel="M")
     bx = w.getBounds()
     d = Drawing(size, size, transform=[size / (bx[2] - bx[0]), 0, 0, size / (bx[3] - bx[1]), 0, 0])
     d.add(w)
@@ -363,7 +363,7 @@ def draw_qr_bill(c, cfg, inv, amount, nummer):
     x1 = 118 * mm
     y = top - 5 * mm
     y = block(x1, y - 4 * mm, "Konto / Zahlbar an", cred, 8, 10, 11)
-    y = block(x1, y, "Zusätzliche Informationen", [f"Stromabrechnung {nummer}"], 8, 10, 11)
+    y = block(x1, y, "Zusätzliche Informationen", [f"{zweck} {nummer}"], 8, 10, 11)
     block(x1, y, "Zahlbar durch", debt, 8, 10, 11)
 
 
@@ -496,6 +496,10 @@ if __name__ == "__main__":
         print(f"{name}: CHF {total:.2f}  {rows}")
 
 
+def _zweck(rechnung):
+    return "Nebenkostenabrechnung" if rechnung.get("art") == "nebenkosten" else "Stromabrechnung"
+
+
 def render_erinnerung(path, cfg, partei, rechnung, frist, stufe=1, heute=None):
     """Zahlungserinnerung für eine offene Rechnung, mit Einzahlungsschein über den offenen Betrag.
     rechnung = Zeile aus dem Zahlungsregister (nummer, datum, faellig, betrag, bezahlt, offen, zahlungen)."""
@@ -533,7 +537,7 @@ def render_erinnerung(path, cfg, partei, rechnung, frist, stufe=1, heute=None):
     c.setFont("Helvetica", 10)
     anrede = f"Guten Tag {partei['name']}"
     text = [anrede, "",
-            f"Die Stromabrechnung {rechnung['nummer']} vom {de(date.fromisoformat(rechnung['datum']))} war am "
+            f"Die {_zweck(rechnung)} {rechnung['nummer']} vom {de(date.fromisoformat(rechnung['datum']))} war am "
             f"{de(date.fromisoformat(rechnung['faellig']))} fällig.",
             "Nach unseren Unterlagen ist der folgende Betrag noch offen. Möglicherweise hat sich Ihre Zahlung mit",
             "diesem Schreiben gekreuzt – dann betrachten Sie es bitte als gegenstandslos.", ""]
@@ -561,6 +565,6 @@ def render_erinnerung(path, cfg, partei, rechnung, frist, stufe=1, heute=None):
                "Bei Fragen zur Abrechnung melden Sie sich gerne.", "", "Freundliche Grüsse", b["name"]]:
         c.drawString(L, yy, ln)
         yy -= 5 * mm
-    draw_qr_bill(c, cfg, {"partei": partei}, rechnung["offen"], rechnung["nummer"])
+    draw_qr_bill(c, cfg, {"partei": partei}, rechnung["offen"], rechnung["nummer"], _zweck(rechnung))
     c.showPage()
     c.save()

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.18.0
+
+- **Nebenkostenabrechnung** (Abrechnung → Nebenkosten), Periode 1.7.–30.6.:
+  - Kosten aus der App (Strom der Wärmepumpen für Heizung und Warmwasser, Allgemeinstrom) und von Hand erfasste Kosten mit Beleg.
+  - Verteilung nach Mietvertrag: Heizung mit Grundanteil nach m² (Standard 30 %) und Rest nach Wärmezählern, Warmwasser und Wasser nach Personen, übrige Kosten nach m², «direkt» für eine Wohnung; jedes Mietverhältnis nach Tagen, Leerstand und selbst bewohnte Wohnungen trägt der Vermieter.
+  - Honorar einstellbar (Standard 3 % der Nebenkosten oder fester Betrag), Akonto pro Mietverhältnis.
+  - PDF je Mietverhältnis mit Saldo; Nachzahlung mit QR-Einzahlungsschein im Zahlungsregister, inkl. Zahlungserinnerung.
+  - Wärmezählerstände von Hand oder aus Home Assistant (der Datensammler liest die Sensoren mit).
+
 ## 0.17.3
 
 - Sensoren für Home Assistant: Gesendet wird nur, was sich geändert hat, und gleichzeitig statt nacheinander. Alle Sensoren gehen weiterhin bei «Jetzt schreiben», nach einem Fehler und spätestens stündlich (Home Assistant vergisst so gesetzte Werte beim Neustart). «Zuletzt geschrieben» zeigt, wie viele davon geändert waren.

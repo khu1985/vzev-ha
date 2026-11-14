@@ -6,6 +6,7 @@ erfassten Zahlungen der alten; die alte bleibt als «ersetzt» sichtbar.
 Die Allgemeinstrom-Rechnung ist eine Gesamtrechnung für die Nebenkostenabrechnung und wird nicht bezahlt («intern»).
 """
 import json
+import re
 from datetime import date, datetime, timedelta
 
 S = None
@@ -68,14 +69,15 @@ def umbenennen(alt, neu):
     return n
 
 
-def registrieren(quartal, made, rechnungsdatum, cfg):
+def registrieren(quartal, made, rechnungsdatum, cfg, art=None):
     """Nach dem Erstellen: neue Rechnungen eintragen, Zahlungen alter Fassungen übernehmen."""
     reg = laden()
     frist = int((cfg.get("rechnungen") or {}).get("zahlungsfrist_tage", 30))
     rd = rechnungsdatum or date.today()
     jetzt = datetime.now().strftime("%Y-%m-%d %H:%M")
     for name, total, _rows in made:
-        nummer, partei, art = _meta(name)
+        nummer, partei, art_ = _meta(name)
+        art_ = art or art_
         partei = _voller_name(cfg, partei)
         alte = [k for k, r in reg["rechnungen"].items() if r["nummer"] == nummer and r["status"] != "ersetzt"]
         zahlungen = []
@@ -85,7 +87,7 @@ def registrieren(quartal, made, rechnungsdatum, cfg):
             reg["rechnungen"][k]["ersetzt_am"] = jetzt
         key = f"{quartal}/{name}@{datetime.now():%Y%m%d%H%M%S%f}"
         reg["rechnungen"][key] = {
-            "quartal": quartal, "datei": f"{quartal}/{name}", "nummer": nummer, "partei": partei, "art": art,
+            "quartal": quartal, "datei": f"{quartal}/{name}", "nummer": nummer, "partei": partei, "art": art_,
             "betrag": round(float(total), 2), "datum": rd.isoformat(),
             "faellig": (rd + timedelta(days=frist)).isoformat(), "erstellt": jetzt,
             "status": "aktiv", "zahlungen": zahlungen,
@@ -148,12 +150,21 @@ def stand(r, heute=None):
     return dict(r, bezahlt=bezahlt, offen=offen, stand=s)
 
 
+def _reihenfolge(quartal):
+    """2026-Q3 → 20263; Nebenkosten NK-2026-27 (endet 30.6.2027) → 20272 (wie Q2 2027)."""
+    m = re.fullmatch(r"(\d{4})-Q([1-4])", quartal)
+    if m:
+        return int(m.group(1)) * 10 + int(m.group(2))
+    m = re.fullmatch(r"NK-(\d{4})-\d{2}", quartal)
+    return (int(m.group(1)) + 1) * 10 + 2 if m else 0
+
+
 def uebersicht():
     nachtragen()
     reg = laden()
     zeilen = sorted((dict(stand(r), key=k) for k, r in reg["rechnungen"].items()),
                     key=lambda r: (r["status"] == "ersetzt", r["quartal"], r["nummer"], r["erstellt"]), reverse=False)
-    zeilen.sort(key=lambda r: (r["status"] == "ersetzt", -int(r["quartal"][:4]) * 10 - int(r["quartal"][-1])))
+    zeilen.sort(key=lambda r: (r["status"] == "ersetzt", -_reihenfolge(r["quartal"])))
     aktiv = [z for z in zeilen if z["stand"] in ("offen", "teilweise", "überfällig")]
     return dict(zeilen=zeilen,
                 offen=round(sum(z["offen"] or 0 for z in aktiv), 2),

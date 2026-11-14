@@ -679,3 +679,34 @@ def test_waermepumpen_eingabe_abgesichert(app):
                                    ("Warmwasser", "sensor.shelly_b_energy", ""))
     wp = yaml.safe_load((d / "vzev.yaml").read_text())["homeassistant"]["waermepumpen"]
     assert wp[0]["waerme"].endswith("erzeugte_warme_gesamt") and [w["name"] for w in wp] == ["Heizung", "Warmwasser"]
+
+
+def test_nebenkosten_seite(app):
+    server, c, d, quelle = app
+    warten(server)
+    h = c.get("/nebenkosten?p=2025-26").get_data(as_text=True)   # Testdaten liegen in dieser Periode
+    assert "<h2>Verteilung</h2>" in h and "Allgemeinstrom (inkl. Grundpreis)" in h
+    h = c.get("/nebenkosten?p=2026-27").get_data(as_text=True)
+    assert "Fläche (m²) aller Wohnungen" in h                       # noch keine Grundlagen
+    cfg = yaml.safe_load((d / "vzev.yaml").read_text())
+    form = {"aktion": "grundlagen", "p": "2026-27", "flaeche_1OG": "90", "flaeche_2OG": "110", "personen_2OG": "2",
+            "grundanteil": "30", "honorar_wert": "3", "honorar_art": "prozent"}
+    import nebenkosten
+    for m in cfg["mietverhaeltnisse"]:
+        form[f"mp_{nebenkosten.mieter_key(m)}"] = "2"
+        form[f"ma_{nebenkosten.mieter_key(m)}"] = "150"
+    assert "Gespeichert" in ziel(c.post("/nebenkosten", data=form))
+    import io
+    r = c.post("/nebenkosten", data={"aktion": "position", "p": "2026-27", "titel": "Wasser und Abwasser", "kategorie": "wasser",
+                                     "einheit": "1OG", "betrag": "730", "beleg": (io.BytesIO(b"%PDF-1.4 test"), "Rechnung Wasser.pdf")},
+               content_type="multipart/form-data")
+    assert "Erfasst" in ziel(r)
+    h = c.get("/nebenkosten?p=2026-27").get_data(as_text=True)
+    assert "Wasser und Abwasser" in h and "nebenkosten_beleg?p=2026-27" in h and "Fläche (m²) aller Wohnungen" not in h
+    beleg = re.search(r'nebenkosten_beleg\?p=2026-27&d=([^"]+)"', h).group(1)
+    assert c.get(f"/nebenkosten_beleg?p=2026-27&d={beleg}").data.startswith(b"%PDF")
+    assert c.get("/nebenkosten_beleg?p=2026-27&d=..%2F..%2Fvzev.yaml").status_code == 404
+    assert "Vorschau-PDF erstellt" in ziel(c.post("/nebenkosten", data={"aktion": "vorschau", "p": "2026-27"}))
+    assert list((d / "rechnungen" / "NK-2026-27").glob("Vorschau_*.pdf"))
+    assert "Periode noch nicht vollständig" in ziel(c.post("/nebenkosten", data={"aktion": "erstellen", "p": "2026-27"}))
+    assert "Nebenkosten" in c.get("/rechnungen").get_data(as_text=True)          # Navigation

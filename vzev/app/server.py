@@ -112,7 +112,7 @@ CHANGELOG = _changelog()
 NEU_KURZ = (CHANGELOG[0][1][0].split(":")[0] if CHANGELOG and CHANGELOG[0][0] == VERSION and CHANGELOG[0][1] else "Verbesserungen")
 NAVIGATION = [
     ("Auswertung", [("./", "Energiefluss"), ("uebersicht", "Übersicht"), ("verlauf", "Verlauf"), ("wertschoepfung", "Wertschöpfung")]),
-    ("Abrechnung", [("aufgaben", "Aufgaben"), ("import", "Daten importieren"), ("rechnungen", "Rechnungen"), ("jahr", "Jahresabrechnung"), ("abschluss", "Abschluss")]),
+    ("Abrechnung", [("aufgaben", "Aufgaben"), ("import", "Daten importieren"), ("rechnungen", "Rechnungen"), ("jahr", "Jahresabrechnung"), ("nebenkosten", "Nebenkosten"), ("abschluss", "Abschluss")]),
     ("Stammdaten", [("mieter", "Mieter"), ("tarife", "Tarife"), ("primeo", "Primeo"), ("einstellungen", "Einstellungen")]),
     ("Anlage", [("prognose", "Prognose"), ("batterie", "Batterie"), ("sammler", "Datensammler"), ("protokoll", "Protokoll"), ("vorschlaege", "Vorschläge")]),
 ]
@@ -911,7 +911,7 @@ def einstellungen():
 
 
 # --- Status und Warteseite ------------------------------------------------------
-BRAUCHT_BERECHNUNG = {"index", "uebersicht", "aufgaben", "vorschlaege", "verlauf", "wertschoepfung", "abschluss", "primeo", "sammler", "import_page", "jahr"}
+BRAUCHT_BERECHNUNG = {"index", "uebersicht", "aufgaben", "vorschlaege", "verlauf", "wertschoepfung", "abschluss", "primeo", "sammler", "import_page", "jahr", "nebenkosten"}
 
 
 @app.get("/status")
@@ -989,6 +989,9 @@ import aufgaben  # noqa: E402
 aufgaben.register(app, sys.modules[__name__])
 import vorschlaege  # noqa: E402
 vorschlaege.register(app, sys.modules[__name__])
+import nebenkosten  # noqa: E402
+nebenkosten.register(app, sys.modules[__name__])
+collector.zusatz = lambda: nebenkosten.wp_entitaeten(nebenkosten.laden()["einstellungen"])  # Wärmezähler mitlesen
 import leistung  # noqa: E402
 leistung.register(app, sys.modules[__name__], starten=not os.environ.get("VZEV_KEINE_SENSOREN"))
 import sensoren  # noqa: E402
