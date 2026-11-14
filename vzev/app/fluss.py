@@ -214,7 +214,7 @@ def seite():
     d = uebersicht.daten()
     res, cfg = d["res"], d["cfg"]
     if res is None:
-        return S.page("Energiefluss", render_template_string(SEITE, w=None, tabs=[], monate=[], jahre=[], sel="", F=F,
+        return S.page("Energiefluss", _ampeln() + render_template_string(SEITE, w=None, tabs=[], monate=[], jahre=[], sel="", F=F,
                                                              fehler="Noch keine Daten. Zuerst unter «Daten importieren» die Lastgänge hochladen."))
     heute = date.today()
     letzter = res.index.max().date()
@@ -240,7 +240,7 @@ def seite():
     tabs = [("heute", "Heute"), ("gestern", "Gestern")]
     mon = [(str(x), f"{MONATE[x.month]} {x.year}") for x in reversed(perioden)]
     if r.empty:
-        return S.page("Energiefluss", render_template_string(SEITE, w=None, tabs=tabs, monate=mon, jahre=jahre, sel=sel, m=m, j=j, F=F,
+        return S.page("Energiefluss", _ampeln() + render_template_string(SEITE, w=None, tabs=tabs, monate=mon, jahre=jahre, sel=sel, m=m, j=j, F=F,
                                                              fehler=f"Für {titel} gibt es noch keine Daten (Lastgänge bis {letzter:%d.%m.%Y})."))
     w = werte(r, cfg)
     sp = solis(S.collector._db, cfg, von, bis)
@@ -252,9 +252,19 @@ def seite():
     k = dict(autarkie=w["solar_haus"] / w["haus"] * 100 if w["haus"] else 0, eigen=w["solar_haus"] / w["prod"] * 100 if w["prod"] else 0,
              netz=_zahl(w["netz_haus"] + w["laden"]), export=_zahl(w["export"]), laden=w["laden"] > 0.005)
     link_m = f"?m={str(pd.Period(von, 'M'))}" if sel != "jahr" else ""
-    return S.page("Energiefluss", render_template_string(
+    return S.page("Energiefluss", _ampeln() + render_template_string(
         SEITE, w=w, svg=diagramm(w, sp), titel=titel, tabs=tabs, monate=mon, jahre=jahre, sel=sel, m=m, j=j, F=F, k=k,
         quelle=quelle, vorlaeufig=ha or bis >= heute, link_m=link_m, aufgabe=_aufgabe()))
+
+
+def _ampeln():
+    """Ampeln aller Bereiche als Kacheln (beim ersten Aufruf nach dem Start einmal gerechnet, danach im Hintergrund)."""
+    import ampel
+    try:
+        return ampel.karte(ampel.aktuell(warten=not ampel._CACHE["zeit"]))
+    except Exception as e:  # noqa: BLE001
+        S.log.debug("Ampeln: %s", e)
+        return ""
 
 
 def _aufgabe():

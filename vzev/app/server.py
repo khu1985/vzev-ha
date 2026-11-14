@@ -109,13 +109,21 @@ def _changelog():
 
 
 CHANGELOG = _changelog()
-NEU_KURZ = (CHANGELOG[0][1][0].split(":")[0] if CHANGELOG and CHANGELOG[0][0] == VERSION and CHANGELOG[0][1] else "Verbesserungen")
+NEU_KURZ = (CHANGELOG[0][1][0].replace("**", "").split(":")[0].split(" (")[0]
+            if CHANGELOG and CHANGELOG[0][0] == VERSION and CHANGELOG[0][1] else "Verbesserungen")
+# Gruppiert wie in der Finanz-App: «Überblick» immer offen, die übrigen Gruppen klappen auf, wenn sie die aktuelle Seite
+# enthalten; zugeklappt zeigt die Gruppe die schlechteste Ampel ihrer Seiten.
 NAVIGATION = [
-    ("Auswertung", [("./", "Energiefluss"), ("uebersicht", "Übersicht"), ("verlauf", "Verlauf"), ("wertschoepfung", "Wertschöpfung")]),
-    ("Abrechnung", [("aufgaben", "Aufgaben"), ("import", "Daten importieren"), ("rechnungen", "Rechnungen"), ("jahr", "Jahresabrechnung"), ("nebenkosten", "Nebenkosten"), ("abschluss", "Abschluss")]),
-    ("Stammdaten", [("mieter", "Mieter"), ("tarife", "Tarife"), ("primeo", "Primeo"), ("einstellungen", "Einstellungen")]),
-    ("Anlage", [("prognose", "Prognose"), ("batterie", "Batterie"), ("sammler", "Datensammler"), ("protokoll", "Protokoll"), ("vorschlaege", "Vorschläge")]),
+    ("Überblick", [("./", "Energiefluss"), ("uebersicht", "Übersicht"), ("aufgaben", "Aufgaben")]),
+    ("Auswertung", [("verlauf", "Verlauf"), ("wertschoepfung", "Wertschöpfung"), ("prognose", "Prognose"), ("batterie", "Batterie")]),
+    ("Abrechnung", [("rechnungen", "Rechnungen"), ("nebenkosten", "Nebenkosten"), ("jahr", "Jahresabrechnung"), ("abschluss", "Abschluss")]),
+    ("Daten", [("import", "Daten importieren"), ("primeo", "Primeo"), ("sammler", "Datensammler")]),
+    ("Stammdaten", [("mieter", "Mieter"), ("tarife", "Tarife")]),
+    ("App", [("einstellungen", "Einstellungen"), ("vorschlaege", "Vorschläge")]),
 ]
+OFFEN_IMMER = {"Überblick"}
+# Seiten ohne eigenen Menüeintrag (Reiter der Einstellungen) → Eintrag, der dafür hervorgehoben wird
+MENU_ALIAS = {"Protokoll": "Einstellungen", "Was ist neu": "Einstellungen"}
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
@@ -341,16 +349,22 @@ main{max-width:1180px;margin:0 auto;padding:24px;min-width:0;width:100%}
 .side{background:var(--card)}.top{display:flex;align-items:center;gap:10px}.brand{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}.ver{color:var(--muted);font-size:12px;font-weight:500}
 nav a{color:var(--nav);text-decoration:none;padding:8px 10px;border-radius:8px;font-weight:500;white-space:nowrap}nav a.on{background:var(--soft);color:var(--ink)}nav a:hover{background:var(--bg)}
 nav .gl{display:none;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+nav button.gl{background:none;border:0;border-radius:6px;padding:4px 0;min-height:0;font:inherit;font-size:11px;font-weight:600;color:var(--muted);text-align:left;cursor:pointer;width:calc(100% - 20px);align-items:center;gap:6px}
+nav button.gl::after{content:"▾";margin-left:auto;font-size:12px;transition:transform .15s}nav .grp.zu button.gl::after{transform:rotate(-90deg)}
+nav .grp:not(.zu) button.gl .ampel{display:none}
+{{ ampel_css|safe }}
 #menu{display:none;min-height:40px;margin-left:auto;flex-shrink:0}
 @media (min-width:1200px){.app{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
  .side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);padding:20px 12px}
- .top{padding:0 10px;flex-wrap:wrap;gap:4px 8px}.brand{white-space:normal}nav .gl{display:block;margin:18px 10px 4px}nav a{display:block}}
+ .top{padding:0 10px;flex-wrap:wrap;gap:4px 8px}.brand{white-space:normal}nav .gl{display:block;margin:18px 10px 4px}nav a{display:block}
+ nav button.gl{display:flex}nav .grp.zu a{display:none}nav .grp.zu button.gl{margin-bottom:0}}
 @media (max-width:1199px){.side{position:sticky;top:0;z-index:5;border-bottom:1px solid var(--line);padding:10px 16px 0}
  nav{display:flex;overflow-x:auto;scrollbar-width:none;padding:6px 0 8px}nav::-webkit-scrollbar{display:none}
  nav .grp{display:flex;flex-shrink:0}nav .grp+.grp{border-left:1px solid var(--line);margin-left:6px;padding-left:6px}}
 @media (max-width:759px){ #menu{display:inline-flex}.ver{flex-shrink:0}.brand{flex:1 1 0}nav{display:none}
  .side{padding:10px 16px}.side.offen nav{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;padding:8px 0 12px;max-height:calc(100vh - 70px);overflow-y:auto}
  .side.offen nav .grp{display:block;border:0;margin:0;padding:0}.side.offen nav .gl{display:block;margin:10px 10px 2px}.side.offen nav a{display:block}
+ .side.offen nav button.gl{display:flex}.side.offen nav .grp.zu a{display:none}
  main{padding:16px}h1{font-size:22px}.card{padding:16px}}
 h1{font-size:26px;margin:4px 0 16px}h2{font-size:16px;margin:0 0 12px}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:20px}
 .scroll{overflow-x:auto}table{border-collapse:collapse;width:100%}th{font-size:12px;color:var(--muted);text-align:right;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -443,8 +457,9 @@ a.ver{text-decoration:none}a.ver:hover{text-decoration:underline;color:var(--ink
 </style></head><body>
 <div class="app"><aside class="side" id="side"><div class="top"><span class="brand">☀ vZEV {{ anlage }}</span><a class="ver" href="neu" title="Was ist neu in dieser Version">v{{ version }}</a><button id="thema" type="button" title="Darstellung umstellen: Auto (wie das Gerät) → Hell → Dunkel" aria-label="Darstellung umstellen"></button><span id="bg" class="bg" role="status" aria-live="polite"></span>
 <button id="menu" type="button" aria-expanded="false" aria-controls="nav" onclick="var s=document.getElementById('side');var o=s.classList.toggle('offen');this.setAttribute('aria-expanded',o);this.textContent=o?'Schliessen':'Menü'">Menü</button></div>
-<nav id="nav">{% for gruppe, eintraege in navigation %}<div class="grp"><span class="gl">{{ gruppe }}</span>{% for href, label in eintraege %}
-<a href="{{ href }}" class="{{ 'on' if label == title else '' }}"{% if label == title %} aria-current="page"{% endif %}>{{ label }}{% if label == 'Protokoll' and nfehler %} <span class="pill warn">{{ nfehler }}</span>{% endif %}</a>{% endfor %}</div>{% endfor %}</nav></aside>
+<nav id="nav">{% for g in navigation %}<div class="grp{{ '' if g.offen else ' zu' }}">{% if g.knopf %}<button type="button" class="gl" aria-expanded="{{ 'true' if g.offen else 'false' }}"><span>{{ g.gruppe }}</span>{% if g.status in ('gelb', 'rot') %}{{ licht(g.status)|safe }}{% endif %}</button>{% else %}<span class="gl">{{ g.gruppe }}</span>{% endif %}{% for x in g.links %}
+<a href="{{ x.href }}" class="{{ 'on' if x.aktiv else '' }}"{% if x.aktiv %} aria-current="page"{% endif %}>{{ x.label }}{% if x.status in ('gelb', 'rot') %}{{ licht(x.status)|safe }}{% endif %}{% if x.label == 'Einstellungen' and nfehler %} <span class="pill warn" title="Fehler im Protokoll seit dem Start">{{ nfehler }}</span>{% endif %}</a>{% endfor %}</div>{% endfor %}</nav></aside>
+<script>document.querySelectorAll('nav button.gl').forEach(function(b){b.addEventListener('click',function(){var g=b.parentNode,zu=g.classList.toggle('zu');b.setAttribute('aria-expanded',zu?'false':'true')})})</script>
 <script>(function(){var a=document.querySelector('nav a.on');if(a&&innerWidth<1200&&innerWidth>=760)a.scrollIntoView({block:'nearest',inline:'center'})})()</script>
 <main><h1>{{ title }}</h1>{% if msg %}<div class="msg {{ msgclass or 'ok' }}">{{ msg }}</div>{% endif %}{{ body|safe }}</main></div>
 <div id="neu-hinweis" class="neu-hinweis" hidden>Neu in v{{ version }}: {{ neu_kurz }} <a href="neu">Alle Änderungen</a> <button type="button" aria-label="Hinweis schliessen" onclick="try{localStorage.setItem('vzev-gesehen','{{ version }}')}catch(e){}this.parentNode.hidden=true">×</button></div>
@@ -490,9 +505,26 @@ b.addEventListener('click',function(){var t=h.getAttribute('data-wahl')||'auto';
 if(window.matchMedia)matchMedia('(prefers-color-scheme: dark)').addEventListener('change',function(){if((h.getAttribute('data-wahl')||'auto')==='auto')setzen('auto')});zeigen()})();</script></body></html>"""
 
 
+def navigation(title, stati):
+    """Gruppen der Navigation mit Ampeln: [{gruppe, knopf, offen, punkt, links: [{href, label, aktiv, punkt}]}]."""
+    aktiv_label = MENU_ALIAS.get(title, title)
+    out = []
+    for gruppe, eintraege in NAVIGATION:
+        links = [dict(href=h, label=l, aktiv=l == aktiv_label, status=stati.get(h, "")) for h, l in eintraege]
+        offen = gruppe in OFFEN_IMMER or any(x["aktiv"] for x in links)
+        gst = ampel.schlechteste([x["status"] for x in links])
+        out.append(dict(gruppe=gruppe, knopf=gruppe not in OFFEN_IMMER, offen=offen, status=gst, links=links))
+    return out
+
+
 def page(title, body, **kw):
     b = config().get("betreiber", {})
-    return render_template_string(BASE, title=title, body=body, anlage=f"{b.get('strasse', '')} {b.get('hausnr', '')}".strip(), msg=request.args.get("msg"), msgclass=request.args.get("c"), nfehler=fehler_seit_start(), version=VERSION, navigation=NAVIGATION, neu_kurz=NEU_KURZ, **kw)
+    try:
+        stati = ampel.pro_seite(ampel.aktuell())
+    except Exception as e:  # noqa: BLE001 – Ampeln dürfen nie eine Seite verhindern
+        log.debug("Ampeln: %s", e)
+        stati = {}
+    return render_template_string(BASE, title=title, body=body, anlage=f"{b.get('strasse', '')} {b.get('hausnr', '')}".strip(), msg=request.args.get("msg"), msgclass=request.args.get("c"), nfehler=fehler_seit_start(), version=VERSION, navigation=navigation(title, stati), neu_kurz=NEU_KURZ, licht=ampel.licht, ampel_css=ampel.CSS, **kw)
 
 
 # --- Import -------------------------------------------------------------------
@@ -952,6 +984,7 @@ def zugriff_erlaubt(adresse: str | None) -> bool:
 def nach_aenderung(antwort):
     if request.method == "POST":   # Upload, Einstellungen, Zahlungen …: Rechenstand sofort neu prüfen
         key_vergessen()
+        ampel.zuruecksetzen()
     return antwort
 
 
@@ -991,6 +1024,8 @@ import vorschlaege  # noqa: E402
 vorschlaege.register(app, sys.modules[__name__])
 import nebenkosten  # noqa: E402
 nebenkosten.register(app, sys.modules[__name__])
+import ampel  # noqa: E402
+ampel.register(app, sys.modules[__name__])
 collector.zusatz = lambda: nebenkosten.wp_entitaeten(nebenkosten.laden()["einstellungen"])  # Wärmezähler mitlesen
 import leistung  # noqa: E402
 leistung.register(app, sys.modules[__name__], starten=not os.environ.get("VZEV_KEINE_SENSOREN"))
@@ -1034,7 +1069,8 @@ NEU = """<div class="card changelog">{% for v, punkte in eintraege %}
 
 @app.route("/neu")
 def neu():
-    return page("Was ist neu", render_template_string(NEU, eintraege=CHANGELOG, version=VERSION))
+    return page("Was ist neu", render_template_string(seiten.EINST_TABS, tab="neu", nfehler=fehler_seit_start())
+                + render_template_string(NEU, eintraege=CHANGELOG, version=VERSION))
 
 
 @app.route("/protokoll")
@@ -1042,7 +1078,7 @@ def protokoll_seite():
     stufe = request.args.get("stufe", "")
     rang = {"INFO": 0, "WARNING": 1, "ERROR": 2, "CRITICAL": 2}
     eintraege = [e for e in protokoll() if rang.get(e["stufe"], 0) >= rang.get(stufe, 0)]
-    return page("Protokoll", render_template_string(PROT, eintraege=eintraege, stufe=stufe, start=START[8:10] + "." + START[5:7] + ". " + START[11:16],
+    return page("Protokoll", render_template_string(seiten.EINST_TABS, tab="protokoll", nfehler=fehler_seit_start()) + render_template_string(PROT, eintraege=eintraege, stufe=stufe, start=START[8:10] + "." + START[5:7] + ". " + START[11:16],
                                                    stufen={"INFO": "Info", "WARNING": "Warnung", "ERROR": "Fehler", "CRITICAL": "Fehler"}))
 
 

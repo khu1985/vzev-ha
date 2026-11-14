@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.19.0
+
+- Ampeln für alle Bereiche: grün, gelb, rot oder grau für Primeo-Lastgänge, Monatsabschluss, Kontrollen, Zahlungen, Tarife, Nebenkosten, Datensammler, PV-Prognose, Sensoren, Protokoll und Vorschläge – als Kacheln auf der Startseite und als Punkte in der Navigation (wie in der Finanz-App). Bewertet im Hintergrund, keine Seite wartet darauf.
+- Navigation neu gegliedert wie in der Finanz-App: Überblick (Energiefluss, Übersicht, Aufgaben) immer offen; Auswertung, Abrechnung, Daten, Stammdaten und App klappen auf, wenn sie die aktuelle Seite enthalten. Zugeklappt zeigt die Gruppe ihre schlechteste Ampel.
+- Protokoll und Änderungen sind Reiter der Einstellungen (mit Anzahl Fehler).
+
 ## 0.18.0
 
 - **Nebenkostenabrechnung** (Abrechnung → Nebenkosten), Periode 1.7.–30.6.:

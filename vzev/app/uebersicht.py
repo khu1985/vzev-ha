@@ -25,7 +25,7 @@ def daten():
     cfg = b["cfg"] if b.get("ok") else S.config()
     res_p = b["res"] if b.get("ok") else None
     with S.collector._db() as c:
-        letzter = c.execute("SELECT MAX(ts) FROM messwerte").fetchone()[0]
+        letzter = c.execute("SELECT MAX(ts), COUNT(*) FROM messwerte").fetchone()  # auch rückwirkend eingefügte Werte
     key = (b.get("key"), letzter, S.files_key())
     if _vcache.get("key") != key:
         ab = (res_p.index.max() + VIERTEL) if res_p is not None else None

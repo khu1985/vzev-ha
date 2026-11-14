@@ -92,6 +92,7 @@ flowchart TB
 | `vzev/app/server.py` | Webserver, Navigation, Statusanzeige, Import, Rechnungen, Datensammler-Seite, Protokoll |
 | `vzev/app/hastatistik.py` | Langzeit-Statistik aus Home Assistant über die WebSocket-API (kleiner Client ohne Zusatzpaket), rückwirkende Wärmepumpen-Werte |
 | `vzev/app/vorschlaege.py` | Vorschläge für die Weiterentwicklung aus Protokoll, Kontrollen, Import, Korrekturen, Datensammler, Prognose und Leistung; anonymisiert zum Weitergeben (Text, Datei, GitHub-Issue) |
+| `vzev/app/ampel.py` | Ampeln (grün/gelb/rot/grau) für alle Bereiche: Kacheln auf der Startseite, Punkte in der Navigation; im Hintergrund bewertet |
 | `vzev/app/nebenkosten.py` | Nebenkostenabrechnung 1.7.–30.6.: Kosten mit Belegen und aus der App (Wärmepumpen, Allgemeinstrom), Verteilung nach m², Personen, Wärmezähler, Tagen; Honorar, Akonto, PDF mit QR-Einzahlungsschein, Zahlungsregister |
 | `vzev/app/leistung.py` | Leistung messen: Ladezeiten der Seiten, Rechenzeiten der Berechnungen, Hintergrundaufgaben, System und Datenmengen – pro Version mit Vergleich zur Vorversion |
 | `vzev/app/sensoren.py` | Sensoren `sensor.vzev_*` / `binary_sensor.vzev_*` über die REST-API von Home Assistant (alle 15 Minuten und nach jeder Berechnung) |

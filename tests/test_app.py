@@ -710,3 +710,23 @@ def test_nebenkosten_seite(app):
     assert list((d / "rechnungen" / "NK-2026-27").glob("Vorschau_*.pdf"))
     assert "Periode noch nicht vollständig" in ziel(c.post("/nebenkosten", data={"aktion": "erstellen", "p": "2026-27"}))
     assert "Nebenkosten" in c.get("/rechnungen").get_data(as_text=True)          # Navigation
+
+
+def test_ampeln_und_navigation(app):
+    server, c, d, quelle = app
+    warten(server)
+    import ampel
+    amp = ampel.aktuell(warten=True)
+    namen = {a.bereich for a in amp}
+    assert {"Primeo-Lastgänge", "Monatsabschluss", "Zahlungen", "Datensammler", "Protokoll"} <= namen
+    assert all(a.status in (ampel.GRUEN, ampel.GELB, ampel.ROT, ampel.GRAU) for a in amp)
+    h = c.get("/").get_data(as_text=True)
+    assert 'class="ampel-kachel' in h and "handeln" in h
+    # Navigation: Überblick immer offen, die Gruppe der aktuellen Seite offen, andere zu
+    h = c.get("/tarife").get_data(as_text=True)
+    assert '<span class="gl">Überblick</span>' in h
+    assert re.search(r'<div class="grp">\s*<button type="button" class="gl" aria-expanded="true"><span>Stammdaten', h)
+    assert re.search(r'<div class="grp zu"><button type="button" class="gl" aria-expanded="false"><span>Abrechnung', h)
+    # Protokoll und Änderungen als Reiter der Einstellungen
+    h = c.get("/protokoll").get_data(as_text=True)
+    assert 'href="neu"' in h and 'aria-current="page">Einstellungen' in h

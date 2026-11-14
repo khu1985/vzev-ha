@@ -681,8 +681,8 @@ def preis_infos():
 
 
 # --- Einstellungen ------------------------------------------------------------
-EINST_TABS = """<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">{% for k, v in [('betreiber','Betreiber und Rechnungen'),('zaehler','Zähler'),('regeln','Regeln'),('datei','Datei vzev.yaml')] %}
-<a class="btn {{ 'primary' if k == tab }}" href="einstellungen?tab={{ k }}">{{ v }}</a>{% endfor %}</div>"""
+EINST_TABS = """<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">{% for k, v, u in [('betreiber','Betreiber und Rechnungen','einstellungen?tab=betreiber'),('zaehler','Zähler','einstellungen?tab=zaehler'),('regeln','Regeln','einstellungen?tab=regeln'),('datei','Datei vzev.yaml','einstellungen?tab=datei'),('protokoll','Protokoll','protokoll'),('neu','Änderungen','neu')] %}
+<a class="btn {{ 'primary' if k == tab }}" href="{{ u }}">{{ v }}{% if k == 'protokoll' and nfehler %} <span class="pill warn" style="margin-left:6px">{{ nfehler }}</span>{% endif %}</a>{% endfor %}</div>"""
 
 BETREIBER = """<form method="post" action="einstellungen?tab=betreiber" class="card"><h2>Betreiber</h2><table class="form">
 {% for k, l in felder %}<tr><td class="l">{{ l }}</td><td class="l"><input name="b.{{ k }}" value="{{ b.get(k) or '' }}" style="width:320px"></td></tr>{% endfor %}
@@ -865,7 +865,7 @@ def einstellungen_formulare(tab):
             return redirect(f"einstellungen?tab={tab}&msg=Gespeichert")
         except (ValueError, KeyError, IndexError) as e:
             return redirect(f"einstellungen?tab={tab}&c=warn&msg=Nicht gespeichert: {e}")
-    kopf = render_template_string(EINST_TABS, tab=tab)
+    kopf = render_template_string(EINST_TABS, tab=tab, nfehler=S.fehler_seit_start())
     if tab == "betreiber":
         body = render_template_string(BETREIBER, b=cfg.get("betreiber") or {}, felder=B_FELDER, start=_d(cfg.get("vzev_start")) or "",
                                       r=cfg.get("rechnungen") or {"zahlungsfrist_tage": 30, "nummer": "{jahr}-Q{quartal}-{einheit}"})

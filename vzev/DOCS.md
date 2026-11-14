@@ -16,29 +16,59 @@ und getrennt ausgewiesenem Netzstrom aus dem Batteriespeicher.
 
 ## Seiten
 
-**Auswertung**
-- **Energiefluss** (Startseite): animiertes Diagramm von PV-Anlage, Netz und Speicher zum Haus und zu den Verbrauchern, für heute, gestern, einen Monat oder ein Jahr. Die Ringe zeigen den Anteil Solar-, Speicher- und Netzstrom; Werte erscheinen per Maus oder Tippen. Speicherwerte stammen vom Wechselrichter, alles andere aus derselben Rechnung wie die Abrechnung.
+Die Navigation ist gruppiert wie in der Finanz-App: **Überblick** ist immer offen, die übrigen Gruppen klappen auf, wenn
+sie die aktuelle Seite enthalten (Klick auf den Gruppennamen öffnet oder schliesst sie).
+
+**Ampeln.** Für jeden Bereich gibt es eine Ampel – grün in Ordnung, gelb prüfen, rot handeln, grau keine Daten. Die
+Startseite zeigt alle als Kacheln (Klick führt zur Seite); in der Navigation stehen gelbe und rote Punkte bei der Seite und
+bei der zugeklappten Gruppe.
+
+| Ampel | grün | gelb | rot |
+|---|---|---|---|
+| Primeo-Lastgänge | bis 45 Tage alt | bis 75 Tage | älter |
+| Monatsabschluss | alle vergangenen Monate abgeschlossen | 1 Monat offen | 2 und mehr |
+| Kontrollen | ältester offener (sonst letzter) Monat: alle stimmen | 1–2 stimmen nicht | mehr |
+| Zahlungen | nichts überfällig | Quartalsrechnungen 3 Wochen nach Quartalsende nicht erstellt | Rechnung überfällig |
+| Tarife | alle Monate mit Tarif | im Dezember Tarife des neuen Jahres fehlen, Rückliefertarif fehlt | – |
+| Nebenkosten | Grundlagen vollständig | Angaben fehlen; Abrechnung 1 Monat nach Periodenende nicht erstellt | 3 Monate danach |
+| Datensammler | letzte Ablesung bis 1 h | bis 6 h, Sensor ohne Wert | älter |
+| PV-Prognose | Prognose für heute vorhanden | fehlt | – |
+| Sensoren für HA | geschrieben | Fehler beim Schreiben | – |
+| Protokoll | keine Fehler seit dem Start | 1–4 Fehler | 5 und mehr |
+| Vorschläge | keine dringenden | Vorschlag mit hoher Priorität | – |
+
+Die Ampeln werden im Hintergrund bewertet (höchstens alle 5 Minuten, nach jeder Änderung und neuen Berechnung) – keine
+Seite wartet darauf.
+
+**Überblick**
+- **Energiefluss** (Startseite): oben die Ampeln, darunter animiertes Diagramm von PV-Anlage, Netz und Speicher zum Haus und zu den Verbrauchern, für heute, gestern, einen Monat oder ein Jahr. Die Ringe zeigen den Anteil Solar-, Speicher- und Netzstrom; Werte erscheinen per Maus oder Tippen. Speicherwerte stammen vom Wechselrichter, alles andere aus derselben Rechnung wie die Abrechnung.
 - **Übersicht:** Jahr wählen; Produktion, Autarkie, Rücklieferung und Wertschöpfung des Jahres; Diagramm «Energiefluss pro Monat» – ein Klick auf einen Monat zeigt darunter dessen Kennzahlen, Kontrollen (Abgleich mit Primeo, Ladestation, Lücken, Rückliefertarif, 80-%-Grenze Solarpreis, dynamische Preise, Wärmepumpen, Netzladung gegen Wechselrichter, Abschluss, offene Rechnungen) und Verbraucher mit Betrag inkl. Grundpreis.
-- **Wertschöpfung:** Ertrag des Betreibers pro Monat nach Quelle (Verkauf an Mieter, Eigenverbrauch, Rücklieferung, Gutschriften), kumuliert, Verwendung des Solarstroms und Wert pro kWh; filterbar nach Jahr.
+- **Aufgaben:** Assistent für den Monatsabschluss und wiederkehrende Aufgaben; erkennt erledigte Schritte selbst.
+
+**Auswertung**
 - **Verlauf:** pro Zähler Verbrauch, Solar/Netz und Kosten pro Monat, beim 1. OG nach Mietverhältnis gruppiert.
+- **Wertschöpfung:** Ertrag des Betreibers pro Monat nach Quelle (Verkauf an Mieter, Eigenverbrauch, Rücklieferung, Gutschriften), kumuliert, Verwendung des Solarstroms und Wert pro kWh; filterbar nach Jahr.
+- **Prognose:** PV-Prognose aus der Solcast-Integration (heute, morgen, folgende Tage) mit Bandbreite, gemessenem Ertrag, üblichem Verbrauch und dynamischem Strompreis; Zeitfenster «günstig aus dem Netz laden»; Trefferquote der Prognose vom Vortag.
+- **Batterie:** Monatswerte des Speichers (geladen, entladen, Wirkungsgrad) aus den Solis-Daten. Für die Abrechnung zählt die Netzladung aus den Primeo-Lastgängen (siehe «Dynamische Strompreise»).
 
 **Abrechnung**
-- **Daten importieren:** Dateien hochladen, ersetzen oder entfernen. Die Zuordnung erfolgt über die Messpunkt-Nummer im Dateikopf, nicht über den Dateinamen. Oben steht, bis wann die Lastgänge reichen.
-- **Jahresabrechnung:** Allgemeinstrom fürs ganze Jahr als PDF für die Nebenkostenabrechnung, Mieter, Wertschöpfung, Excel-Export (auf Wunsch mit allen Viertelstunden).
 - **Rechnungen:** Quartal und Rechnungsdatum wählen und erstellen – pro Mietverhältnis eine Rechnung mit QR-Einzahlungsschein, dazu eine Gesamtrechnung Allgemeinstrom für die Nebenkostenabrechnung. Ab 2027 zusätzlich die Spalte «Speicher NT» und die Zeile «Bonus dynamischer Stromtarif», sobald sie vorkommen. Darunter **Rechnungen und Zahlungen**: offene und überfällige Beträge, Zahlungen erfassen oder entfernen, Rechnungsdatum und Fälligkeit ändern.
+- **Nebenkosten:** Nebenkostenabrechnung 1.7.–30.6. (siehe unten).
+- **Jahresabrechnung:** Allgemeinstrom fürs ganze Jahr als PDF für die Nebenkostenabrechnung, Mieter, Wertschöpfung, Excel-Export (auf Wunsch mit allen Viertelstunden).
 - **Abschluss:** Monate der Reihe nach abschliessen (mit Abschlussdatum). Danach sind Änderungen an Tarifen, Mietern und Erträgen für diesen Monat gesperrt.
+
+**Daten**
+- **Daten importieren:** Dateien hochladen, ersetzen oder entfernen. Die Zuordnung erfolgt über die Messpunkt-Nummer im Dateikopf, nicht über den Dateinamen. Oben steht, bis wann die Lastgänge reichen.
+- **Primeo:** Primeo-Rechnungen für den Abgleich, manuelle Erträge.
+- **Datensammler:** Zählerstände aus Home Assistant (alle 15 Minuten) mit letztem Wert und Status, evcc-Ladevorgänge im Detail.
 
 **Stammdaten**
 - **Mieter:** Mietverhältnisse mit Historie. In der App steht nur der Vorname; Rechnungen, Zahlungserinnerungen, Jahresabrechnung und Excel verwenden Vor- und Nachname.
 - **Tarife:** Tarife mit Gültig-ab-Datum und **Dynamische Strompreise** (Verlauf heute/morgen, Schnittstelle einstellen).
-- **Primeo:** Primeo-Rechnungen für den Abgleich, manuelle Erträge.
-- **Einstellungen:** Betreiber, Zähler, Regeln (Aufteilung sowie Speicher und Bonus dynamischer Tarif) und die Datei `vzev.yaml` direkt.
 
-**Anlage**
-- **Prognose:** PV-Prognose aus der Solcast-Integration (heute, morgen, folgende Tage) mit Bandbreite, gemessenem Ertrag, üblichem Verbrauch und dynamischem Strompreis; Zeitfenster «günstig aus dem Netz laden»; Trefferquote der Prognose vom Vortag.
-- **Batterie:** Monatswerte des Speichers (geladen, entladen, Wirkungsgrad) aus den Solis-Daten. Für die Abrechnung zählt die Netzladung aus den Primeo-Lastgängen (siehe «Dynamische Strompreise»).
-- **Datensammler:** Zählerstände aus Home Assistant (alle 15 Minuten) mit letztem Wert und Status, evcc-Ladevorgänge im Detail.
-- **Protokoll:** Uploads, Rechnungen, Zahlungen, Korrekturen, Warnungen und Fehler.
+**App**
+- **Einstellungen:** Betreiber, Zähler, Regeln (Aufteilung sowie Speicher und Bonus dynamischer Tarif) die Datei `vzev.yaml` direkt sowie als Reiter **Protokoll** (Uploads, Rechnungen, Zahlungen, Korrekturen, Warnungen und Fehler) und **Änderungen**.
+- **Vorschläge:** Vorschläge für die Weiterentwicklung und Leistung der App (siehe unten).
 
 Ein Klick auf die **Versionsnummer** zeigt, was neu ist. Der Knopf daneben stellt die Darstellung um: **Auto** (wie das Gerät), **Hell** oder **Dunkel**. Daneben zeigt eine **Statusanzeige**, was im Hintergrund läuft (Berechnung, Abruf von Zählerständen, evcc oder Strompreisen). Seiten, die auf eine Berechnung warten, laden von selbst neu.
 
