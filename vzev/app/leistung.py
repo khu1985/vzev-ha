@@ -42,7 +42,8 @@ LANGSAM_SEITE_MS = 1500
 LANGSAM_FUNKTION_MS = 800
 # hängt am Netz oder läuft selten und darf dauern – keine Vorschläge wegen Langsamkeit
 OHNE_VORSCHLAG = ("hastatistik.", "invoices.main", "core.run", "core.load",
-                  "sensoren.")  # Sensoren laufen alle 15 Minuten im Hintergrund – niemand wartet darauf
+                  "sensoren.",   # Sensoren laufen alle 15 Minuten im Hintergrund – niemand wartet darauf
+                  "vorschlaege.sammeln")  # nur auf der Seite «Vorschläge» und für die Ampel (zwischengespeichert)
 NICHT_MESSEN = {"static", "status"}  # Dateien und die Abfrage der Warteseite (läuft im Sekundentakt)
 
 

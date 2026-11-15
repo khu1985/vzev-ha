@@ -258,10 +258,11 @@ def seite():
 
 
 def _ampeln():
-    """Ampeln aller Bereiche als Kacheln (beim ersten Aufruf nach dem Start einmal gerechnet, danach im Hintergrund)."""
+    """Ampeln aller Bereiche als Kacheln (im Hintergrund bewertet, die Startseite wartet nie darauf)."""
     import ampel
     try:
-        return ampel.karte(ampel.aktuell(warten=not ampel._CACHE["zeit"]))
+        amp = ampel.aktuell()  # nie warten – bewertet wird im Hintergrund
+        return ampel.karte(amp) if amp else '<p class="muted" style="margin:0 0 14px">Ampeln werden bewertet …</p>'
     except Exception as e:  # noqa: BLE001
         S.log.debug("Ampeln: %s", e)
         return ""

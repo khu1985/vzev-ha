@@ -16,7 +16,7 @@ GRUEN, GELB, ROT, GRAU = "gruen", "gelb", "rot", "grau"
 RANG = {ROT: 3, GELB: 2, GRUEN: 1, GRAU: 0}
 TEXT = {GRUEN: "in Ordnung", GELB: "prüfen", ROT: "handeln", GRAU: "keine Daten"}
 GUELTIG_S = 300
-_CACHE = {"zeit": 0.0, "key": None, "ampeln": [], "laeuft": False}
+_CACHE = {"zeit": 0.0, "key": None, "ampeln": [], "laeuft": False, "gestartet": False}
 _SPERRE = threading.Lock()
 
 
@@ -277,7 +277,7 @@ def aktuell(warten=False):
     key = S._cache.get("key")
     alt = time.time() - _CACHE["zeit"] > GUELTIG_S or _CACHE["key"] != key
     if alt and not _CACHE["laeuft"] and not S.RECHNEN.get("aktiv"):
-        _CACHE.update(laeuft=True, key=key)
+        _CACHE.update(laeuft=True, key=key, gestartet=True)
         if warten:
             _neu_bewerten()
         else:
@@ -324,6 +324,22 @@ nav .ampel{width:8px;height:8px;margin:0 0 0 6px;box-shadow:none;vertical-align:
 """
 
 
-def register(app, server):
+def hintergrund(intervall=GUELTIG_S):
+    """Ampeln regelmässig vorab bewerten, damit die Startseite sie fertig vorfindet."""
+    def schleife():
+        time.sleep(30)  # erst die Berechnung nach dem Start
+        while True:
+            try:
+                if S._cache.get("key") and not S.RECHNEN.get("aktiv"):
+                    aktuell()
+            except Exception as e:  # noqa: BLE001
+                S.log.debug("Ampeln im Hintergrund: %s", e)
+            time.sleep(intervall)
+    threading.Thread(target=schleife, name="ampeln-vorab", daemon=True).start()
+
+
+def register(app, server, starten=False):
     global S
     S = server
+    if starten:
+        hintergrund()

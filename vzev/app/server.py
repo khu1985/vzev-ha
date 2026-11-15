@@ -1025,7 +1025,7 @@ vorschlaege.register(app, sys.modules[__name__])
 import nebenkosten  # noqa: E402
 nebenkosten.register(app, sys.modules[__name__])
 import ampel  # noqa: E402
-ampel.register(app, sys.modules[__name__])
+ampel.register(app, sys.modules[__name__], starten=not os.environ.get("VZEV_KEINE_SENSOREN"))
 collector.zusatz = lambda: nebenkosten.wp_entitaeten(nebenkosten.laden()["einstellungen"])  # Wärmezähler mitlesen
 import leistung  # noqa: E402
 leistung.register(app, sys.modules[__name__], starten=not os.environ.get("VZEV_KEINE_SENSOREN"))

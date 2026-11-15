@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.19.1
+
+- Startseite schneller: Nach jedem Speichern wartete sie, bis alle Ampeln neu bewertet waren (bis 5 s). Jetzt werden die Ampeln nur noch im Hintergrund bewertet – vorab alle 5 Minuten und nach Änderungen; die Startseite zeigt den letzten Stand.
+- Vorschläge werden für die Ampel zwischengespeichert (5 Minuten); die Seite «Vorschläge» rechnet beim Öffnen weiterhin neu.
+
 ## 0.19.0
 
 - Ampeln für alle Bereiche: grün, gelb, rot oder grau für Primeo-Lastgänge, Monatsabschluss, Kontrollen, Zahlungen, Tarife, Nebenkosten, Datensammler, PV-Prognose, Sensoren, Protokoll und Vorschläge – als Kacheln auf der Startseite und als Punkte in der Navigation (wie in der Finanz-App). Bewertet im Hintergrund, keine Seite wartet darauf.

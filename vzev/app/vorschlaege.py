@@ -313,8 +313,21 @@ def idee_loeschen(iid):
 
 # ---------------------------------------------------------------- Sammeln und Bericht
 
-def sammeln():
-    """Alle Vorschläge, bereits anonymisiert, wichtigste zuerst."""
+_SAMMLUNG = {"zeit": 0.0, "liste": None}
+
+
+def sammeln(max_alter=300):
+    """Alle Vorschläge, bereits anonymisiert, wichtigste zuerst. Zwischengespeichert (die Ampel fragt alle 5 Minuten,
+    die Seite «Vorschläge» rechnet beim Öffnen neu)."""
+    import time
+    if _SAMMLUNG["liste"] is not None and time.time() - _SAMMLUNG["zeit"] < max_alter:
+        return list(_SAMMLUNG["liste"])
+    liste = _sammeln()
+    _SAMMLUNG.update(zeit=time.time(), liste=liste)
+    return list(liste)
+
+
+def _sammeln():
     erg = {}
     for quelle in (_protokoll, _kontrollen, _import, _korrekturen, _datensammler, _prognose, _leistung):
         try:
@@ -420,7 +433,7 @@ document.getElementById('vs-kopieren').addEventListener('click', function(){
 
 def seite():
     from flask import render_template_string
-    alle = sammeln()
+    alle = sammeln(max_alter=0)  # Seite: immer aktuell
     st = laden()["status"]
     sichtbar = [v for v in alle if v.schluessel not in st]
     weg = [(v, st[v.schluessel]["status"]) for v in alle if v.schluessel in st]
@@ -469,7 +482,7 @@ def aktion():
 def herunterladen():
     from flask import Response
     st = laden()["status"]
-    text = bericht([v for v in sammeln() if v.schluessel not in st], S.VERSION, _leistung_text())
+    text = bericht([v for v in sammeln(max_alter=0) if v.schluessel not in st], S.VERSION, _leistung_text())
     return Response(text.encode("utf-8"), mimetype="text/markdown; charset=utf-8",
                     headers={"Content-Disposition": 'attachment; filename="vzev-vorschlaege.md"'})
 
