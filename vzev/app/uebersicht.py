@@ -459,7 +459,12 @@ VERLAUF_BAT = diagramme.STIL + """
 {% if zeilen %}<tr class="sum"><td class="l">Summe</td><td></td><td>{{ tot.geladen|f2 }}</td><td>{{ tot.netz|f2 }}</td><td>{{ tot.entladen|f2 }}</td><td>{{ '%.0f %%'|format(tot.entladen / tot.geladen * 100) if tot.geladen else '–' }}</td><td>{{ tot.speicher|f2 }}</td><td>{{ tot.kosten|f2 }}</td><td>{{ tot.ergebnis|f2 }}</td></tr>{% endif %}
 </table></div>
 <p class="muted">Geladen, entladen: Tageszähler des Wechselrichters. Netzladung, Netzstrom aus dem Speicher und Ergebnis: aus der Abrechnung
-(Primeo-Lastgänge, ab {{ ab|dmy }}; Ladekosten zum dynamischen Preis, sonst zum Netztarif). Mehr unter <a href="batterie">Batterie</a>.</p></div>"""
+(Primeo-Lastgänge, ab {{ ab|dmy }}; Ladekosten zum dynamischen Preis, sonst zum Netztarif). Mehr unter <a href="batterie">Batterie</a>.</p></div>
+{% if statistik %}<div class="card"><h2>Ältere Werte holen</h2>
+<form method="post" action="batterie_statistik" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="hidden" name="von" value="verlauf">
+ab <input type="date" name="ab" value="{{ statistik_ab }}"> <button>Aus der Langzeit-Statistik von Home Assistant holen</button></form>
+<p class="muted">Home Assistant speichert die Tageszähler des Wechselrichters stündlich und dauerhaft. Übernommen wird nur, was vor der
+ersten eigenen Ablesung liegt; eigene Werte bleiben unverändert.</p></div>{% endif %}"""
 
 
 def verlauf_batterie(alle_z):
@@ -495,7 +500,7 @@ def verlauf_batterie(alle_z):
                               vorlaeufig={j for j, r in enumerate(zeilen) if r["vorl"]}, hoehe=220, summe="geladen")
     zeilen.reverse()
     return S.page("Verlauf", render_template_string(VERLAUF_BAT, zl=list(alle_z.items()), z="BAT", zeilen=zeilen, tot=tot, chart=chart, soc=soc,
-                                                    ab=pd.Timestamp(str(sp["speicher_ab"])).date()))
+                                                    ab=pd.Timestamp(str(sp["speicher_ab"])).date(), **seiten.statistik_formular(cfg)))
 
 
 def verlauf():

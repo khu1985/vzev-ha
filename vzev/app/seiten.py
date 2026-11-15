@@ -626,7 +626,19 @@ BATTERIE = """
 <td>{{ '%.0f %%'|format(m.entladen / m.geladen * 100) if m.geladen else '–' }}</td><td>{{ m.pv|f2 }}</td><td>{{ m.bezug|f2 }}</td><td>{{ m.einspeisung|f2 }}</td></tr>
 {% else %}<tr><td colspan="8" class="l">Noch keine Daten vom Wechselrichter. Der Datensammler speichert sie alle 15 Minuten.</td></tr>{% endfor %}</table></div>
 <p class="muted">Tageswerte des Solis-Wechselrichters (Höchstwert pro Tag), gesammelt vom Datensammler. Für die Abrechnung zählen weiterhin die Primeo-Lastgänge.</p></div>
-<p class="muted">Dynamische Strompreise: Seite <a href="tarife">Tarife</a>. Speicher und Bonus: <a href="einstellungen?tab=regeln">Einstellungen → Regeln</a>.</p>"""
+<p class="muted">Dynamische Strompreise: Seite <a href="tarife">Tarife</a>. Speicher und Bonus: <a href="einstellungen?tab=regeln">Einstellungen → Regeln</a>.</p>
+{% if statistik %}<div class="card"><h2>Ältere Werte holen</h2>
+<form method="post" action="batterie_statistik" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="hidden" name="von" value="batterie">
+ab <input type="date" name="ab" value="{{ statistik_ab }}"> <button>Aus der Langzeit-Statistik von Home Assistant holen</button></form>
+<p class="muted">Home Assistant speichert die Tageszähler des Wechselrichters stündlich und dauerhaft. Übernommen wird nur, was vor der
+ersten eigenen Ablesung liegt; eigene Werte bleiben unverändert.</p></div>{% endif %}"""
+
+
+def statistik_formular(cfg):
+    """Werte für das Formular «Ältere Werte holen»: nur mit Wechselrichter-Sensoren; Vorschlag ab vZEV-Start."""
+    start = cfg.get("vzev_start")
+    return dict(statistik=bool(S.solis_tageszaehler(cfg)),
+                statistik_ab=str(start)[:10] if start else date(date.today().year, 1, 1).isoformat())
 
 
 def solis_monate(cfg):
@@ -658,7 +670,7 @@ def batterie():
     monate, soc = solis_monate(cfg)
     akt = monate[0] if monate and monate[0]["monat"] == date.today().strftime("%m.%Y") else dict(geladen=None, entladen=None)
     return S.page("Batterie", render_template_string(BATTERIE, r=r, monate=monate, akt=akt, monat=date.today().strftime("%m.%Y"), p=preis_infos(),
-                                                     soc=soc))
+                                                     soc=soc, **statistik_formular(cfg)))
 
 
 def preis_infos():

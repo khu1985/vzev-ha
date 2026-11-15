@@ -130,3 +130,19 @@ def test_jahresarbeitszahl(db):
             t, s, w = t + timedelta(minutes=15), s + 0.2, w + 0.0007   # 0.7 kWh Wärme aus 0.2 kWh Strom
     j = vorschau.jaz(db, cfg, date(2026, 11, 1), date(2026, 11, 30))["Heizung"]
     assert j["jaz"] == pytest.approx(3.5, rel=0.001) and j["strom"] == pytest.approx(0.2 * (96 * 3 - 1))
+
+
+def test_statistik_tageszaehler_mitternacht(db):
+    """Solis-Tageszähler springen um Mitternacht auf 0: der Wert der letzten Stunde gehört zum alten Tag (versatz_min)."""
+    # 08.11. 21:00 UTC – 09.11. 01:00 UTC = 22:00–02:00 Lokalzeit; Reset nach Mitternacht
+    start = datetime(2026, 11, 8, 21, 0, tzinfo=timezone.utc)
+    staende = [8.0, 9.5, 0.0, 0.4]   # Ende 23:00, 24:00 (alter Tag!), 01:00, 02:00 Lokalzeit
+    zeilen = [{"start": (start + timedelta(hours=i)).timestamp() * 1000, "end": (start + timedelta(hours=i + 1)).timestamp() * 1000,
+               "state": s, "sum": None} for i, s in enumerate(staende)]
+    ha = FakeHA({"sensor.geladen_heute": zeilen})
+    erg = hastatistik.fuellen(db, f"http://127.0.0.1:{ha.port}/api", "geheim", ["sensor.geladen_heute"], date(2026, 11, 8),
+                              heute=datetime(2026, 11, 9, 12, 0), versatz_min=1)
+    assert erg["sensor.geladen_heute"][0] == 4
+    with db() as c:
+        rows = dict(c.execute("SELECT ts, wert FROM messwerte").fetchall())
+    assert rows["2026-11-08T23:59"] == 9.5 and rows["2026-11-09T00:59"] == 0.0   # Tagesmaximum 8.11. = 9.5

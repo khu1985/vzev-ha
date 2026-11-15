@@ -884,6 +884,39 @@ def wp_statistik():
         return redirect(f"einstellungen?tab=zaehler&c=warn&msg=Langzeit-Statistik: {e}")
 
 
+def solis_tageszaehler(cfg):
+    """Tageszähler des Wechselrichters (Batterie geladen/entladen, PV, Netz) – ohne Ladestand (Momentanwert)."""
+    sol = (cfg.get("homeassistant") or {}).get("solis") or {}
+    return [sol[k] for k in ("batterie_geladen_heute", "batterie_entladen_heute", "pv_heute", "netz_bezug_heute", "netz_einspeisung_heute")
+            if sol.get(k)]
+
+
+@app.route("/batterie_statistik", methods=["POST"])
+def batterie_statistik():
+    """Batterie- und PV-Tageswerte des Wechselrichters rückwirkend aus der Langzeit-Statistik von Home Assistant."""
+    import hastatistik
+    zurueck = "verlauf?z=BAT" if request.form.get("von") == "verlauf" else "batterie"
+    try:
+        ab = date.fromisoformat(request.form.get("ab") or "")
+        ents = solis_tageszaehler(config())
+        if not ents:
+            raise ValueError("keine Wechselrichter-Sensoren eingerichtet (Einstellungen → Zähler → Solis)")
+        base, token = collector._ha()
+        if not token:
+            raise ValueError("kein Zugang zu Home Assistant")
+        erg = hastatistik.fuellen(collector._db, base, token, ents, ab, versatz_min=1)
+        n = sum(x[0] for x in erg.values())
+        txt = "; ".join(f"{e}: {x[0]} Stundenwerte" + (f" {x[1]:%d.%m.%Y}–{x[2]:%d.%m.%Y}" if x[0] else "") for e, x in erg.items())
+        log.info("Wechselrichter aus Langzeit-Statistik ab %s: %s", ab, txt)
+        sep = "&" if "?" in zurueck else "?"
+        meldung = f"{n} Stundenwerte übernommen" if n else f"c=warn&msg=Keine Statistik gefunden ({txt})"
+        return redirect(f"{zurueck}{sep}msg={meldung}" if n else f"{zurueck}{sep}{meldung}")
+    except Exception as e:
+        log.warning("Langzeit-Statistik Wechselrichter: %s", e)
+        sep = "&" if "?" in zurueck else "?"
+        return redirect(f"{zurueck}{sep}c=warn&msg=Langzeit-Statistik: {e}")
+
+
 @app.route("/erinnerung", methods=["POST"])
 def erinnerung():
     import zahlungen

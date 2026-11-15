@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.19.3
+
+- Batterie im Verlauf und Seite «Batterie»: **Ältere Werte holen** – die Tageszähler des Wechselrichters (Batterie geladen/entladen, PV, Netz) rückwirkend aus der Langzeit-Statistik von Home Assistant, ab einem wählbaren Datum. Eigene Ablesungen bleiben unverändert; der Wert der letzten Stunde vor Mitternacht zählt zum richtigen Tag.
+
 ## 0.19.2
 
 - Verlauf: neuer Reiter **Batterie** – pro Monat geladen (aus Solarstrom und aus dem Netz) und entladen mit Wirkungsgrad (Wechselrichter), dazu aus der Abrechnung Netzladung, Netzstrom aus dem Speicher, Ladekosten und Ergebnis (ab dem Start des Speichermodells).

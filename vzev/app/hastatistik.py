@@ -144,8 +144,11 @@ def lokal(t_utc):
     return t + preise.offset((t + timedelta(hours=1)).date())
 
 
-def fuellen(db, api_base, token, entitaeten, ab, heute=None):
-    """Zählerstände vor der ersten eigenen Ablesung aus der Statistik eintragen. Gibt {entity: (anzahl, von, bis)} zurück."""
+def fuellen(db, api_base, token, entitaeten, ab, heute=None, versatz_min=0):
+    """Zählerstände vor der ersten eigenen Ablesung aus der Statistik eintragen. Gibt {entity: (anzahl, von, bis)} zurück.
+
+    versatz_min: Werte so viele Minuten vor dem Stundenende eintragen – für Tageszähler, die um Mitternacht auf 0 springen
+    (Solis «heute»): der Wert der letzten Stunde gehört dann noch zum alten Tag (23:59 statt 00:00)."""
     heute = heute or datetime.now()
     with db() as c:
         erste = {e: c.execute("SELECT MIN(ts) FROM messwerte WHERE entity=?", (e,)).fetchone()[0] for e in entitaeten}
@@ -156,7 +159,7 @@ def fuellen(db, api_base, token, entitaeten, ab, heute=None):
     for e in entitaeten:
         zeilen = roh.get(e) or []
         grenze = datetime.fromisoformat(erste[e]) if erste[e] else None
-        werte = [(lokal(t), s, su) for t, s, su in zeilen if t is not None]
+        werte = [(lokal(t) - timedelta(minutes=versatz_min), s, su) for t, s, su in zeilen if t is not None]
         werte = [(t, s, su) for t, s, su in werte if t.date() >= ab and (grenze is None or t < grenze)]
         if not werte:
             ergebnis[e] = (0, None, None)

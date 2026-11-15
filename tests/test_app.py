@@ -540,6 +540,9 @@ def test_netzladung_und_jaz(app):
         assert "Netzladung passt zum Wechselrichter" in h and "Wechselrichter «Batterie geladen»" in h
         h = c.get("/verlauf?z=BAT").get_data(as_text=True)   # Reiter Batterie im Verlauf: Werte des Wechselrichters
         assert "Ladung pro Monat" in h and 'class="btn primary" href="verlauf?z=BAT">Batterie' in h
+        assert 'action="batterie_statistik"' in h and 'name="ab" value="2026-03-01"' in h   # ältere Werte aus HA holen
+        r = c.post("/batterie_statistik", data={"ab": "2026-03-01", "von": "verlauf"})
+        assert r.headers["Location"].startswith("verlauf?z=BAT&c=warn&msg=Langzeit-Statistik")   # kein Zugang im Test
         assert re.search(r"April 2026\*?</td><td>30</td><td><b>120\.00</b>", h), re.search(r"<table class=\"wide\">.*?</table>", h, re.S).group(0)[:1500]
         # Wärmepumpe mit Wärme-Sensor → Jahresarbeitszahl
         y = yaml.safe_load(cfg_alt)
