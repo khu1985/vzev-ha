@@ -439,11 +439,72 @@ VERLAUF = diagramme.STIL + """
 {% endif %}"""
 
 
+VERLAUF_BAT = diagramme.STIL + """
+<div style="display:flex;gap:6px;margin:-8px 0 16px;flex-wrap:wrap">{% for k, l in zl %}<a class="btn {{ 'primary' if k == z }}" href="verlauf?z={{ k }}">{{ l }}</a>{% endfor %}</div>
+<div class="grid" style="margin-bottom:20px">
+ <div class="kpi"><div>Geladen</div><div>{{ tot.geladen|k0 }} <small>kWh</small></div><div class="s">davon aus dem Netz {{ tot.netz|k0 }} kWh</div></div>
+ <div class="kpi"><div>Entladen</div><div>{{ tot.entladen|k0 }} <small>kWh</small></div><div class="s">ins Haus abgegeben</div></div>
+ <div class="kpi"><div>Wirkungsgrad</div><div>{{ '%.0f'|format(tot.entladen / tot.geladen * 100) if tot.geladen else '–' }} <small>%</small></div><div class="s">entladen ÷ geladen</div></div>
+ <div class="kpi"><div>{{ 'Ergebnis Netzladung' if tot.netz else 'Ladestand' }}</div><div>{% if tot.netz %}{{ tot.ergebnis|f2 }} <small>CHF</small>{% else %}{{ '%.0f'|format(soc) if soc is not none else '–' }} <small>%</small>{% endif %}</div>
+ <div class="s">{{ 'Verkauf/Eigennutzung minus Ladekosten' if tot.netz else 'zuletzt gemessen' }}</div></div>
+</div>
+<div class="card"><h2>Ladung pro Monat</h2>{{ chart|safe }}<p class="muted">kWh geladen: aus Solarstrom und aus dem Netz (Netzladung ab {{ ab|dmy }} aus den Primeo-Lastgängen). * vorläufig.</p></div>
+<div class="card"><div class="scroll"><table class="wide">
+<tr><th class="l">Monat</th><th>Tage</th><th>Geladen kWh</th><th>davon Netz</th><th>Entladen kWh</th><th>Wirkungsgrad</th><th>Netzstrom aus Speicher verbraucht</th><th>Ladekosten CHF</th><th>Ergebnis CHF</th></tr>
+{% for r in zeilen %}<tr><td class="l">{{ r.label }}</td><td>{{ r.tage if r.tage else '–' }}</td><td><b>{{ r.geladen|f2 if r.geladen is not none else '–' }}</b></td>
+<td>{{ r.netz|f2 if r.netz else '–' }}</td><td>{{ r.entladen|f2 if r.entladen is not none else '–' }}</td>
+<td>{{ '%.0f %%'|format(r.entladen / r.geladen * 100) if r.geladen and r.entladen is not none else '–' }}</td>
+<td>{{ r.speicher|f2 if r.speicher else '–' }}</td><td>{{ r.kosten|f2 if r.kosten else '–' }}</td><td><b>{{ r.ergebnis|f2 if r.netz else '–' }}</b></td></tr>{% else %}
+<tr><td class="l" colspan="9">Noch keine Daten vom Wechselrichter. Der Datensammler speichert sie alle 15 Minuten (Einstellungen → Zähler → Solis).</td></tr>{% endfor %}
+{% if zeilen %}<tr class="sum"><td class="l">Summe</td><td></td><td>{{ tot.geladen|f2 }}</td><td>{{ tot.netz|f2 }}</td><td>{{ tot.entladen|f2 }}</td><td>{{ '%.0f %%'|format(tot.entladen / tot.geladen * 100) if tot.geladen else '–' }}</td><td>{{ tot.speicher|f2 }}</td><td>{{ tot.kosten|f2 }}</td><td>{{ tot.ergebnis|f2 }}</td></tr>{% endif %}
+</table></div>
+<p class="muted">Geladen, entladen: Tageszähler des Wechselrichters. Netzladung, Netzstrom aus dem Speicher und Ergebnis: aus der Abrechnung
+(Primeo-Lastgänge, ab {{ ab|dmy }}; Ladekosten zum dynamischen Preis, sonst zum Netztarif). Mehr unter <a href="batterie">Batterie</a>.</p></div>"""
+
+
+def verlauf_batterie(alle_z):
+    """Reiter «Batterie»: Wechselrichter (geladen, entladen) und Abrechnung (Netzladung, Netzstrom aus dem Speicher)."""
+    d = daten()
+    res, cfg = d["res"], d["cfg"] or S.config()
+    sol, soc = seiten.solis_monate(cfg)
+    sol = {m["periode"]: m for m in sol}
+    sp = core.speicher_regeln(cfg)
+    abr = {}
+    if res is not None:
+        w = _memo("wertschoepfung", lambda: core.wertschoepfung(res, cfg))
+        laden = res["Laden"].groupby(res["month"]).sum()
+        ladepreis = res["dynprice"].fillna(res["price"]) if "dynprice" in res else res["price"]
+        kosten = (res["Laden"] * ladepreis).groupby(res["month"]).sum()
+        speicher = res[[f"P_{k}" for k in core.ZAEHLER if f"P_{k}" in res]].sum(axis=1).groupby(res["month"]).sum()
+        for p in laden.index:
+            abr[p] = dict(netz=float(laden[p]), kosten=float(kosten[p]), speicher=float(speicher.get(p, 0)),
+                          ergebnis=float(w.loc[p, "speicher_chf"]) if p in w.index and "speicher_chf" in w else 0.0)
+    mon = _memo("monate", lambda: monate(res)) if res is not None else None
+    perioden = sorted(set(sol) | {p for p, a in abr.items() if a["netz"] or a["speicher"]})
+    zeilen = []
+    for p in perioden:
+        s, a = sol.get(p, {}), abr.get(p, {})
+        vorl = mon is not None and p in mon.index and bool(mon.loc[p, "vorlaeufig"])
+        zeilen.append(dict(periode=p, label=_titel(p) + ("*" if vorl else ""), vorl=vorl, tage=s.get("tage"),
+                           geladen=s.get("geladen"), entladen=s.get("entladen"), netz=a.get("netz", 0.0), kosten=a.get("kosten", 0.0),
+                           speicher=a.get("speicher", 0.0), ergebnis=a.get("ergebnis", 0.0)))
+    tot = {k: sum((r[k] or 0) for r in zeilen) for k in ("geladen", "entladen", "netz", "kosten", "speicher", "ergebnis")}
+    chart = diagramme.saeulen([_ml(r["periode"]) for r in zeilen],
+                              [("aus Solarstrom", diagramme.FARBEN["solar"], [max(0.0, (r["geladen"] or 0) - (r["netz"] or 0)) for r in zeilen]),
+                               ("aus dem Netz", diagramme.FARBEN["netz"], [r["netz"] or 0 for r in zeilen])],
+                              vorlaeufig={j for j, r in enumerate(zeilen) if r["vorl"]}, hoehe=220, summe="geladen")
+    zeilen.reverse()
+    return S.page("Verlauf", render_template_string(VERLAUF_BAT, zl=list(alle_z.items()), z="BAT", zeilen=zeilen, tot=tot, chart=chart, soc=soc,
+                                                    ab=pd.Timestamp(str(sp["speicher_ab"])).date()))
+
+
 def verlauf():
     z = request.args.get("z", "1OG")
-    alle_z = dict(zl(S.config()) + core.wp_namen(S.config()))
+    alle_z = dict(zl(S.config()) + core.wp_namen(S.config()) + [("BAT", "Batterie")])
     if z not in alle_z:
         z = "1OG"
+    if z == "BAT":
+        return verlauf_batterie(alle_z)
     d = daten()
     res, cfg = d["res"], d["cfg"]
     if res is None:

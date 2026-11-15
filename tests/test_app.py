@@ -79,7 +79,7 @@ def test_kaputte_datei_wird_gemeldet(app):
 def test_seiten_mit_daten(app):
     server, c, d, quelle = app
     warten(server)
-    for u in ["/", "/uebersicht?m=2026-03", "/uebersicht?m=2026-04", "/verlauf?z=1OG", "/verlauf?z=AllgC", "/verlauf?z=EV",
+    for u in ["/", "/uebersicht?m=2026-03", "/uebersicht?m=2026-04", "/verlauf?z=1OG", "/verlauf?z=AllgC", "/verlauf?z=EV", "/verlauf?z=BAT",
               "/abschluss", "/primeo", "/sammler", "/import"]:
         r = c.get(u)
         assert r.status_code == 200 and b"schiefgelaufen" not in r.data, u
@@ -538,6 +538,9 @@ def test_netzladung_und_jaz(app):
                     con.execute("INSERT OR REPLACE INTO messwerte VALUES (?, ?, ?)", (t.isoformat(timespec="minutes"), "sensor.t_gel", gel))
         h = c.get("/uebersicht?m=2026-04").get_data(as_text=True)
         assert "Netzladung passt zum Wechselrichter" in h and "Wechselrichter «Batterie geladen»" in h
+        h = c.get("/verlauf?z=BAT").get_data(as_text=True)   # Reiter Batterie im Verlauf: Werte des Wechselrichters
+        assert "Ladung pro Monat" in h and 'class="btn primary" href="verlauf?z=BAT">Batterie' in h
+        assert re.search(r"April 2026\*?</td><td>30</td><td><b>120\.00</b>", h), re.search(r"<table class=\"wide\">.*?</table>", h, re.S).group(0)[:1500]
         # Wärmepumpe mit Wärme-Sensor → Jahresarbeitszahl
         y = yaml.safe_load(cfg_alt)
         y["homeassistant"]["waermepumpen"] = [{"name": "Heizung", "entity": "sensor.t_wp2", "waerme": "sensor.t_wwaerme"}]

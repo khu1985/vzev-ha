@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.19.2
+
+- Verlauf: neuer Reiter **Batterie** – pro Monat geladen (aus Solarstrom und aus dem Netz) und entladen mit Wirkungsgrad (Wechselrichter), dazu aus der Abrechnung Netzladung, Netzstrom aus dem Speicher, Ladekosten und Ergebnis (ab dem Start des Speichermodells).
+
 ## 0.19.1
 
 - Startseite schneller: Nach jedem Speichern wartete sie, bis alle Ampeln neu bewertet waren (bis 5 s). Jetzt werden die Ampeln nur noch im Hintergrund bewertet – vorab alle 5 Minuten und nach Änderungen; die Startseite zeigt den letzten Stand.

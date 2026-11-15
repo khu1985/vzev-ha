@@ -46,7 +46,7 @@ Seite wartet darauf.
 - **Aufgaben:** Assistent für den Monatsabschluss und wiederkehrende Aufgaben; erkennt erledigte Schritte selbst.
 
 **Auswertung**
-- **Verlauf:** pro Zähler Verbrauch, Solar/Netz und Kosten pro Monat, beim 1. OG nach Mietverhältnis gruppiert.
+- **Verlauf:** pro Zähler Verbrauch, Solar/Netz und Kosten pro Monat, beim 1. OG nach Mietverhältnis gruppiert. Reiter **Batterie**: geladen (aus Solarstrom und aus dem Netz) und entladen pro Monat mit Wirkungsgrad, dazu ab dem Start des Speichermodells Netzladung, Netzstrom aus dem Speicher, Ladekosten und Ergebnis.
 - **Wertschöpfung:** Ertrag des Betreibers pro Monat nach Quelle (Verkauf an Mieter, Eigenverbrauch, Rücklieferung, Gutschriften), kumuliert, Verwendung des Solarstroms und Wert pro kWh; filterbar nach Jahr.
 - **Prognose:** PV-Prognose aus der Solcast-Integration (heute, morgen, folgende Tage) mit Bandbreite, gemessenem Ertrag, üblichem Verbrauch und dynamischem Strompreis; Zeitfenster «günstig aus dem Netz laden»; Trefferquote der Prognose vom Vortag.
 - **Batterie:** Monatswerte des Speichers (geladen, entladen, Wirkungsgrad) aus den Solis-Daten. Für die Abrechnung zählt die Netzladung aus den Primeo-Lastgängen (siehe «Dynamische Strompreise»).

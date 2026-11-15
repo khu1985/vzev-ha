@@ -629,10 +629,9 @@ BATTERIE = """
 <p class="muted">Dynamische Strompreise: Seite <a href="tarife">Tarife</a>. Speicher und Bonus: <a href="einstellungen?tab=regeln">Einstellungen → Regeln</a>.</p>"""
 
 
-def batterie():
-    cfg = S.config()
-    r = cfg.get("batterie") or {}
-    r = {"netzladung_zahlt": "betreiber", "entladung_netzanteil": "offen", "dynamisch_ab": "2027-01-01", **r}
+def solis_monate(cfg):
+    """Monatswerte des Wechselrichters (Solis-Tageszähler, Höchstwert pro Tag): [{periode, monat, tage, geladen, …}],
+    neuester zuerst; dazu der letzte Ladestand."""
     sol = (cfg.get("homeassistant") or {}).get("solis") or {}
     spalten = {"geladen": sol.get("batterie_geladen_heute"), "entladen": sol.get("batterie_entladen_heute"), "pv": sol.get("pv_heute"),
                "bezug": sol.get("netz_bezug_heute"), "einspeisung": sol.get("netz_einspeisung_heute")}
@@ -647,11 +646,19 @@ def batterie():
         tag = tag.rename(columns={v: k for k, v in spalten.items() if v})
         tag.index = pd.to_datetime(tag.index)
         for m, g in tag.groupby(tag.index.to_period("M")):
-            monate.append(dict(monat=m.strftime("%m.%Y"), tage=len(g), **{k: (g[k].sum() if k in g else None) for k in spalten}))
+            monate.append(dict(periode=m, monat=m.strftime("%m.%Y"), tage=len(g), **{k: (g[k].sum() if k in g else None) for k in spalten}))
         monate.reverse()
+    return monate, (soc_row[0] if soc_row else None)
+
+
+def batterie():
+    cfg = S.config()
+    r = cfg.get("batterie") or {}
+    r = {"netzladung_zahlt": "betreiber", "entladung_netzanteil": "offen", "dynamisch_ab": "2027-01-01", **r}
+    monate, soc = solis_monate(cfg)
     akt = monate[0] if monate and monate[0]["monat"] == date.today().strftime("%m.%Y") else dict(geladen=None, entladen=None)
     return S.page("Batterie", render_template_string(BATTERIE, r=r, monate=monate, akt=akt, monat=date.today().strftime("%m.%Y"), p=preis_infos(),
-                                                     soc=soc_row[0] if soc_row else None))
+                                                     soc=soc))
 
 
 def preis_infos():
