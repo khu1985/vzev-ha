@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.20.0
+
+- Usability- und UX-Score auf der Seite «Vorschläge» (wie in der Finanz-App):
+  - **Usability:** einmal am Tag (oder mit «Jetzt prüfen») werden alle Seiten mit den eigenen Daten automatisch geprüft – Länge, Tabellen auf dem Handy, Formulare, Beschriftungen, Kennzahlen, Diagramme, Ladezeit, Farbkontrast in Hell und Dunkel. Score pro Seite und gesamt, mit Vergleich zur Vorversion.
+  - **UX:** Kurzbefragung (UEQ-S, alle 90 Tage), Nutzungsverhalten der letzten 90 Tage und Usability ergeben den UX-Score; Hinweise daraus erscheinen als Vorschläge.
+- Eingabefelder der Tabellen (Mieter, Tarife, Primeo, Zähler) und der Nebenkosten sind für Screenreader beschriftet.
+- Seite «Batterie»: Fehler behoben, wenn der Wechselrichter keinen Entlade-Zähler liefert (von der Usability-Prüfung gefunden).
+
 ## 0.19.3
 
 - Batterie im Verlauf und Seite «Batterie»: **Ältere Werte holen** – die Tageszähler des Wechselrichters (Batterie geladen/entladen, PV, Netz) rückwirkend aus der Langzeit-Statistik von Home Assistant, ab einem wählbaren Datum. Eigene Ablesungen bleiben unverändert; der Wert der letzten Stunde vor Mitternacht zählt zum richtigen Tag.

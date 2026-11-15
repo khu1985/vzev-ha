@@ -92,6 +92,7 @@ flowchart TB
 | `vzev/app/server.py` | Webserver, Navigation, Statusanzeige, Import, Rechnungen, Datensammler-Seite, Protokoll |
 | `vzev/app/hastatistik.py` | Langzeit-Statistik aus Home Assistant über die WebSocket-API (kleiner Client ohne Zusatzpaket), rückwirkende Wärmepumpen-Werte |
 | `vzev/app/vorschlaege.py` | Vorschläge für die Weiterentwicklung aus Protokoll, Kontrollen, Import, Korrekturen, Datensammler, Prognose und Leistung; anonymisiert zum Weitergeben (Text, Datei, GitHub-Issue) |
+| `vzev/app/usability.py`, `vzev/app/ux.py` | Usability-Score (alle Seiten automatisch prüfen, Kontrast) und UX-Score (Kurzbefragung UEQ-S, Nutzungsverhalten, Usability) für die Vorschläge |
 | `vzev/app/ampel.py` | Ampeln (grün/gelb/rot/grau) für alle Bereiche: Kacheln auf der Startseite, Punkte in der Navigation; im Hintergrund bewertet |
 | `vzev/app/nebenkosten.py` | Nebenkostenabrechnung 1.7.–30.6.: Kosten mit Belegen und aus der App (Wärmepumpen, Allgemeinstrom), Verteilung nach m², Personen, Wärmezähler, Tagen; Honorar, Akonto, PDF mit QR-Einzahlungsschein, Zahlungsregister |
 | `vzev/app/leistung.py` | Leistung messen: Ladezeiten der Seiten, Rechenzeiten der Berechnungen, Hintergrundaufgaben, System und Datenmengen – pro Version mit Vergleich zur Vorversion |
@@ -245,6 +246,7 @@ So fliessen sie ab 2027 in die Abrechnung ein (Entscheid Betreiber):
 | `aufgaben.json` | als versendet markierte Rechnungen (Aufgaben-Assistent) |
 | `vorschlaege.json` | ausgeblendete und gemeldete Vorschläge, eigene Ideen |
 | `nebenkosten.json`, `nebenkosten/` | Grundlagen der Nebenkostenabrechnung (Flächen, Personen, Akonto, Honorar), Kosten und Wärmezählerstände pro Periode, Belege |
+| `ux.sqlite` | Usability-Ergebnisse pro Version, UX-Befragungen, Seitenaufrufe (nur Seitennamen) |
 | `leistung.json` | Leistungsmessungen der letzten fünf Versionen (nur Zeiten und Mengen) |
 | `abschluss.json` | abgeschlossene Monate mit festgehaltenen Werten, Korrekturen |
 | `rechnungen/` | erstellte PDFs, `register.json` (Rechnungen, Fälligkeiten, Zahlungen); ersetzte Fassungen unter `rechnungen/_alt/` |

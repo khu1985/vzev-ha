@@ -454,8 +454,8 @@ VMWG): nur im Mietvertrag aufgeführte Kosten, zu den tatsächlichen Kosten.</p>
 <table><tr><th class="l">Zähler</th><th>Stand 1.7. (kWh)</th><th>Stand 30.6. (kWh)</th><th>Verbrauch</th></tr>
 {% for k, label in zaehler %}{% set w = per.waerme.get(k) or {} %}<tr><td class="l">{{ label }}</td>
 {% set s0, s1 = w.get('start'), w.get('ende') %}
-<td><input name="{{ k }}_start" value="{{ s0 if s0 is not none else '' }}" style="width:110px"></td>
-<td><input name="{{ k }}_ende" value="{{ s1 if s1 is not none else '' }}" style="width:110px"></td>
+<td><input name="{{ k }}_start" aria-label="Stand 1.7. {{ label }}" value="{{ s0 if s0 is not none else '' }}" style="width:110px"></td>
+<td><input name="{{ k }}_ende" aria-label="Stand 30.6. {{ label }}" value="{{ s1 if s1 is not none else '' }}" style="width:110px"></td>
 <td>{{ ((s1|float - s0|float)|round(1)) if s0 is not none and s1 is not none else '' }}</td></tr>{% endfor %}</table>
 <button>Speichern</button>{% if ha_waerme %} <button name="ha" value="1">Stände aus Home Assistant holen</button>{% endif %}</form>
 <p class="muted">Wohnungen ohne eigenen Wärmezähler teilen sich den Rest des Gesamtzählers nach m².</p></div>
@@ -464,16 +464,16 @@ VMWG): nur im Mietvertrag aufgeführte Kosten, zu den tatsächlichen Kosten.</p>
 <form method="post"><input type="hidden" name="aktion" value="grundlagen"><input type="hidden" name="p" value="{{ p }}">
 <table><tr><th class="l">Wohnung</th><th>Fläche m²</th><th>Personen ohne Mieter</th><th class="l">Wärmezähler (Sensor, optional)</th></tr>
 {% for k, v in einheiten.items() %}{% set u = ein.einheiten.get(k) or {} %}<tr><td class="l">{{ v }}</td>
-<td><input name="flaeche_{{ k }}" value="{{ u.get('flaeche') or '' }}" style="width:80px"></td>
+<td><input name="flaeche_{{ k }}" aria-label="Fläche {{ v }}" value="{{ u.get('flaeche') or '' }}" style="width:80px"></td>
 <td><input name="personen_{{ k }}" value="{{ u.get('personen_ohne_mieter') or '' }}" style="width:60px" title="z. B. selbst bewohnt"></td>
 <td class="l"><input name="sensor_{{ k }}" value="{{ ein.waerme.get(k) or '' }}" placeholder="sensor.…" list="energie" style="min-width:260px"></td></tr>{% endfor %}
 <tr><td class="l">Gesamtzähler</td><td></td><td></td><td class="l"><input name="sensor_gesamt" value="{{ ein.waerme.get('gesamt') or '' }}" placeholder="sensor.…" list="energie" style="min-width:260px"></td></tr></table>
 <table style="margin-top:12px"><tr><th class="l">Mietverhältnis</th><th>Personen</th><th>Akonto / Monat</th></tr>
 {% for a in e.abschnitte if a.mieter %}{% set md = ein.mieter.get(key(a.mieter)) or {} %}<tr><td class="l">{{ a.name }} <span class="muted">({{ einheiten.get(a.einheit, a.einheit) }}, ab {{ a.mieter.von|dmy }})</span></td>
-<td><input name="mp_{{ key(a.mieter) }}" value="{{ md.get('personen') or '' }}" style="width:60px"></td>
-<td><input name="ma_{{ key(a.mieter) }}" value="{{ md.get('akonto') or '' }}" style="width:90px"></td></tr>{% endfor %}</table>
-<p>Heizung: <input name="grundanteil" value="{{ ein.heizung_grundanteil }}" style="width:60px"> % Grundanteil nach m², Rest nach Wärmezähler ·
-Honorar: <input name="honorar_wert" value="{{ ein.honorar_wert }}" style="width:70px">
+<td><input name="mp_{{ key(a.mieter) }}" aria-label="Personen {{ a.name }}" value="{{ md.get('personen') or '' }}" style="width:60px"></td>
+<td><input name="ma_{{ key(a.mieter) }}" aria-label="Akonto pro Monat {{ a.name }}" value="{{ md.get('akonto') or '' }}" style="width:90px"></td></tr>{% endfor %}</table>
+<p>Heizung: <input name="grundanteil" aria-label="Grundanteil Heizung in Prozent" value="{{ ein.heizung_grundanteil }}" style="width:60px"> % Grundanteil nach m², Rest nach Wärmezähler ·
+Honorar: <input name="honorar_wert" aria-label="Honorar" value="{{ ein.honorar_wert }}" style="width:70px">
 <select name="honorar_art"><option value="prozent" {{ 'selected' if ein.honorar_art == 'prozent' }}>% der Nebenkosten</option>
 <option value="betrag" {{ 'selected' if ein.honorar_art == 'betrag' }}>CHF pro Periode (nach m²)</option></select></p>
 <button>Speichern</button></form>

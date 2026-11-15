@@ -23,7 +23,7 @@ HOCH, MITTEL, TIEF = 3, 2, 1
 PRIO_TEXT = {HOCH: "hoch", MITTEL: "mittel", TIEF: "tief"}
 ISSUE_MAX = 6000
 REPOSITORY = "https://github.com/khu1985/vzev-ha"
-BEREICHE = ["Fehler und Warnungen", "Leistung", "Kontrollen", "Import", "Korrekturen", "Datensammler", "Prognose", "Eigene Ideen"]
+BEREICHE = ["Fehler und Warnungen", "Leistung", "Usability", "UX", "Kontrollen", "Import", "Korrekturen", "Datensammler", "Prognose", "Eigene Ideen"]
 S = None
 
 
@@ -268,6 +268,18 @@ def _leistung(erg):
         _zaehlen(erg, ("Leistung", titel, detail), gewicht)
 
 
+def _usability(erg):
+    import usability
+    for titel, detail, gewicht in usability.vorschlaege():
+        _zaehlen(erg, ("Usability", titel, detail), gewicht)
+
+
+def _ux(erg):
+    import ux
+    for titel, detail, gewicht in ux.vorschlaege():
+        _zaehlen(erg, ("UX", titel, detail), gewicht)
+
+
 def _datei():
     return S.DATA / "vorschlaege.json"
 
@@ -329,14 +341,14 @@ def sammeln(max_alter=300):
 
 def _sammeln():
     erg = {}
-    for quelle in (_protokoll, _kontrollen, _import, _korrekturen, _datensammler, _prognose, _leistung):
+    for quelle in (_protokoll, _kontrollen, _import, _korrekturen, _datensammler, _prognose, _leistung, _usability, _ux):
         try:
             quelle(erg)
         except Exception as e:  # noqa: BLE001 – eine Quelle darf die anderen nicht verhindern
             _zaehlen(erg, ("Fehler und Warnungen", f"Vorschläge: Quelle «{quelle.__name__.strip('_')}» fehlgeschlagen – {type(e).__name__}", ""), MITTEL)
     private = private_texte(S.config())
     # Leistung: von der App selbst erzeugte Namen und Zeiten – nichts Persönliches, die Zahlen braucht es zum Verbessern
-    liste = [Vorschlag(bereich, titel, detail, anzahl, gewicht) if bereich == "Leistung" else
+    liste = [Vorschlag(bereich, titel, detail, anzahl, gewicht) if bereich in ("Leistung", "Usability", "UX") else
              Vorschlag(bereich, anonymisieren(titel, private), anonymisieren(detail, private), anzahl, gewicht)
              for (bereich, titel, detail), (anzahl, gewicht) in erg.items()]
     eigene = {}
@@ -348,7 +360,7 @@ def _sammeln():
     return liste
 
 
-def bericht(vorschlaege, version, leistung=None):
+def bericht(vorschlaege, version, leistung=None, usability=None):
     kopf = [f"Vorschläge aus der vZEV-App {version}", "",
             "_Automatisch abgeleitet und anonymisiert (keine Namen, Adressen, Messpunkte, Beträge oder Daten)._", ""]
     teile = []
@@ -360,6 +372,8 @@ def bericht(vorschlaege, version, leistung=None):
             teile.append(f"- [{PRIO_TEXT[v.gewicht]}] {v.titel}{n}{d}")
         teile.append("")
     teile = teile or ["Keine Vorschläge.", ""]
+    if usability:
+        teile += ["### Usability (Score pro Seite)", "", "```", *usability, "```", ""]
     if leistung:
         teile += ["### Leistung (Messwerte dieser Version)", "", "```", *leistung, "```", ""]
     return "\n".join(kopf + teile).strip() + "\n"
@@ -385,7 +399,8 @@ SEITE = """
 </div>
 <div class="card"><p>Die App leitet aus deinen Daten ab, wo sie besser werden kann: Fehler im Protokoll, Kontrollen, die nicht stimmen,
 Dateien, die sie nicht einlesen konnte, Korrekturen nach dem Abschluss, Sensoren ohne Werte, die Treffsicherheit der Prognose
-und die eigene Leistung (langsame Seiten und Berechnungen, knapper Speicher).
+die eigene Leistung (langsame Seiten und Berechnungen, knapper Speicher), die Usability jeder Seite und die UX
+(Kurzbefragung und Nutzung).
 Alles ist <b>anonymisiert</b> – Namen, Adressen, Messpunkte, Seriennummern, Beträge und Daten sind ersetzt.
 <b>Nichts wird automatisch gesendet:</b> Unten steht genau der Text, den du kopieren, herunterladen oder als GitHub-Issue öffnen kannst.</p></div>
 <div class="card"><h2>Vorschläge aus deinen Daten</h2>
@@ -438,11 +453,30 @@ def seite():
     sichtbar = [v for v in alle if v.schluessel not in st]
     weg = [(v, st[v.schluessel]["status"]) for v in alle if v.schluessel in st]
     import leistung
-    text = bericht(sichtbar, S.VERSION, _leistung_text())
+    text = bericht(sichtbar, S.VERSION, _leistung_text(), _usability_text())
     return S.page("Vorschläge", render_template_string(
         SEITE, sichtbar=sichtbar, weg=weg, hoch=sum(1 for v in sichtbar if v.gewicht == HOCH),
         gemeldet=sum(1 for _, s in weg if s == "gemeldet"), ausgeblendet=sum(1 for _, s in weg if s == "ausgeblendet"),
-        ideen=laden()["ideen"], text=text, link=issue_link(text, S.VERSION), prio=PRIO_TEXT, leistung_karte=leistung.karte()))
+        ideen=laden()["ideen"], text=text, link=issue_link(text, S.VERSION), prio=PRIO_TEXT,
+        leistung_karte=_ux_karten() + leistung.karte()))
+
+
+def _ux_karten():
+    import ux
+    try:
+        return ux.karten()
+    except Exception:  # noqa: BLE001 – Vorschläge gehen vor
+        S.log.exception("Vorschläge: UX/Usability nicht angezeigt")
+        return ""
+
+
+def _usability_text():
+    import usability
+    try:
+        return usability.bericht_text()
+    except Exception:  # noqa: BLE001
+        S.log.exception("Vorschläge: Usability nicht ausgewertet")
+        return None
 
 
 def _leistung_text():
@@ -461,6 +495,17 @@ def aktion():
         if a == "idee":
             idee_speichern(request.form.get("idee"))
             return redirect("vorschlaege?msg=Idee gespeichert")
+        if a == "ux_umfrage":
+            import ux
+            ux.umfrage_speichern(request.form)
+            ux.sichern()
+            _SAMMLUNG["liste"] = None
+            return redirect("vorschlaege?msg=Danke – Befragung gespeichert#ux")
+        if a == "usability":
+            import ux
+            if not ux.usability_pruefen(warten=False):
+                raise ValueError("Prüfung läuft schon oder die Berechnung ist noch nicht bereit")
+            return redirect("vorschlaege?msg=Usability-Prüfung läuft im Hintergrund – Seite in einer Minute neu laden#usability")
         if a.startswith("idee_loeschen_"):
             idee_loeschen(int(a.rsplit("_", 1)[1]))
             return redirect("vorschlaege?msg=Idee gelöscht")
@@ -482,7 +527,7 @@ def aktion():
 def herunterladen():
     from flask import Response
     st = laden()["status"]
-    text = bericht([v for v in sammeln(max_alter=0) if v.schluessel not in st], S.VERSION, _leistung_text())
+    text = bericht([v for v in sammeln(max_alter=0) if v.schluessel not in st], S.VERSION, _leistung_text(), _usability_text())
     return Response(text.encode("utf-8"), mimetype="text/markdown; charset=utf-8",
                     headers={"Content-Disposition": 'attachment; filename="vzev-vorschlaege.md"'})
 

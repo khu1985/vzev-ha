@@ -118,6 +118,11 @@ def test_warteseite_bei_laufender_berechnung(app):
 def formular(c, url):
     """Das Speicherformular einer Seite so auslesen, wie der Browser es senden würde: (Ziel, [(Name, Wert)])."""
     h = c.get(url).get_data(as_text=True)
+    for _ in range(60):   # Berechnung läuft noch (nach einer Änderung im vorigen Schritt): Warteseite
+        if 'id="warten"' not in h:
+            break
+        time.sleep(0.5)
+        h = c.get(url).get_data(as_text=True)
     form = [f for f in re.findall(r'<form method="post"[^>]*action="([^"]+)"[^>]*>(.*?)</form>', h, re.S)
             if not f[0].startswith("sensoren_schreiben")][-1]   # Knopf «Jetzt schreiben» ist kein Speicherformular
     daten_ = []
@@ -736,3 +741,27 @@ def test_ampeln_und_navigation(app):
     # Protokoll und Änderungen als Reiter der Einstellungen
     h = c.get("/protokoll").get_data(as_text=True)
     assert 'href="neu"' in h and 'aria-current="page">Einstellungen' in h
+
+
+def test_usability_und_ux(app):
+    server, c, d, quelle = app
+    warten(server)
+    import usability
+    import ux
+    assert ux.usability_pruefen(warten=True)
+    e, _ = usability.letztes()
+    assert e and 0 <= e.score <= 100 and len(e.seiten) >= 10
+    assert not [s for s in e.seiten if any(p.titel == "Seite lässt sich nicht anzeigen" for p in s.probleme)], \
+        [(s.titel, [p.detail for p in s.probleme]) for s in e.seiten]
+    c.get("/uebersicht")   # wird als Aufruf gezählt, die Prüfung selbst nicht
+    ux.sichern()
+    with ux.db() as con:
+        seiten = [r[0] for r in con.execute("SELECT seite FROM ux_ereignisse WHERE art='aufruf'")]
+    assert "uebersicht" in seiten and seiten.count("tarife") <= sum(1 for s in seiten if s == "tarife")
+    h = c.get("/vorschlaege").get_data(as_text=True)
+    assert 'id="ux"' in h and 'id="usability"' in h and "Usability-Score" in h and "Kurzbefragung" in h
+    form = {"aktion": "ux_umfrage", **{f"u{i}": "1" for i in range(8)}, "vertrauen": "4", "nutzen": "4"}
+    assert "Befragung gespeichert" in ziel(c.post("/vorschlaege", data=form))
+    assert "Bitte alle 8" in ziel(c.post("/vorschlaege", data={"aktion": "ux_umfrage", "u0": "1"}))
+    md = c.get("/vorschlaege.md").get_data(as_text=True)
+    assert "### Usability (Score pro Seite)" in md

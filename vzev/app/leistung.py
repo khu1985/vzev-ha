@@ -342,7 +342,7 @@ def _vor_anfrage():
 def _nach_anfrage(_fehler=None):
     from flask import g, request
     t0 = g.pop("_leistung_t0", None)
-    if t0 is None or not request.endpoint or request.endpoint in NICHT_MESSEN:
+    if t0 is None or not request.endpoint or request.endpoint in NICHT_MESSEN or request.headers.get("X-VZEV-Pruefung"):
         return
     erfassen("aktion" if request.method == "POST" else "seite", request.endpoint, (time.perf_counter() - t0) * 1000)
 

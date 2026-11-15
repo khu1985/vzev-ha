@@ -165,6 +165,22 @@ Namen, Adressen, Messpunkte, Seriennummern in Sensor-IDs, IBAN, E-Mail, Zugangsd
 Nichts wird automatisch gesendet: Der Text zum Weitergeben lässt sich kopieren, als `vzev-vorschlaege.md`
 herunterladen oder als Entwurf eines GitHub-Issues öffnen. Erledigtes lässt sich ausblenden oder als gemeldet markieren.
 
+**Usability und UX** (wie in der Finanz-App):
+
+- **Usability-Score** (0–100): Die App zeigt einmal am Tag im Hintergrund (oder mit «Jetzt prüfen») alle Seiten mit den
+  eigenen Daten an und prüft sie automatisch – lange Seiten, Tabellen, die auf dem Handy seitlich scrollen oder sehr lang
+  werden, grosse Formulare, Eingabefelder ohne Beschriftung, viele Kennzahlen, Diagramme ohne Beschreibung, Ladezeit und
+  den Farbkontrast in Hell und Dunkel (WCAG, mindestens 4.5:1). Pro Seite 100 Punkte minus Abzüge; Ergebnis pro Version
+  mit Vergleich zur Vorversion.
+- **UX-Score** (0–100), gewichtet 40/40/20: **Kurzbefragung** (UEQ-S, 8 Gegensatzpaare von −3 bis +3, dazu «Ich vertraue
+  den Zahlen» und «Die App erleichtert mir die Abrechnung», alle 90 Tage), **Verhalten** der letzten 90 Tage (Wochen mit
+  Nutzung, genutzte Seiten, Formulare ohne Eingabefehler, Abrechnung à jour: Primeo-Daten, offene Monate, überfällige
+  Rechnungen) und der **Usability-Score**. Aufgezeichnet werden nur Seitennamen und ob ein Formular einen Eingabefehler
+  hatte, in `ux.sqlite` im Datenordner; ausschalten mit `ux: {aufzeichnen: false}` in `vzev.yaml`.
+
+Gefundene Punkte erscheinen als Vorschläge in den Bereichen «Usability» und «UX», der Score pro Seite auch im Text zum
+Weitergeben.
+
 **Leistung.** Die App misst laufend, pro Version:
 
 | Was | Beispiel |

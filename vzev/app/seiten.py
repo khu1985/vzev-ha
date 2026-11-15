@@ -90,9 +90,9 @@ EDITOR = """
 <tr>{% for f in felder %}<th class="l">{{ f.label }}</th>{% endfor %}<th class="l">Entfernen</th></tr>
 {% for r in rows + [{}] %}<tr class="{{ 'neu' if loop.last }}">
 {% for f in felder %}<td class="l">{% set v = r.get(f.key) %}
-{% if f.typ == 'auswahl' %}<select name="{{ p }}.{{ f.key }}"><option value=""></option>
+{% if f.typ == 'auswahl' %}<select name="{{ p }}.{{ f.key }}" aria-label="{{ f.label }}"><option value=""></option>
 {% for o in f.opts %}<option value="{{ o[0] }}" {{ 'selected' if v is not none and o[0] == v|string }}>{{ o[1] }}</option>{% endfor %}</select>
-{% else %}<input name="{{ p }}.{{ f.key }}" type="{{ 'date' if f.typ == 'datum' else 'text' }}" inputmode="{{ 'decimal' if f.typ == 'zahl' else 'text' }}"
+{% else %}<input name="{{ p }}.{{ f.key }}" aria-label="{{ f.label }}" type="{{ 'date' if f.typ == 'datum' else 'text' }}" inputmode="{{ 'decimal' if f.typ == 'zahl' else 'text' }}"
  value="{{ '' if v is none else (v.isoformat() if f.typ == 'datum' and v.isoformat is defined else v) }}" placeholder="{{ f.hinweis or '' }}" style="width:{{ f.breite or 140 }}px"{% if f.liste %} list="{{ f.liste }}"{% endif %}>{% endif %}</td>{% endfor %}
 <td class="l">{% if not loop.last %}<label><input type="checkbox" name="{{ p }}.__weg" value="{{ loop.index0 }}"> entfernen</label>{% else %}<span class="muted">neu</span>{% endif %}</td></tr>{% endfor %}
 </table></div>
@@ -618,12 +618,12 @@ BATTERIE = """
  <div class="kpi"><div>Ladestand</div><div>{{ '%.0f %%'|format(soc) if soc is not none else '–' }}</div></div>
  <div class="kpi"><div>Geladen {{ monat }}</div><div>{{ akt.geladen|f2 }} kWh</div></div>
  <div class="kpi"><div>Entladen {{ monat }}</div><div>{{ akt.entladen|f2 }} kWh</div></div>
- <div class="kpi"><div>Wirkungsgrad {{ monat }}</div><div>{{ '%.0f %%'|format(akt.entladen / akt.geladen * 100) if akt.geladen else '–' }}</div></div>
+ <div class="kpi"><div>Wirkungsgrad {{ monat }}</div><div>{{ '%.0f %%'|format(akt.entladen / akt.geladen * 100) if akt.geladen and akt.entladen is not none else '–' }}</div></div>
 </div>
 <div class="card"><h2>Pro Monat</h2><div class="scroll"><table class="wide">
 <tr><th>Monat</th><th>Tage mit Daten</th><th>Geladen kWh</th><th>Entladen kWh</th><th>Wirkungsgrad</th><th>PV-Ertrag kWh</th><th>Netzbezug kWh</th><th>Einspeisung kWh</th></tr>
 {% for m in monate %}<tr><td>{{ m.monat }}</td><td>{{ m.tage }}</td><td>{{ m.geladen|f2 }}</td><td>{{ m.entladen|f2 }}</td>
-<td>{{ '%.0f %%'|format(m.entladen / m.geladen * 100) if m.geladen else '–' }}</td><td>{{ m.pv|f2 }}</td><td>{{ m.bezug|f2 }}</td><td>{{ m.einspeisung|f2 }}</td></tr>
+<td>{{ '%.0f %%'|format(m.entladen / m.geladen * 100) if m.geladen and m.entladen is not none else '–' }}</td><td>{{ m.pv|f2 }}</td><td>{{ m.bezug|f2 }}</td><td>{{ m.einspeisung|f2 }}</td></tr>
 {% else %}<tr><td colspan="8" class="l">Noch keine Daten vom Wechselrichter. Der Datensammler speichert sie alle 15 Minuten.</td></tr>{% endfor %}</table></div>
 <p class="muted">Tageswerte des Solis-Wechselrichters (Höchstwert pro Tag), gesammelt vom Datensammler. Für die Abrechnung zählen weiterhin die Primeo-Lastgänge.</p></div>
 <p class="muted">Dynamische Strompreise: Seite <a href="tarife">Tarife</a>. Speicher und Bonus: <a href="einstellungen?tab=regeln">Einstellungen → Regeln</a>.</p>
