@@ -3,14 +3,10 @@
 Aufruf: python -I invoices.py <datenordner> <jahr> <quartal> <ausgabeordner> [rechnungsdatum JJJJ-MM-TT]
 """
 import calendar
-import io
 import sys
 from datetime import date, timedelta
 from pathlib import Path
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import pandas as pd
 from reportlab.graphics import renderPDF
 from reportlab.graphics.barcode.qr import QrCodeWidget
@@ -18,7 +14,6 @@ from reportlab.graphics.shapes import Drawing
 from reportlab.lib.colors import HexColor, black, white
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
-from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -253,24 +248,44 @@ GESAMT = {"ALLG": ("Allgemeinstrom vZEV · Gesamtrechnung", "Allgemeinstrom"),
 
 
 # --- Grafik -----------------------------------------------------------------
-def donuts_png(rows):
-    n = len(rows)
-    fig, axes = plt.subplots(1, n, figsize=(1.6 * n, 1.75), dpi=220)
-    axes = [axes] if n == 1 else axes
-    for ax, r in zip(axes, rows):
-        netz = r["ht"] + r["nt"] + r.get("speicher", 0)
-        ax.pie([r["solar"], max(netz, 1e-6)], colors=["#E8A21B", "#3B5B8C"], startangle=90, counterclock=False,
-               wedgeprops=dict(width=0.32, edgecolor="white", linewidth=1.5))
-        ax.text(0, 0.06, f"{r['autarkie']:.1f}%", ha="center", va="center", fontsize=10, fontweight="bold", color="#16201C")
-        ax.text(0, -0.24, "Solar", ha="center", va="center", fontsize=7, color="#5B6660")
-        ax.set_title(r["monat"].split(" (")[0], fontsize=9.5, color="#16201C", pad=3)
-        ax.set_aspect("equal")
-    plt.tight_layout(pad=0.4)
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", transparent=True)
-    plt.close(fig)
-    buf.seek(0)
-    return ImageReader(buf)
+def donuts_zeichnen(c, rows, x, y_oben, breite, hoehe):
+    """Ringdiagramme Solar/Netz pro Monat als Vektorgrafik (ohne matplotlib – kleineres App-Image, scharf im PDF)."""
+    from reportlab.lib.colors import HexColor, white
+    n = max(1, len(rows))
+    zb = breite / n
+    titel_h = hoehe * 0.16
+    r = min(zb * 0.86, hoehe - titel_h) / 2 * 0.95
+    for k, row in enumerate(rows):
+        cx = x + zb * (k + 0.5)
+        cy = y_oben - titel_h - (hoehe - titel_h) / 2
+        c.setFillColor(HexColor("#16201C"))
+        c.setFont("Helvetica", max(6.5, min(9.5, hoehe / mm_pt(4.1))))
+        c.drawCentredString(cx, y_oben - titel_h * 0.75, row["monat"].split(" (")[0])
+        netz = row["ht"] + row["nt"] + row.get("speicher", 0)
+        total = max(row["solar"] + netz, 1e-9)
+        solar_grad = 360 * row["solar"] / total
+        c.setStrokeColor(white)
+        c.setLineWidth(1.2)
+        for start, umfang, farbe in ((90, -solar_grad, "#E8A21B"), (90 - solar_grad, -(360 - solar_grad), "#3B5B8C")):
+            if abs(umfang) < 0.05:
+                continue
+            c.setFillColor(HexColor(farbe))
+            if abs(umfang) >= 359.95:
+                c.circle(cx, cy, r, stroke=0, fill=1)
+            else:
+                c.wedge(cx - r, cy - r, cx + r, cy + r, start, umfang, stroke=1, fill=1)
+        c.setFillColor(white)
+        c.circle(cx, cy, r * 0.68, stroke=0, fill=1)
+        c.setFillColor(HexColor("#16201C"))
+        c.setFont("Helvetica-Bold", max(6, r / 3.3))
+        c.drawCentredString(cx, cy + r * 0.05, f"{row['autarkie']:.1f}%")
+        c.setFillColor(HexColor("#5B6660"))
+        c.setFont("Helvetica", max(5, r / 4.6))
+        c.drawCentredString(cx, cy - r * 0.27, "Solar")
+
+
+def mm_pt(x):
+    return x * 72 / 25.4
 
 
 # --- Swiss QR ---------------------------------------------------------------
@@ -438,11 +453,10 @@ def render(path, cfg, inv, nummer, rechnungsdatum, quartal_label):
     c.setFont("Helvetica-Bold", 8.5)
     c.setFillColor(INK)
     c.drawString(L, gy, "Anteil Solarstrom (Autarkie) pro Monat")
-    img = donuts_png(rows)
     by_fest = 113 * mm if wohnung else None
     ih = 39 * mm if by_fest is None else max(22 * mm, min(39 * mm, gy - by_fest - 17 * mm))  # nicht in den Betrag hinein
     iw = 36 * mm * len(rows) * ih / (39 * mm)
-    c.drawImage(img, L, gy - ih - 1 * mm, iw, ih, mask="auto")
+    donuts_zeichnen(c, rows, L, gy - 1 * mm, iw, ih)
     lx = L + iw + 6 * mm
     for i, (col, lab) in enumerate([(AMBER, "Solarstrom"), (BLUE, "Netzstrom")]):
         c.setFillColor(col)

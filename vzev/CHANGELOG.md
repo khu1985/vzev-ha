@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.20.1
+
+- Schnellere Installation und Updates: matplotlib wird nicht mehr gebraucht. Die Ringdiagramme in den Rechnungen werden direkt ins PDF gezeichnet (gestochen scharf, gleiches Aussehen) – das App-Image ist dadurch deutlich kleiner und wird auf dem Home Assistant schneller gebaut.
+- Tests laufen in rund einer Minute statt zwölf: der Test-Helfer wartete bei neun Tests jeweils 60 Sekunden auf eine Berechnung, die niemand auslöste.
+
 ## 0.20.0
 
 - Usability- und UX-Score auf der Seite «Vorschläge» (wie in der Finanz-App):

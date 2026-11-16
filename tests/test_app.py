@@ -41,9 +41,14 @@ def ziel(r):
 
 
 def warten(server):
+    """Bis die Berechnung zu den aktuellen Dateien passt. Ist keine unterwegs, selbst rechnen – sonst wartete der Test
+    bis zur Zeitgrenze (die App rechnet erst beim nächsten Seitenaufruf)."""
     ende = time.time() + 60
     while (server.veraltet() or server._rechnen.locked()) and time.time() < ende:
-        time.sleep(0.1)
+        if not server._rechnen.locked():
+            server.berechnung("Test")
+        else:
+            time.sleep(0.1)
 
 
 def test_leere_app_alle_seiten(app):

@@ -24,10 +24,8 @@ jobs:
           echo "Pakete: $PAKETE"
           apt-get update
           apt-get install -y --no-install-recommends $PAKETE python3-pytest
-          python3 -c "import pandas, numpy, openpyxl, reportlab, matplotlib, flask; print('pandas', pandas.__version__, 'numpy', numpy.__version__)"
+          python3 -c "import pandas, numpy, openpyxl, reportlab, flask; print('pandas', pandas.__version__, 'numpy', numpy.__version__)"
       - name: Tests
-        env:
-          MPLCONFIGDIR: /tmp/matplotlib
         run: python3 -m pytest tests -q
 
   aktuell:
@@ -40,7 +38,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install pandas openpyxl pyyaml reportlab matplotlib flask requests pytest
+      - run: pip install pandas openpyxl pyyaml reportlab flask requests pytest
       - run: python -m pytest tests -q
 
   image:

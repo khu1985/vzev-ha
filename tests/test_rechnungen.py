@@ -61,5 +61,5 @@ def test_pdfs_werden_erstellt(ordner, tmp_path):
     assert len(made) == 2
     for name, total, rows in made:
         p = tmp_path / name
-        assert p.exists() and p.read_bytes()[:4] == b"%PDF" and p.stat().st_size > 5000
+        assert p.exists() and p.read_bytes()[:4] == b"%PDF" and p.stat().st_size > 2500  # Diagramme als Vektorgrafik: klein
         assert total > 0
