@@ -440,12 +440,14 @@ PRIMEO = """
 <form method="post" action="primeo">
 <div class="card"><h2>Primeo-Rechnungen für den Abgleich</h2>{{ t_rech|safe }}
 <h2 style="margin-top:16px">Rücklieferung laut Primeo-Rechnung</h2>{{ t_rueck|safe }}
-<p class="muted">Primeo rechnet in ganzen kWh. Die Übersicht vergleicht diese Werte mit den Lastgängen (Toleranz 1 kWh).</p></div>
+<p class="muted">Primeo rechnet in ganzen kWh. Die Übersicht vergleicht diese Werte mit den Lastgängen (Toleranz 1 kWh).</p>
+<p><button class="primary">Speichern</button></p></div>
 <div class="card"><h2>Einspeisevergütung vor dem vZEV-Start</h2>{{ t_vor|safe }}
-<p class="muted">Monat als JJJJ-MM. Ersetzt die berechnete Rücklieferung in der Wertschöpfung.</p></div>
+<p class="muted">Monat als JJJJ-MM. Ersetzt die berechnete Rücklieferung in der Wertschöpfung.</p>
+<p><button class="primary">Speichern</button></p></div>
 <div class="card"><h2>Übrige Erträge und Gutschriften</h2>{{ t_ue|safe }}
-<p class="muted">Monat als JJJJ-MM, Betrag in CHF (Gutschrift positiv). Fliesst in die Wertschöpfung.</p></div>
-<p><button class="primary">Speichern</button></p></form>
+<p class="muted">Monat als JJJJ-MM, Betrag in CHF (Gutschrift positiv). Fliesst in die Wertschöpfung.</p>
+<p><button class="primary">Speichern</button></p></div></form>
 {% if abg is not none %}<div class="card"><h2>Abgleich</h2><div class="scroll"><table>
 <tr><th>Rechnung</th><th class="l">Position</th><th>Primeo kWh</th><th>Berechnet kWh</th><th>Differenz</th><th></th></tr>
 {% for r in abg.itertuples() %}<tr><td>{{ r.rechnung }}</td><td class="l">{{ r.position }}</td><td>{{ r.primeo_kwh }}</td><td>{{ r.berechnet_kwh|f2 }}</td><td>{{ r.diff|f2 }}</td>
@@ -620,7 +622,7 @@ BATTERIE = """
  <div class="kpi"><div>Entladen {{ monat }}</div><div>{{ akt.entladen|f2 }} kWh</div></div>
  <div class="kpi"><div>Wirkungsgrad {{ monat }}</div><div>{{ '%.0f %%'|format(akt.entladen / akt.geladen * 100) if akt.geladen and akt.entladen is not none else '–' }}</div></div>
 </div>
-<div class="card"><h2>Pro Monat</h2><div class="scroll"><table class="wide">
+<div class="card"><h2>Pro Monat</h2><div class="scroll"><table>
 <tr><th>Monat</th><th>Tage mit Daten</th><th>Geladen kWh</th><th>Entladen kWh</th><th>Wirkungsgrad</th><th>PV-Ertrag kWh</th><th>Netzbezug kWh</th><th>Einspeisung kWh</th></tr>
 {% for m in monate %}<tr><td>{{ m.monat }}</td><td>{{ m.tage }}</td><td>{{ m.geladen|f2 }}</td><td>{{ m.entladen|f2 }}</td>
 <td>{{ '%.0f %%'|format(m.entladen / m.geladen * 100) if m.geladen and m.entladen is not none else '–' }}</td><td>{{ m.pv|f2 }}</td><td>{{ m.bezug|f2 }}</td><td>{{ m.einspeisung|f2 }}</td></tr>
@@ -629,7 +631,7 @@ BATTERIE = """
 <p class="muted">Dynamische Strompreise: Seite <a href="tarife">Tarife</a>. Speicher und Bonus: <a href="einstellungen?tab=regeln">Einstellungen → Regeln</a>.</p>
 {% if statistik %}<div class="card"><h2>Ältere Werte holen</h2>
 <form method="post" action="batterie_statistik" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="hidden" name="von" value="batterie">
-ab <input type="date" name="ab" value="{{ statistik_ab }}"> <button>Aus der Langzeit-Statistik von Home Assistant holen</button></form>
+ab <input type="date" name="ab" value="{{ statistik_ab }}" aria-label="Statistik holen ab"> <button>Aus der Langzeit-Statistik von Home Assistant holen</button></form>
 <p class="muted">Home Assistant speichert die Tageszähler des Wechselrichters stündlich und dauerhaft. Übernommen wird nur, was vor der
 ersten eigenen Ablesung liegt; eigene Werte bleiben unverändert.</p></div>{% endif %}"""
 
@@ -704,10 +706,10 @@ EINST_TABS = """<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wr
 <a class="btn {{ 'primary' if k == tab }}" href="{{ u }}">{{ v }}{% if k == 'protokoll' and nfehler %} <span class="pill warn" style="margin-left:6px">{{ nfehler }}</span>{% endif %}</a>{% endfor %}</div>"""
 
 BETREIBER = """<form method="post" action="einstellungen?tab=betreiber" class="card"><h2>Betreiber</h2><table class="form">
-{% for k, l in felder %}<tr><td class="l">{{ l }}</td><td class="l"><input name="b.{{ k }}" value="{{ b.get(k) or '' }}" style="width:320px"></td></tr>{% endfor %}
-<tr><td class="l">vZEV-Start</td><td class="l"><input type="date" name="vzev_start" value="{{ start }}"></td></tr>
-<tr><td class="l">Zahlungsfrist (Tage)</td><td class="l"><input name="frist" value="{{ r.zahlungsfrist_tage }}" style="width:80px"></td></tr>
-<tr><td class="l">Rechnungsnummer</td><td class="l"><input name="nummer" value="{{ r.nummer }}" style="width:320px"> <span class="muted">Platzhalter {jahr}, {quartal}, {einheit}</span></td></tr></table>
+{% for k, l in felder %}<tr><td class="l">{{ l }}</td><td class="l"><input aria-label="{{ l }}" name="b.{{ k }}" value="{{ b.get(k) or '' }}" style="width:320px"></td></tr>{% endfor %}
+<tr><td class="l">vZEV-Start</td><td class="l"><input aria-label="vZEV-Start" type="date" name="vzev_start" value="{{ start }}"></td></tr>
+<tr><td class="l">Zahlungsfrist (Tage)</td><td class="l"><input aria-label="Zahlungsfrist (Tage)" name="frist" value="{{ r.zahlungsfrist_tage }}" style="width:80px"></td></tr>
+<tr><td class="l">Rechnungsnummer</td><td class="l"><input aria-label="Rechnungsnummer" name="nummer" value="{{ r.nummer }}" style="width:320px"> <span class="muted">Platzhalter {jahr}, {quartal}, {einheit}</span></td></tr></table>
 <p><button class="primary">Speichern</button> <span class="muted">Name, Adresse und IBAN erscheinen auf den Rechnungen und im QR-Einzahlungsschein.</span></p></form>"""
 
 ZAEHLER = """<form method="post" action="einstellungen?tab=zaehler"><div class="card"><h2>Primeo-Messpunkte</h2>{{ t_mp|safe }}
@@ -726,7 +728,7 @@ Wärme-Sensor (optional): erzeugte Wärme in kWh, z. B. von der Wärmepumpe oder
 <p class="muted">Leer lassen: Die App nimmt alle Sensoren mit Halbstunden-Prognose («detailedForecast»). Sonst Sensoren mit Komma getrennt, z. B. Prognose heute und morgen.</p></div>
 <div class="card"><h2>Sensoren für Home Assistant</h2><table class="form">
 <tr><td class="l">Liefern</td><td class="l"><label><input type="checkbox" name="sensoren_aktiv" value="1" {{ 'checked' if sens_aktiv }}> Kennzahlen als Sensoren an Home Assistant schreiben</label></td></tr>
-<tr><td class="l">Präfix</td><td class="l"><input name="sensoren_praefix" value="{{ sens_praefix }}" style="width:160px"> <span class="muted">→ sensor.{{ sens_praefix }}_autarkie_jahr …</span></td></tr></table>
+<tr><td class="l">Präfix</td><td class="l"><input aria-label="Präfix" name="sensoren_praefix" value="{{ sens_praefix }}" style="width:160px"> <span class="muted">→ sensor.{{ sens_praefix }}_autarkie_jahr …</span></td></tr></table>
 <p class="muted">Für Dashboards, Verlauf und Automationen (z. B. Boiler oder Batterie, wenn binary_sensor.{{ sens_praefix }}_guenstig_laden «an» ist). Alle 15 Minuten und nach jeder Berechnung neu geschrieben.</p></div>
 <p><button class="primary">Speichern</button></p></form>
 {% if wp_aktiv %}<div class="card"><h2>Wärmepumpen rückwirkend</h2>
@@ -750,23 +752,23 @@ PREISKARTE = """<div class="card"><h2>Dynamische Strompreise</h2>
 <form method="post" action="preise_abrufen" data-busy="Strompreise werden abgerufen …" style="margin-top:8px"><button>Jetzt abrufen</button></form>
 <details style="margin-top:12px"><summary class="muted">Schnittstelle einstellen</summary>
 <form method="post" action="tarife?teil=dynamisch"><table class="form">
-<tr><td class="l">Adresse (URL)</td><td class="l"><input name="api_url" value="{{ p.e.api_url }}" style="width:420px" required></td></tr>
-<tr><td class="l">Tarifname</td><td class="l"><input name="tarif_name" value="{{ p.e.tarif_name }}" style="width:200px"> <span class="muted">NetzDynamisch, NetzDynamischAVAG, NetzDynamischELAG</span></td></tr>
-<tr><td class="l">Tariftyp</td><td class="l"><select name="tarif_typ">{% for k, v in [('', 'alle'), ('integrated', 'integrated – Netz + Energie'), ('electricity', 'electricity – Energie'), ('grid', 'grid – Netz inkl. nationale Abgaben'), ('grid_usage', 'grid_usage – nur Netznutzung')] %}<option value="{{ k }}" {{ 'selected' if k == p.e.tarif_typ }}>{{ v }}</option>{% endfor %}</select></td></tr>
-<tr><td class="l">Abrufen ab</td><td class="l"><input type="date" name="abrufen_ab" value="{{ p.e.abrufen_ab }}"></td></tr>
+<tr><td class="l">Adresse (URL)</td><td class="l"><input aria-label="Adresse (URL)" name="api_url" value="{{ p.e.api_url }}" style="width:420px" required></td></tr>
+<tr><td class="l">Tarifname</td><td class="l"><input aria-label="Tarifname" name="tarif_name" value="{{ p.e.tarif_name }}" style="width:200px"> <span class="muted">NetzDynamisch, NetzDynamischAVAG, NetzDynamischELAG</span></td></tr>
+<tr><td class="l">Tariftyp</td><td class="l"><select aria-label="Tariftyp" name="tarif_typ">{% for k, v in [('', 'alle'), ('integrated', 'integrated – Netz + Energie'), ('electricity', 'electricity – Energie'), ('grid', 'grid – Netz inkl. nationale Abgaben'), ('grid_usage', 'grid_usage – nur Netznutzung')] %}<option value="{{ k }}" {{ 'selected' if k == p.e.tarif_typ }}>{{ v }}</option>{% endfor %}</select></td></tr>
+<tr><td class="l">Abrufen ab</td><td class="l"><input aria-label="Abrufen ab" type="date" name="abrufen_ab" value="{{ p.e.abrufen_ab }}"></td></tr>
 <tr><td class="l">Automatisch abrufen</td><td class="l"><label><input type="checkbox" name="aktiv" value="1" {{ 'checked' if p.e.aktiv }}> stündlich, zwischen 18 und 21 Uhr alle 15 Minuten</label></td></tr>
 </table><p><button class="primary">Speichern</button> <span class="muted">Standard laut Primeo-Merkblatt: https://tarife.primeo-energie.ch/api/v1/tariffs</span></p></form></details></div>
 """
 
 BATTERIE_REGELN = """<form method="post" action="einstellungen?tab=batterie" class="card"><h2>Speicher und dynamischer Tarif</h2>
 <table class="form">
-<tr><td class="l">Gilt ab</td><td class="l"><input type="date" name="speicher_ab" value="{{ sp.speicher_ab }}"></td></tr>
-<tr><td class="l">Standby PV-Anlage bis</td><td class="l"><input name="pva_standby_max_kwh" value="{{ sp.pva_standby_max_kwh }}" style="width:80px"> kWh pro 15 Min.
+<tr><td class="l">Gilt ab</td><td class="l"><input aria-label="Gilt ab" type="date" name="speicher_ab" value="{{ sp.speicher_ab }}"></td></tr>
+<tr><td class="l">Standby PV-Anlage bis</td><td class="l"><input aria-label="Standby PV-Anlage bis" name="pva_standby_max_kwh" value="{{ sp.pva_standby_max_kwh }}" style="width:80px"> kWh pro 15 Min.
 <span class="muted">mehr Netzbezug am Zähler der PV-Anlage = Laden des Speichers aus dem Netz</span></td></tr>
-<tr><td class="l">Wirkungsgrad Speicher</td><td class="l"><input name="speicher_wirkungsgrad" value="{{ (sp.speicher_wirkungsgrad * 100)|round(0)|int }}" style="width:80px"> %</td></tr>
-<tr><td class="l">Bonus dynamischer Tarif</td><td class="l"><label><input type="checkbox" name="bonus" value="1" {{ 'checked' if dy.bonus }}> Vorteil gegenüber HT/NT gutschreiben</label> ab <input type="date" name="bonus_ab" value="{{ dy.bonus_ab }}"></td></tr>
-<tr><td class="l">Konzessionsabgabe</td><td class="l"><input name="konzession_prozent" value="{{ dy.konzession_prozent }}" style="width:80px"> % auf die Netznutzung <span class="muted">(fehlt in den Preisen der Schnittstelle)</span></td></tr>
-<tr><td class="l">MWST</td><td class="l"><input name="mwst_prozent" value="{{ dy.mwst_prozent }}" style="width:80px"> %</td></tr>
+<tr><td class="l">Wirkungsgrad Speicher</td><td class="l"><input aria-label="Wirkungsgrad Speicher" name="speicher_wirkungsgrad" value="{{ (sp.speicher_wirkungsgrad * 100)|round(0)|int }}" style="width:80px"> %</td></tr>
+<tr><td class="l">Bonus dynamischer Tarif</td><td class="l"><label><input type="checkbox" name="bonus" value="1" {{ 'checked' if dy.bonus }}> Vorteil gegenüber HT/NT gutschreiben</label> ab <input type="date" name="bonus_ab" aria-label="Bonus gilt ab" value="{{ dy.bonus_ab }}"></td></tr>
+<tr><td class="l">Konzessionsabgabe</td><td class="l"><input aria-label="Konzessionsabgabe" name="konzession_prozent" value="{{ dy.konzession_prozent }}" style="width:80px"> % auf die Netznutzung <span class="muted">(fehlt in den Preisen der Schnittstelle)</span></td></tr>
+<tr><td class="l">MWST</td><td class="l"><input aria-label="MWST" name="mwst_prozent" value="{{ dy.mwst_prozent }}" style="width:80px"> %</td></tr>
 </table>
 <p><button class="primary">Speichern</button></p>
 <p class="muted">Laden aus dem Netz bezahlt der Betreiber; nur der Standby bleibt im Allgemeinstrom. Wird dieser Netzstrom später im Haus verbraucht,
@@ -775,10 +777,10 @@ Bonus: pro Viertelstunde Standardtarif HT/NT minus dynamischer Preis (integrated
 pro Monat nie negativ. Grundpreis und Messung sind in beiden Tarifen gleich und zählen nicht.</p></form>"""
 
 REGELN = """<form method="post" action="einstellungen?tab=regeln" class="card"><h2>Regeln der Aufteilung</h2><table class="form">
-<tr><td class="l">Netzbezug PV-Anlage (Standby) geht auf</td><td class="l"><select name="pva_standby_auf">{% for k, v in [('Allg','Allgemeinstrom')] %}<option value="{{ k }}" selected>{{ v }}</option>{% endfor %}</select></td></tr>
-<tr><td class="l">Allgemeinstrom</td><td class="l"><select name="allgemein_rechnung"><option value="gesamt" selected>Gesamtrechnung für die Nebenkostenabrechnung</option></select></td></tr>
-<tr><td class="l">Mieteranteil Allgemeinstrom (nur Wertschöpfung)</td><td class="l"><input name="allgemein_mieteranteil" value="{{ (r.allgemein_mieteranteil * 100)|round(1) }}" style="width:80px"> %</td></tr>
-<tr><td class="l">Grundlast Allgemein für Ladestation-Verteilung</td><td class="l"><input name="ladestation_grundlast_kwh" value="{{ r.ladestation_grundlast_kwh }}" style="width:80px"> kWh pro 15 Min.</td></tr></table>
+<tr><td class="l">Netzbezug PV-Anlage (Standby) geht auf</td><td class="l"><select aria-label="Netzbezug PV-Anlage (Standby) geht auf" name="pva_standby_auf">{% for k, v in [('Allg','Allgemeinstrom')] %}<option value="{{ k }}" selected>{{ v }}</option>{% endfor %}</select></td></tr>
+<tr><td class="l">Allgemeinstrom</td><td class="l"><select aria-label="Allgemeinstrom" name="allgemein_rechnung"><option value="gesamt" selected>Gesamtrechnung für die Nebenkostenabrechnung</option></select></td></tr>
+<tr><td class="l">Mieteranteil Allgemeinstrom (nur Wertschöpfung)</td><td class="l"><input aria-label="Mieteranteil Allgemeinstrom (nur Wertschöpfung)" name="allgemein_mieteranteil" value="{{ (r.allgemein_mieteranteil * 100)|round(1) }}" style="width:80px"> %</td></tr>
+<tr><td class="l">Grundlast Allgemein für Ladestation-Verteilung</td><td class="l"><input aria-label="Grundlast Allgemein für Ladestation-Verteilung" name="ladestation_grundlast_kwh" value="{{ r.ladestation_grundlast_kwh }}" style="width:80px"> kWh pro 15 Min.</td></tr></table>
 <p><button class="primary">Speichern</button></p>
 <p class="muted">Diese Regeln wirken auf alle Monate. Ist ein Monat abgeschlossen, zeigt «Abschluss» danach eine Abweichung an.</p></form>"""
 

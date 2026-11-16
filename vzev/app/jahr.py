@@ -23,7 +23,37 @@ def _jahre(b, cfg):
     return list(range(ende, start.year - 1, -1))
 
 
+_PUFFER = {}
+
+
+def _stand():
+    """Alles, wovon die Jahreswerte abhängen: Berechnung, Messwerte (Wärmepumpen) und die Dateien im Datenordner
+    (Rechnungsregister, Abschluss, Einstellungen)."""
+    with S.collector._db() as c:
+        mw = c.execute("SELECT MAX(ts), COUNT(*) FROM messwerte").fetchone()
+    dateien = tuple(sorted((f.name, f.stat().st_mtime) for f in S.DATA.iterdir() if f.is_file() and f.suffix in (".json", ".yaml")))
+    reg = zahlungen._pfad()
+    dateien += (reg.stat().st_mtime if reg.exists() else 0,)
+    return (S._cache.get("key"), mw, dateien)
+
+
 def daten(jahr):
+    """Alle Werte eines Jahres, zwischengespeichert, bis sich Berechnung, Messwerte oder Daten ändern."""
+    b = S.berechnung() if any(S.PRIMEO.iterdir()) else {"ok": False, "fehler": "keine Dateien importiert"}
+    if not b.get("ok"):
+        return b, None
+    key = (_stand(), jahr)
+    e = _PUFFER.get(jahr)
+    if e and e[0] == key:
+        return b, e[1]
+    b, d = _daten_neu(jahr)
+    if len(_PUFFER) >= 3:
+        _PUFFER.clear()
+    _PUFFER[jahr] = (key, d)
+    return b, d
+
+
+def _daten_neu(jahr):
     """Alle Werte eines Jahres; None, wenn keine Berechnung vorliegt."""
     b = S.berechnung() if any(S.PRIMEO.iterdir()) else {"ok": False, "fehler": "keine Dateien importiert"}
     if not b.get("ok"):
@@ -101,7 +131,7 @@ def daten(jahr):
 
 SEITE = """
 <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin:-8px 0 16px">
-<form method="get" action="jahr"><select name="j" onchange="this.form.submit()">{% for y in jahre %}<option {{ 'selected' if y == jahr }}>{{ y }}</option>{% endfor %}</select></form>
+<form method="get" action="jahr"><select name="j" onchange="this.form.submit()" aria-label="Jahr">{% for y in jahre %}<option {{ 'selected' if y == jahr }}>{{ y }}</option>{% endfor %}</select></form>
 {% if d %}<div style="display:flex;gap:8px;flex-wrap:wrap">
 <a class="btn primary" href="jahr/pdf?j={{ jahr }}" target="_blank">PDF Allgemeinstrom</a>
 {% if d.mit_wp %}<a class="btn primary" href="jahr/pdf?j={{ jahr }}&teil=wp" target="_blank">PDF Heizung und Warmwasser</a>{% endif %}
@@ -117,14 +147,14 @@ Die Zahlen können sich bis zum Abschluss aller Monate ändern.</div>{% else %}<
  <div class="kpi"><div class="t">Rücklieferung</div><div class="v">{{ d.k.export|k0 }} <small>kWh</small></div><div class="s">{{ d.k.export_chf|f2 if d.k.export_chf is not none else '–' }} CHF{{ ', Tarif teilweise offen' if d.k.export_offen }}</div></div>
  <div class="kpi"><div class="t">Wertschöpfung</div><div class="v">{{ d.k.wert|f2 }} <small>CHF</small></div><div class="s">inkl. manuell erfasster Erträge</div></div>
 </div>
-<div class="card"><h2>Allgemeinstrom {{ d.von.strftime('%d.%m.') }}–{{ d.bis.strftime('%d.%m.%Y') }}</h2><div class="scroll"><table class="wide">
+<div class="card"><h2>Allgemeinstrom {{ d.von.strftime('%d.%m.') }}–{{ d.bis.strftime('%d.%m.%Y') }}</h2><div class="scroll"><table>
 {% set sp = d.allg|sum(attribute='speicher') > 0.0005 %}{% set bo = d.allg|sum(attribute='bonus') > 0 %}
 <tr><th>Monat</th><th>Solar kWh</th><th>Netz HT</th><th>Netz NT</th>{% if sp %}<th>Speicher NT</th>{% endif %}<th>Solar CHF</th><th>Netz CHF</th><th>Grundpreis</th>{% if bo %}<th>Bonus</th>{% endif %}<th>Total CHF</th></tr>
 {% for r in d.allg %}<tr><td>{{ r.monat }}</td><td>{{ r.solar|f2 }}</td><td>{{ r.ht|f2 }}</td><td>{{ r.nt|f2 }}</td>{% if sp %}<td>{{ r.speicher|f2 }}</td>{% endif %}<td>{{ r.solar_chf|f2 }}</td><td>{{ (r.netz_chf + r.speicher_chf)|f2 }}</td><td>{{ r.grundpreis|f2 }}</td>{% if bo %}<td>–{{ r.bonus|f2 }}</td>{% endif %}<td><b>{{ r.total|f2 }}</b></td></tr>{% endfor %}
 <tr class="sum"><td>Total</td><td>{{ d.allg|sum(attribute='solar')|f2 }}</td><td>{{ d.allg|sum(attribute='ht')|f2 }}</td><td>{{ d.allg|sum(attribute='nt')|f2 }}</td>{% if sp %}<td>{{ d.allg|sum(attribute='speicher')|f2 }}</td>{% endif %}
 <td>{{ d.allg|sum(attribute='solar_chf')|f2 }}</td><td>{{ (d.allg|sum(attribute='netz_chf') + d.allg|sum(attribute='speicher_chf'))|f2 }}</td><td>{{ d.allg|sum(attribute='grundpreis')|f2 }}</td>{% if bo %}<td>–{{ d.allg|sum(attribute='bonus')|f2 }}</td>{% endif %}<td>{{ d.k.allg|f2 }}</td></tr>
 </table></div><p class="muted">Ohne Ladestation{{ ' und Wärmepumpen' if d.mit_wp }}, inkl. Standby der PV-Anlage. Das PDF fasst diese Tabelle für die Nebenkostenabrechnung zusammen.</p></div>
-{% if d.mit_wp %}<div class="card"><h2>Heizung und Warmwasser {{ d.von.strftime('%d.%m.') }}–{{ d.bis.strftime('%d.%m.%Y') }}</h2><div class="scroll"><table class="wide">
+{% if d.mit_wp %}<div class="card"><h2>Heizung und Warmwasser {{ d.von.strftime('%d.%m.') }}–{{ d.bis.strftime('%d.%m.%Y') }}</h2><div class="scroll"><table>
 {% set namen = d.wp_einzeln.keys()|list %}
 <tr><th>Monat</th>{% for n in namen %}<th>{{ n }} kWh</th>{% endfor %}<th>Solar kWh</th><th>Netz HT</th><th>Netz NT</th><th>Solar CHF</th><th>Netz CHF</th><th>Total CHF</th></tr>
 {% for r in d.wp %}<tr><td>{{ r.monat }}</td>{% for n in namen %}<td>{{ d.wp_einzeln[n].get(r.periode, 0)|f2 }}</td>{% endfor %}<td>{{ r.solar|f2 }}</td><td>{{ r.ht|f2 }}</td><td>{{ r.nt|f2 }}</td>
@@ -139,12 +169,12 @@ Die Zahlen können sich bis zum Abschluss aller Monate ändern.</div>{% else %}<
 <td>{{ m.kwh|f2 }}</td><td>{{ m.solar|f2 }}</td><td><b>{{ m.betrag|f2 }}</b></td><td>{{ m.gestellt|f2 }}</td><td>{{ m.bezahlt|f2 }}</td><td class="l muted">{{ m.rechnungen|join(', ') or '–' }}</td></tr>
 {% else %}<tr><td class="l" colspan="8">Keine Mietverhältnisse in {{ jahr }}.</td></tr>{% endfor %}</table></div>
 <p class="muted">«Berechnet» = aktueller Stand aus den Lastgängen inkl. Grundpreis; «In Rechnung gestellt» = Summe der erstellten Quartalsrechnungen. Unterschiede entstehen, solange Quartale noch offen sind oder Rechnungen vor einer Korrektur erstellt wurden.</p></div>
-<div class="card"><h2>Zähler pro Monat</h2><div class="scroll"><table class="wide">
+<div class="card"><h2>Zähler pro Monat</h2><div class="scroll"><table>
 <tr><th>Monat</th>{% for k, l in zl %}<th>{{ l }} kWh</th><th>Solar</th>{% endfor %}</tr>
 {% for p in d.perioden %}{% set m = d.monate.get(p, {}) %}<tr><td>{{ p.strftime('%m.%Y') }}</td>{% for k, l in zl %}{% set z = m.get(k) %}
 <td>{{ (z.solar + z.ht + z.nt)|f2 if z is not none else '–' }}</td><td>{{ z.solar|f2 if z is not none else '–' }}</td>{% endfor %}</tr>{% endfor %}
 </table></div></div>
-<div class="card"><h2>Wertschöpfung {{ jahr }}</h2><div class="scroll"><table class="wide">
+<div class="card"><h2>Wertschöpfung {{ jahr }}</h2><div class="scroll"><table>
 <tr><th>Monat</th><th>Rücklieferung</th><th>Verkauf Mieter</th><th>Eigenverbrauch</th><th>Übrige</th><th>Total CHF</th></tr>
 {% for m, r in d.w.iterrows() %}<tr><td>{{ m.strftime('%m.%Y') }}</td><td>{{ r.export_chf|f2 }}</td><td>{{ r.mieter_chf|f2 }}</td><td>{{ r.eigen_chf|f2 }}</td><td>{{ r.uebrige_chf|f2 }}</td><td><b>{{ r.total_chf|f2 }}</b></td></tr>{% endfor %}
 <tr class="sum"><td>Summe</td><td>{{ d.w.export_chf.sum()|f2 }}</td><td>{{ d.w.mieter_chf.sum()|f2 }}</td><td>{{ d.w.eigen_chf.sum()|f2 }}</td><td>{{ d.w.uebrige_chf.sum()|f2 }}</td><td>{{ d.w.total_chf.sum()|f2 }}</td></tr>

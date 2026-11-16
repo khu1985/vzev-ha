@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.20.2
+
+- Usability-Befunde aus 0.20.1 behoben:
+  - Alle Eingabefelder sind beschriftet (Einstellungen, Regeln, Zähler, Nebenkosten, Jahres- und Periodenauswahl, Protokoll-Filter, Batterie).
+  - Monatstabellen (Verlauf, Batterie, Wertschöpfung, Jahresabrechnung) erscheinen auf dem Handy als Karten statt seitlich zu scrollen.
+  - Protokoll zeigt die neuesten 40 Einträge, ältere mit «Ältere anzeigen».
+  - Primeo: jeder Abschnitt hat seinen eigenen «Speichern»-Knopf.
+- Schnellere Seiten:
+  - Jahresabrechnung: Werte werden zwischengespeichert, bis sich Berechnung, Messwerte, Rechnungen oder Einstellungen ändern.
+  - Nebenkosten: Stromkosten der Wärmepumpen und des Allgemeinstroms werden pro Berechnung nur einmal gerechnet; die Sensorliste aus Home Assistant wird im Hintergrund aufgefrischt, statt die Seite warten zu lassen.
+  - Übersicht und Jahresabrechnung werden nach jedem Ablesen des Datensammlers im Hintergrund vorbereitet.
+
 ## 0.20.1
 
 - Schnellere Installation und Updates: matplotlib wird nicht mehr gebraucht. Die Ringdiagramme in den Rechnungen werden direkt ins PDF gezeichnet (gestochen scharf, gleiches Aussehen) – das App-Image ist dadurch deutlich kleiner und wird auf dem Home Assistant schneller gebaut.

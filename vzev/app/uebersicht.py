@@ -420,7 +420,7 @@ VERLAUF = diagramme.STIL + """
  <div class="kpi"><div>{{ 'Ersparnis ggü. Netz' if z == 'EV' else 'Eigenverbrauch' if z == '2OG' else 'Verrechnet' }}</div><div>{{ tot.betrag|f2 }} <small>CHF</small></div></div>
 </div>
 <div class="card"><h2>Verbrauch pro Monat</h2>{{ chart|safe }}<p class="muted">kWh, Säulenhöhe = Verbrauch gesamt (Solar + Netz). * vorläufig.</p></div>
-<div class="card"><div class="scroll"><table class="wide">
+<div class="card"><div class="scroll"><table>
 <tr><th class="l">Monat</th><th>Verbrauch kWh</th><th>Solar kWh</th><th>Netz HT</th><th>Netz NT</th><th>Solar CHF</th><th>Netz CHF</th>{% if gp %}<th>Grundpreis*</th>{% endif %}<th>Total CHF</th><th>Autarkie</th><th class="l">Status</th></tr>
 {% for r in zeilen %}{% if r.gruppe %}<tr><td class="l" colspan="11" style="background:var(--bg);font-weight:600">{{ r.gruppe }}</td></tr>{% endif %}
 <tr><td class="l">{{ r.label }}</td><td><b>{{ r.verbrauch|f2 }}</b></td><td>{{ r.solar|f2 }}</td><td>{{ r.ht|f2 }}</td><td>{{ r.nt|f2 }}</td><td>{{ r.solar_chf|f2 }}</td><td>{{ r.netz_chf|f2 }}</td>
@@ -449,7 +449,7 @@ VERLAUF_BAT = diagramme.STIL + """
  <div class="s">{{ 'Verkauf/Eigennutzung minus Ladekosten' if tot.netz else 'zuletzt gemessen' }}</div></div>
 </div>
 <div class="card"><h2>Ladung pro Monat</h2>{{ chart|safe }}<p class="muted">kWh geladen: aus Solarstrom und aus dem Netz (Netzladung ab {{ ab|dmy }} aus den Primeo-Lastgängen). * vorläufig.</p></div>
-<div class="card"><div class="scroll"><table class="wide">
+<div class="card"><div class="scroll"><table>
 <tr><th class="l">Monat</th><th>Tage</th><th>Geladen kWh</th><th>davon Netz</th><th>Entladen kWh</th><th>Wirkungsgrad</th><th>Netzstrom aus Speicher verbraucht</th><th>Ladekosten CHF</th><th>Ergebnis CHF</th></tr>
 {% for r in zeilen %}<tr><td class="l">{{ r.label }}</td><td>{{ r.tage if r.tage else '–' }}</td><td><b>{{ r.geladen|f2 if r.geladen is not none else '–' }}</b></td>
 <td>{{ r.netz|f2 if r.netz else '–' }}</td><td>{{ r.entladen|f2 if r.entladen is not none else '–' }}</td>
@@ -462,7 +462,7 @@ VERLAUF_BAT = diagramme.STIL + """
 (Primeo-Lastgänge, ab {{ ab|dmy }}; Ladekosten zum dynamischen Preis, sonst zum Netztarif). Mehr unter <a href="batterie">Batterie</a>.</p></div>
 {% if statistik %}<div class="card"><h2>Ältere Werte holen</h2>
 <form method="post" action="batterie_statistik" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="hidden" name="von" value="verlauf">
-ab <input type="date" name="ab" value="{{ statistik_ab }}"> <button>Aus der Langzeit-Statistik von Home Assistant holen</button></form>
+ab <input type="date" name="ab" value="{{ statistik_ab }}" aria-label="Statistik holen ab"> <button>Aus der Langzeit-Statistik von Home Assistant holen</button></form>
 <p class="muted">Home Assistant speichert die Tageszähler des Wechselrichters stündlich und dauerhaft. Übernommen wird nur, was vor der
 ersten eigenen Ablesung liegt; eigene Werte bleiben unverändert.</p></div>{% endif %}"""
 
@@ -570,7 +570,7 @@ def verlauf():
 # =============================================================================
 WERT = diagramme.STIL + """
 <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin:-8px 0 16px">
-<form method="get" action="wertschoepfung"><select name="j" onchange="this.form.submit()"><option value="">Seit Beginn</option>
+<form method="get" action="wertschoepfung"><select name="j" onchange="this.form.submit()" aria-label="Zeitraum"><option value="">Seit Beginn</option>
 {% for y in jahre %}<option {{ 'selected' if y|string == j }}>{{ y }}</option>{% endfor %}</select></form>
 <span class="muted">{{ zeitraum }}{% if vorl %} · * vorläufig{% endif %}</span></div>
 {% if not ok %}<div class="msg warn">Noch keine Daten: {{ fehler }}</div>{% else %}
@@ -587,7 +587,7 @@ WERT = diagramme.STIL + """
 <div class="card"><h2>Wohin geht der Solarstrom?</h2>{{ c_kwh|safe }}<p class="muted">kWh pro Monat ab vZEV-Start.</p></div>
 <div class="card"><h2>Was eine kWh wert ist</h2>{{ c_wert|safe }}
 <p class="muted">Durchschnitt im Zeitraum. Selbst genutzter oder an Mieter verkaufter Solarstrom bringt ein Mehrfaches der Einspeisung – Verbrauch in sonnige Stunden zu verschieben (Ladestation, Batterie) lohnt sich deshalb.</p></div>
-<div class="card"><h2>Monate</h2><div class="scroll"><table class="wide">
+<div class="card"><h2>Monate</h2><div class="scroll"><table>
 <tr><th>Monat</th><th>Verkauf Mieter kWh</th><th>CHF</th><th>Eigenverbrauch kWh</th><th>CHF</th><th>Rücklieferung kWh</th><th>CHF</th><th>Übrige CHF</th><th>Total CHF</th></tr>
 {% for m, r in w.iterrows() %}<tr><td>{{ m.strftime('%m.%Y') }}{{ '*' if m in vorl }}</td><td>{{ r.mieter_kwh|f2 }}</td><td>{{ r.mieter_chf|f2 }}</td><td>{{ r.eigen_kwh|f2 }}</td><td>{{ r.eigen_chf|f2 }}</td>
 <td>{{ r.export_kwh|f2 }}</td><td>{{ r.export_chf|f2 if r.export_chf == r.export_chf else 'offen' }}</td><td>{{ r.uebrige_chf|f2 }}</td><td><b>{{ r.total_chf|f2 }}</b></td></tr>{% endfor %}

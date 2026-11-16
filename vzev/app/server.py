@@ -253,9 +253,22 @@ def im_hintergrund_rechnen(grund="Hintergrund"):
                 liste()  # Dateiinfos für «Daten importieren»
                 berechnung(grund)
                 sensoren.aktualisieren()
+                vorwaermen()
         except Exception:
             log.exception("Berechnung im Hintergrund fehlgeschlagen")
     threading.Thread(target=lauf, daemon=True).start()
+
+
+def vorwaermen():
+    """Teure Seitenwerte vorab rechnen (nach dem Ablesen des Datensammlers und nach einer Berechnung), damit
+    Übersicht und Jahresabrechnung beim Aufruf fertig sind. Nur wenn die Berechnung aktuell ist – nie selbst rechnen."""
+    if RECHNEN.get("aktiv") or not _cache.get("ok") or _cache.get("key") != files_key():
+        return
+    import jahr
+    import uebersicht
+    uebersicht.daten()
+    jahr.daten(date.today().year)
+    collector.energie_sensoren()
 
 
 INFO_DATEI = DATA / ".dateiinfo.json"
@@ -1059,6 +1072,7 @@ import nebenkosten  # noqa: E402
 nebenkosten.register(app, sys.modules[__name__])
 import ampel  # noqa: E402
 ampel.register(app, sys.modules[__name__], starten=not os.environ.get("VZEV_KEINE_SENSOREN"))
+collector.nach_ablesen = vorwaermen
 import usability  # noqa: E402
 usability.register(app, sys.modules[__name__])
 import ux  # noqa: E402
@@ -1086,16 +1100,17 @@ app.jinja_env.filters["dmy"] = lambda x: "" if not x else f"{str(x)[8:10]}.{str(
 # --- Protokoll ----------------------------------------------------------------
 PROT = """
 <div class="card"><form method="get" action="protokoll" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-<select name="stufe" onchange="this.form.submit()">{% for k, v in [('', 'Alle Einträge'), ('WARNING', 'Warnungen und Fehler'), ('ERROR', 'Nur Fehler')] %}
+<select name="stufe" onchange="this.form.submit()" aria-label="Einträge filtern">{% for k, v in [('', 'Alle Einträge'), ('WARNING', 'Warnungen und Fehler'), ('ERROR', 'Nur Fehler')] %}
 <option value="{{ k }}" {{ 'selected' if k == stufe }}>{{ v }}</option>{% endfor %}</select>
 <a class="btn" href="protokoll?stufe={{ stufe }}">Aktualisieren</a>
-<span class="muted">App gestartet {{ start }} · {{ eintraege|length }} Einträge</span></form></div>
+<span class="muted">App gestartet {{ start }} · {{ gesamt }} Einträge{% if gesamt > eintraege|length %}, die neuesten {{ eintraege|length }} angezeigt{% endif %}</span></form></div>
 <div class="card"><div class="scroll"><table>
 <tr><th class="l">Zeit</th><th class="l">Art</th><th class="l">Meldung</th></tr>
 {% for e in eintraege %}<tr><td class="l" style="vertical-align:top">{{ e.zeit[8:10] }}.{{ e.zeit[5:7] }}. {{ e.zeit[11:] }}</td>
 <td class="l" style="vertical-align:top"><span class="pill {{ 'warn' if e.stufe in ('WARNING','ERROR','CRITICAL') else 'ok' }}">{{ stufen.get(e.stufe, e.stufe) }}</span></td>
 <td class="l" style="white-space:pre-wrap;word-break:break-word">{{ e.text }}</td></tr>
 {% else %}<tr><td class="l" colspan="3">Keine Einträge.</td></tr>{% endfor %}</table></div>
+{% if gesamt > eintraege|length %}<p><a class="btn" href="protokoll?stufe={{ stufe }}&anzahl={{ eintraege|length + 40 }}">Ältere anzeigen</a></p>{% endif %}
 <p class="muted">Das Protokoll liegt auch als Datei «vzev.log» im App-Konfigurationsordner.</p></div>"""
 
 
@@ -1114,8 +1129,9 @@ def neu():
 def protokoll_seite():
     stufe = request.args.get("stufe", "")
     rang = {"INFO": 0, "WARNING": 1, "ERROR": 2, "CRITICAL": 2}
-    eintraege = [e for e in protokoll() if rang.get(e["stufe"], 0) >= rang.get(stufe, 0)]
-    return page("Protokoll", render_template_string(seiten.EINST_TABS, tab="protokoll", nfehler=fehler_seit_start()) + render_template_string(PROT, eintraege=eintraege, stufe=stufe, start=START[8:10] + "." + START[5:7] + ". " + START[11:16],
+    alle = [e for e in protokoll() if rang.get(e["stufe"], 0) >= rang.get(stufe, 0)]
+    anzahl = max(40, min(500, request.args.get("anzahl", 40, type=int) or 40))   # seitenweise: lange Listen sind auf dem Handy mühsam
+    return page("Protokoll", render_template_string(seiten.EINST_TABS, tab="protokoll", nfehler=fehler_seit_start()) + render_template_string(PROT, eintraege=alle[:anzahl], gesamt=len(alle), stufe=stufe, start=START[8:10] + "." + START[5:7] + ". " + START[11:16],
                                                    stufen={"INFO": "Info", "WARNING": "Warnung", "ERROR": "Fehler", "CRITICAL": "Fehler"}))
 
 

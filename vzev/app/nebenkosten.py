@@ -161,12 +161,26 @@ def belegung(cfg, ein, von, bis, wohnungen):
     return out
 
 
+_AUTO = {}
+
+
 def auto_positionen(cfg, res, von, bis):
-    """Kosten aus der App: Strom der Wärmepumpen (Heizung/Warmwasser) und Allgemeinstrom, wie in den Gesamtrechnungen."""
-    import core
-    import invoices
+    """Kosten aus der App: Strom der Wärmepumpen (Heizung/Warmwasser) und Allgemeinstrom, wie in den Gesamtrechnungen.
+    Zwischengespeichert pro Berechnung und Periode (die Seite rechnet sonst bei jedem Aufruf alle Viertelstunden durch)."""
+    import json as _j
     if res is None or not len(res):
         return [], None
+    key = (id(res), len(res), res.index.max(), float(res["AllgC"].sum()) if "AllgC" in res else 0, von, bis,
+           _j.dumps(cfg, sort_keys=True, default=str))
+    if _AUTO.get("key") != key:
+        _AUTO.update(key=key, wert=_auto_neu(cfg, res, von, bis))
+    out, ende = _AUTO["wert"]
+    return [dict(x) for x in out], ende
+
+
+def _auto_neu(cfg, res, von, bis):
+    import core
+    import invoices
     ende = min(bis, res.index.max().date())
     if ende < von:
         return [], ende
@@ -413,7 +427,7 @@ SEITE = """
 <p class="muted">Neben- und Betriebskosten nach Mietvertrag, Abrechnungsperiode 1.7.–30.6. Strom aus der App
 (Wärmepumpen, Allgemeinstrom) kommt automatisch dazu; die übrigen Kosten mit Beleg erfassen. Rechtliches (Art. 257a/b OR,
 VMWG): nur im Mietvertrag aufgeführte Kosten, zu den tatsächlichen Kosten.</p>
-<form method="get" style="margin:8px 0 16px"><select name="p" onchange="this.form.submit()">{% for x in liste %}
+<form method="get" style="margin:8px 0 16px"><select name="p" onchange="this.form.submit()" aria-label="Abrechnungsperiode">{% for x in liste %}
 <option value="{{ x }}" {{ 'selected' if x == p }}>{{ text(x) }}</option>{% endfor %}</select></form>
 {% for h in e.hinweise %}<div class="msg warn">{{ h }}</div>{% endfor %}
 {% if not e.vollstaendig %}<div class="msg">Vorschau: Stromkosten bis {{ e.daten_bis|dmy if e.daten_bis else '–' }} – die Abrechnung lässt sich nach dem {{ e.bis|dmy }} erstellen, wenn die Lastgänge bis Ende Juni da sind.</div>{% endif %}
@@ -444,7 +458,7 @@ VMWG): nur im Mietvertrag aufgeführte Kosten, zu den tatsächlichen Kosten.</p>
 <form method="post" enctype="multipart/form-data" style="margin-top:12px"><input type="hidden" name="aktion" value="position"><input type="hidden" name="p" value="{{ p }}">
 <input name="titel" list="nk-titel" placeholder="z. B. Wasser und Abwasser" required style="min-width:240px">
 <datalist id="nk-titel">{% for v in vorschlaege %}<option value="{{ v }}">{% endfor %}</datalist>
-<select name="kategorie">{% for k, v in kat.items() %}<option value="{{ k }}">{{ v[0] }} ({{ v[1] }})</option>{% endfor %}</select>
+<select name="kategorie" aria-label="Kategorie">{% for k, v in kat.items() %}<option value="{{ k }}">{{ v[0] }} ({{ v[1] }})</option>{% endfor %}</select>
 <select name="einheit" title="nur für «Direkt»">{% for k, v in einheiten.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
 <input name="betrag" placeholder="CHF" required style="width:100px"> <input type="file" name="beleg" accept=".pdf,.jpg,.jpeg,.png">
 <button>Erfassen</button></form></div>
@@ -474,7 +488,7 @@ VMWG): nur im Mietvertrag aufgeführte Kosten, zu den tatsächlichen Kosten.</p>
 <td><input name="ma_{{ key(a.mieter) }}" aria-label="Akonto pro Monat {{ a.name }}" value="{{ md.get('akonto') or '' }}" style="width:90px"></td></tr>{% endfor %}</table>
 <p>Heizung: <input name="grundanteil" aria-label="Grundanteil Heizung in Prozent" value="{{ ein.heizung_grundanteil }}" style="width:60px"> % Grundanteil nach m², Rest nach Wärmezähler ·
 Honorar: <input name="honorar_wert" aria-label="Honorar" value="{{ ein.honorar_wert }}" style="width:70px">
-<select name="honorar_art"><option value="prozent" {{ 'selected' if ein.honorar_art == 'prozent' }}>% der Nebenkosten</option>
+<select name="honorar_art" aria-label="Honorar als"><option value="prozent" {{ 'selected' if ein.honorar_art == 'prozent' }}>% der Nebenkosten</option>
 <option value="betrag" {{ 'selected' if ein.honorar_art == 'betrag' }}>CHF pro Periode (nach m²)</option></select></p>
 <button>Speichern</button></form>
 <datalist id="energie">{% for s in sensoren %}<option value="{{ s }}">{% endfor %}</datalist>

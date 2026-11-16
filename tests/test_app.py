@@ -770,3 +770,48 @@ def test_usability_und_ux(app):
     assert "Bitte alle 8" in ziel(c.post("/vorschlaege", data={"aktion": "ux_umfrage", "u0": "1"}))
     md = c.get("/vorschlaege.md").get_data(as_text=True)
     assert "### Usability (Score pro Seite)" in md
+
+
+
+def test_usability_befunde_behoben(app):
+    """Alle Felder beschriftet, keine seitlich scrollende Tabelle, kein Riesenformular mit nur einem Knopf."""
+    server, c, d, quelle = app
+    warten(server)
+    import usability as U
+    for pfad, titel in U.seitenliste():
+        r = c.get("/" + pfad.lstrip("./"), headers={U.PRUEF_KOPF: "1"}, environ_base={"REMOTE_ADDR": server.INGRESS_PROXY})
+        h = r.get_data(as_text=True)
+        if 'id="warten"' in h:
+            continue
+        befunde = [p.titel for p in U.pruefen_html(h)]
+        for b in ("Eingabefelder ohne Beschriftung", "Tabelle scrollt auf dem Handy seitlich", "Sehr grosses Formular"):
+            assert b not in befunde, (titel, befunde)
+
+
+def test_protokoll_seitenweise(app):
+    server, c, d, quelle = app
+    for i in range(80):
+        server.log.info("Testeintrag %d", i)
+    h = c.get("/protokoll").get_data(as_text=True)
+    assert "die neuesten 40 angezeigt" in h and "anzahl=80" in h and "Testeintrag 79" in h and "Testeintrag 20" not in h
+    h = c.get("/protokoll?anzahl=80").get_data(as_text=True)
+    assert "Testeintrag 20" in h
+
+
+def test_jahreswerte_zwischengespeichert(app):
+    server, c, d, quelle = app
+    warten(server)
+    import jahr
+    import zahlungen
+    b, d1 = jahr.daten(2026)
+    _, d2 = jahr.daten(2026)
+    assert d1 is not None, b.get("fehler")
+    assert d1 is d2
+    reg = zahlungen._pfad()
+    reg.parent.mkdir(parents=True, exist_ok=True)
+    alt = reg.read_text(encoding="utf-8") if reg.exists() else None
+    reg.write_text(alt or "[]", encoding="utf-8")
+    import os, time
+    os.utime(reg, (time.time() + 5, time.time() + 5))
+    _, d3 = jahr.daten(2026)
+    assert d3 is not d1   # neue Rechnung oder Zahlung → neu rechnen

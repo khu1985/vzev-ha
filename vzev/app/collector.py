@@ -134,8 +134,15 @@ class Collector:
 
     def energie_sensoren(self):
         """Energie-Sensoren aus Home Assistant zur Auswahl (kWh/Wh), zwischengespeichert für 10 Minuten."""
-        if getattr(self, "_es_zeit", None) and time.time() - self._es_zeit < 600:
+        if getattr(self, "_es_zeit", None):
+            if time.time() - self._es_zeit >= 600 and not getattr(self, "_es_laeuft", False):
+                # veraltet: die Seite bekommt sofort die bisherige Liste, die neue kommt im Hintergrund
+                self._es_laeuft = True
+                threading.Thread(target=self._energie_sensoren_laden, daemon=True).start()
             return self._es
+        return self._energie_sensoren_laden()
+
+    def _energie_sensoren_laden(self):
         base, token = self._ha()
         out = []
         if token:
@@ -148,7 +155,7 @@ class Collector:
                         out.append((s["entity_id"], a.get("friendly_name") or s["entity_id"], s.get("state"), a.get("unit_of_measurement") or ""))
             except Exception as e:
                 log.warning("Energie-Sensoren nicht abrufbar: %s", e)
-        self._es, self._es_zeit = sorted(out), time.time()
+        self._es, self._es_zeit, self._es_laeuft = sorted(out), time.time(), False
         return self._es
 
     # --- evcc ----------------------------------------------------------
@@ -285,6 +292,15 @@ class Collector:
                     if prognose.fehler != str(e):
                         log.error("PV-Prognose: %s", e)
                     prognose.fehler = str(e)
+                finally:
+                    self.aktiv = None
+            nach = getattr(self, "nach_ablesen", None)
+            if nach is not None:   # Seiten im Hintergrund vorrechnen, damit der nächste Aufruf nicht wartet
+                self.aktiv = "Seiten vorbereiten"
+                try:
+                    nach()
+                except Exception as e:  # noqa: BLE001
+                    log.debug("Vorrechnen: %s", e)
                 finally:
                     self.aktiv = None
             tick += 1
