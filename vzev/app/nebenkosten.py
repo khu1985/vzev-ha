@@ -440,18 +440,37 @@ def erstellen(cfg, res, p, datum=None):
 
 # ---------------------------------------------------------------- Seite
 
-SEITE = """
+SEITE = """{% set grundlagen %}<div class="card" id="grundlagen"><h2>Grundlagen</h2>
+<form method="post"><input type="hidden" name="aktion" value="grundlagen"><input type="hidden" name="p" value="{{ p }}">
+<table><tr><th class="l">Wohnung</th><th>Fläche m²</th><th>Personen ohne Mieter</th><th class="l">Wärmezähler (Sensor, optional)</th></tr>
+{% for k, v in einheiten.items() %}{% set u = ein.einheiten.get(k) or {} %}<tr><td class="l">{{ v }}</td>
+<td><input name="flaeche_{{ k }}" aria-label="Fläche {{ v }}" value="{{ u.get('flaeche') or '' }}" style="width:80px"></td>
+<td><input name="personen_{{ k }}" aria-label="Personen ohne Mieter {{ v }}" value="{{ u.get('personen_ohne_mieter') or '' }}" style="width:60px" title="z. B. selbst bewohnt"></td>
+<td class="l"><input name="sensor_{{ k }}" aria-label="Wärmezähler {{ v }}" value="{{ ein.waerme.get(k) or '' }}" placeholder="sensor.…" list="energie" style="min-width:260px"></td></tr>{% endfor %}
+<tr><td class="l">Gesamtzähler</td><td></td><td></td><td class="l"><input name="sensor_gesamt" aria-label="Wärmezähler gesamt" value="{{ ein.waerme.get('gesamt') or '' }}" placeholder="sensor.…" list="energie" style="min-width:260px"></td></tr></table>
+<table style="margin-top:12px"><tr><th class="l">Mietverhältnis</th><th>Personen</th><th>Akonto / Monat</th></tr>
+{% for a in e.abschnitte if a.mieter %}{% set md = ein.mieter.get(key(a.mieter)) or {} %}<tr><td class="l">{{ a.name }} <span class="muted">({{ einheiten.get(a.einheit, a.einheit) }}, ab {{ a.mieter.von|dmy }})</span></td>
+<td><input name="mp_{{ key(a.mieter) }}" aria-label="Personen {{ a.name }}" value="{{ md.get('personen') or '' }}" style="width:60px"></td>
+<td><input name="ma_{{ key(a.mieter) }}" aria-label="Akonto pro Monat {{ a.name }}" value="{{ md.get('akonto') or '' }}" style="width:90px"></td></tr>{% endfor %}</table>
+<p>Heizung: <input name="grundanteil" aria-label="Grundanteil Heizung in Prozent" value="{{ ein.heizung_grundanteil }}" style="width:60px"> % Grundanteil nach m², Rest nach Wärmezähler ·
+Honorar: <input name="honorar_wert" aria-label="Honorar" value="{{ ein.honorar_wert }}" style="width:70px">
+<select name="honorar_art" aria-label="Honorar als"><option value="prozent" {{ 'selected' if ein.honorar_art == 'prozent' }}>% der Nebenkosten</option>
+<option value="betrag" {{ 'selected' if ein.honorar_art == 'betrag' }}>CHF pro Periode (nach m²)</option></select></p>
+<button>Speichern</button></form>
+<datalist id="energie">{% for s in sensoren %}<option value="{{ s }}">{% endfor %}</datalist>
+<p class="muted">Üblich sind 3–5 % Honorar; 30–50 % Grundanteil bei verbrauchsabhängiger Heizkostenabrechnung. Personen und Akonto stehen im Mietvertrag.</p></div>{% endset %}
 <p class="muted">Neben- und Betriebskosten nach Mietvertrag, Abrechnungsperiode 1.7.–30.6. Strom aus der App
 (Wärmepumpen, Allgemeinstrom) kommt automatisch dazu; die übrigen Kosten mit Beleg erfassen. Rechtliches (Art. 257a/b OR,
 VMWG): nur im Mietvertrag aufgeführte Kosten, zu den tatsächlichen Kosten.</p>
 <form method="get" style="margin:8px 0 16px"><select name="p" onchange="this.form.submit()" aria-label="Abrechnungsperiode">{% for x in liste %}
 <option value="{{ x }}" {{ 'selected' if x == p }}>{{ text(x) }}</option>{% endfor %}</select></form>
-{% for h in e.hinweise %}<div class="msg warn">{{ h }}</div>{% endfor %}
+{% for h in e.hinweise %}<div class="msg warn">{% if 'Grundlagen' in h or h.startswith('Personen für') or h.startswith('Akonto für') %}<a href="#grundlagen" style="color:inherit">{{ h }} →</a>{% else %}{{ h }}{% endif %}</div>{% endfor %}
 {% if not e.vollstaendig %}<div class="msg">Vorschau: Stromkosten bis {{ e.daten_bis|dmy if e.daten_bis else '–' }} – die Abrechnung lässt sich nach dem {{ e.bis|dmy }} erstellen, wenn die Lastgänge bis Ende Juni da sind.</div>{% endif %}
 
+{% if gl_zuerst %}{{ grundlagen }}{% endif %}
 <div class="card"><h2>Verteilung</h2>
 <div style="overflow-x:auto"><table><tr><th class="l">Position</th><th class="l">Schlüssel</th><th>Kosten</th>
-{% for a in e.abschnitte %}<th>{{ a.name|vorname if a.mieter else 'Vermieter' }}<div class="muted" style="font-weight:normal">{{ einheiten.get(a.einheit, a.einheit) }} · {{ a.tage }} T.</div></th>{% endfor %}</tr>
+{% for a in e.abschnitte %}<th>{{ a.name|vorname if a.mieter else 'Vermieter' }} <div class="muted" style="font-weight:normal">{{ einheiten.get(a.einheit, a.einheit) }} · {{ a.tage }} T.</div></th>{% endfor %}</tr>
 {% for x in e.positionen %}{% set i = loop.index0 %}<tr><td class="l">{{ x.titel }}{% if x.auto %} <span class="muted">(App)</span>{% endif %}</td><td class="l muted">{{ kat[x.kategorie][1] }}{% if x.kategorie == 'direkt' %}: {{ einheiten.get(x.get('einheit'), x.get('einheit')) }}{% endif %}</td><td>{{ x.betrag|f2 }}</td>
 {% for a in e.abschnitte %}<td>{{ a.zeilen[i].betrag|f2 }}</td>{% endfor %}</tr>{% endfor %}
 <tr><td class="l"><b>Nebenkosten</b></td><td></td><td><b>{{ e.kosten|f2 }}</b></td>{% for a in e.abschnitte %}<td><b>{{ a.summe|f2 }}</b></td>{% endfor %}</tr>
@@ -475,12 +494,14 @@ VMWG): nur im Mietvertrag aufgeführte Kosten, zu den tatsächlichen Kosten.</p>
 <form method="post" enctype="multipart/form-data" style="margin-top:12px"><input type="hidden" name="aktion" value="position"><input type="hidden" name="p" value="{{ p }}">
 <input name="titel" aria-label="Bezeichnung" list="nk-titel" placeholder="z. B. Wasser und Abwasser" required style="min-width:240px">
 <datalist id="nk-titel">{% for v in vorschlaege %}<option value="{{ v }}">{% endfor %}</datalist>
-<script>(function(){var k={{ vorschlaege|tojson }};var t=document.querySelector('input[name=titel]');
-var s=document.querySelector('select[name=kategorie]');if(t&&s)t.addEventListener('change',function(){if(k[t.value])s.value=k[t.value];});})();</script>
-<select name="kategorie" aria-label="Kategorie">{% for k, v in kat.items() %}<option value="{{ k }}">{{ v[0] }} ({{ v[1] }})</option>{% endfor %}</select>
+<select name="kategorie" aria-label="Kategorie">{% for k, v in kat.items() %}<option value="{{ k }}">{{ v[0] }} – {{ kurz.get(k, v[1]) }}</option>{% endfor %}</select>
 <select name="einheit" title="nur für «Direkt»" aria-label="Einheit (nur für «Direkt»)">{% for k, v in einheiten.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
 <input name="betrag" aria-label="Betrag in CHF" placeholder="CHF" required style="width:100px"> <input type="file" name="beleg" aria-label="Beleg" accept=".pdf,.jpg,.jpeg,.png">
-<button>Erfassen</button></form></div>
+<button>Erfassen</button></form>
+<script>(function(){var k={{ vorschlaege|tojson }};var t=document.querySelector('input[name=titel]');
+var s=document.querySelector('select[name=kategorie]');var u=document.querySelector('select[name=einheit]');if(!t||!s||!u)return;
+function einheit(){u.style.display=s.value==='direkt'?'':'none';}
+t.addEventListener('change',function(){if(k[t.value])s.value=k[t.value];einheit();});s.addEventListener('change',einheit);einheit();})();</script></div>
 
 <div class="card"><h2>Wärmezähler {{ text(p) }}</h2>
 <form method="post"><input type="hidden" name="aktion" value="waerme"><input type="hidden" name="p" value="{{ p }}">
@@ -493,25 +514,7 @@ var s=document.querySelector('select[name=kategorie]');if(t&&s)t.addEventListene
 <button>Speichern</button>{% if ha_waerme %} <button name="ha" value="1">Stände aus Home Assistant holen</button>{% endif %}</form>
 <p class="muted">Wohnungen ohne eigenen Wärmezähler teilen sich den Rest des Gesamtzählers nach m².</p></div>
 
-<div class="card"><h2>Grundlagen</h2>
-<form method="post"><input type="hidden" name="aktion" value="grundlagen"><input type="hidden" name="p" value="{{ p }}">
-<table><tr><th class="l">Wohnung</th><th>Fläche m²</th><th>Personen ohne Mieter</th><th class="l">Wärmezähler (Sensor, optional)</th></tr>
-{% for k, v in einheiten.items() %}{% set u = ein.einheiten.get(k) or {} %}<tr><td class="l">{{ v }}</td>
-<td><input name="flaeche_{{ k }}" aria-label="Fläche {{ v }}" value="{{ u.get('flaeche') or '' }}" style="width:80px"></td>
-<td><input name="personen_{{ k }}" value="{{ u.get('personen_ohne_mieter') or '' }}" style="width:60px" title="z. B. selbst bewohnt"></td>
-<td class="l"><input name="sensor_{{ k }}" value="{{ ein.waerme.get(k) or '' }}" placeholder="sensor.…" list="energie" style="min-width:260px"></td></tr>{% endfor %}
-<tr><td class="l">Gesamtzähler</td><td></td><td></td><td class="l"><input name="sensor_gesamt" value="{{ ein.waerme.get('gesamt') or '' }}" placeholder="sensor.…" list="energie" style="min-width:260px"></td></tr></table>
-<table style="margin-top:12px"><tr><th class="l">Mietverhältnis</th><th>Personen</th><th>Akonto / Monat</th></tr>
-{% for a in e.abschnitte if a.mieter %}{% set md = ein.mieter.get(key(a.mieter)) or {} %}<tr><td class="l">{{ a.name }} <span class="muted">({{ einheiten.get(a.einheit, a.einheit) }}, ab {{ a.mieter.von|dmy }})</span></td>
-<td><input name="mp_{{ key(a.mieter) }}" aria-label="Personen {{ a.name }}" value="{{ md.get('personen') or '' }}" style="width:60px"></td>
-<td><input name="ma_{{ key(a.mieter) }}" aria-label="Akonto pro Monat {{ a.name }}" value="{{ md.get('akonto') or '' }}" style="width:90px"></td></tr>{% endfor %}</table>
-<p>Heizung: <input name="grundanteil" aria-label="Grundanteil Heizung in Prozent" value="{{ ein.heizung_grundanteil }}" style="width:60px"> % Grundanteil nach m², Rest nach Wärmezähler ·
-Honorar: <input name="honorar_wert" aria-label="Honorar" value="{{ ein.honorar_wert }}" style="width:70px">
-<select name="honorar_art" aria-label="Honorar als"><option value="prozent" {{ 'selected' if ein.honorar_art == 'prozent' }}>% der Nebenkosten</option>
-<option value="betrag" {{ 'selected' if ein.honorar_art == 'betrag' }}>CHF pro Periode (nach m²)</option></select></p>
-<button>Speichern</button></form>
-<datalist id="energie">{% for s in sensoren %}<option value="{{ s }}">{% endfor %}</datalist>
-<p class="muted">Üblich sind 3–5 % Honorar; 30–50 % Grundanteil bei verbrauchsabhängiger Heizkostenabrechnung. Personen und Akonto stehen im Mietvertrag.</p></div>
+{% if not gl_zuerst %}{{ grundlagen }}{% endif %}
 
 <div class="card"><h2>Abrechnung erstellen</h2>
 {% if e.abgelaufen and e.vollstaendig and not e.hinweise %}
@@ -570,7 +573,8 @@ def seite():
     return S.page("Nebenkosten", render_template_string(
         SEITE,
         e=e, p=p, liste=liste, text=periode_text, per=per, ein=ein, kat=KATEGORIEN, einheiten=einheiten, zaehler=zaehler,
-        vorschlaege=VORSCHLAEGE, dateien=dateien, sensoren=[s if isinstance(s, str) else s[0] for s in sensoren],
+        vorschlaege=VORSCHLAEGE, kurz={"heizung": "m² und Wärmezähler", "direkt": "einer Wohnung"},
+        gl_zuerst=any("Grundlagen" in h or h.startswith(("Personen für", "Akonto für")) for h in e["hinweise"]), dateien=dateien, sensoren=[s if isinstance(s, str) else s[0] for s in sensoren],
         key=mieter_key, honorar=honorar, heute=date.today().isoformat(), ha_waerme=bool(ein.get("waerme"))))
 
 

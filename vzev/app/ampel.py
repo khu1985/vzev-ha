@@ -296,12 +296,22 @@ def karte(ampeln):
     if not ampeln:
         return ""
     reihen = sorted(ampeln, key=lambda a: -RANG[a.status])
-    kacheln = "".join(f'<a class="ampel-kachel {a.status}" href="{escape(a.ziel)}">{licht(a.status)}<div><b>{escape(a.bereich)}</b>'
-                      f'<span>{escape(a.text)}</span></div></a>' for a in reihen)
+
+    def kachel(a):
+        return (f'<a class="ampel-kachel {a.status}" href="{escape(a.ziel)}">{licht(a.status)}<div><b>{escape(a.bereich)}</b>'
+                f'<span>{escape(a.text)}</span></div></a>')
+    wichtig = [a for a in reihen if a.status in (ROT, GELB)]
+    ruhig = [a for a in reihen if a.status not in (ROT, GELB)]
     z = {s: sum(1 for a in ampeln if a.status == s) for s in (ROT, GELB, GRUEN)}
+    # Was zu tun ist, steht oben; was in Ordnung ist, aufklappbar – auf dem Handy füllten zehn Kacheln sonst den
+    # ganzen ersten Bildschirm, bevor der Energiefluss kam.
+    oben = f'<div class="ampeln">{"".join(kachel(a) for a in wichtig)}</div>' if wichtig else ""
+    rest = (f'<details class="ampel-rest"{"" if wichtig else " open"}><summary>{licht(GRUEN)}{z[GRUEN]} in Ordnung'
+            + (f', {len(ruhig) - z[GRUEN]} ohne Daten' if len(ruhig) > z[GRUEN] else "")
+            + f'</summary><div class="ampeln">{"".join(kachel(a) for a in ruhig)}</div></details>') if ruhig else ""
     legende = (f'<div class="ampel-legende"><span>{licht(ROT)}{z[ROT]} handeln</span><span>{licht(GELB)}{z[GELB]} prüfen</span>'
-               f'<span>{licht(GRUEN)}{z[GRUEN]} in Ordnung</span></div>')
-    return f'<div class="ampeln">{kacheln}</div>{legende}'
+               f'</div>') if wichtig else ""
+    return oben + rest + legende
 
 
 def licht(status, titel=""):
@@ -321,6 +331,8 @@ nav .ampel{width:8px;height:8px;margin:0 0 0 6px;box-shadow:none;vertical-align:
 .ampel-kachel .ampel{margin-top:5px}.ampel-kachel b{display:block;font-size:14px}.ampel-kachel span{color:var(--muted);font-size:12px}
 .ampel-kachel.rot{border-color:color-mix(in srgb,#d93b30 45%,var(--line))}.ampel-kachel.gelb{border-color:color-mix(in srgb,#e6a817 45%,var(--line))}
 .ampel-legende{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:0 0 18px}
+.ampel-rest{margin:0 0 8px}.ampel-rest>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:4px 0 8px;list-style-position:inside}
+.ampel-rest[open]>summary{padding-bottom:8px}
 """
 
 

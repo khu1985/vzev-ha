@@ -255,7 +255,8 @@ def naechste():
             sch = schritte_monat(d, mon, offen[0], abschluss, zst, st)
             s = next((s for s in sch if not s["ok"] and not s.get("optional")), None)
             if s:
-                return (f"{_titel(offen[0])}: {s['titel']}" + (f" (noch {len(offen)} Monate offen)" if len(offen) > 1 else ""), f"aufgaben?m={offen[0]}")
+                titel = s["titel"] if s["titel"].startswith(_titel(offen[0])) else f"{_titel(offen[0])}: {s['titel']}"
+                return (titel + (f" (noch {len(offen)} Monate offen)" if len(offen) > 1 else ""), f"aufgaben?m={offen[0]}")
         for s in stehende(d["cfg"], zst):
             if not s["ok"]:
                 return (s["titel"], "aufgaben")

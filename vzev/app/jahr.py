@@ -62,6 +62,27 @@ def daten(jahr):
 _SPERRE = threading.Lock()
 
 
+def monate_text(monate):
+    """['2026-03', '2026-04', '2026-06'] → «März bis April, Juni 2026» (aufeinanderfolgende Monate zusammengefasst)."""
+    from aufgaben import MONATE
+    if not monate:
+        return ""
+    zahlen = sorted({(int(m[:4]), int(m[5:7])) for m in monate})
+    teile, start, vor = [], zahlen[0], zahlen[0]
+    for z in zahlen[1:] + [None]:
+        if z and (z[0] * 12 + z[1]) == (vor[0] * 12 + vor[1]) + 1:
+            vor = z
+            continue
+        teile.append((start, vor))
+        start = vor = z
+    jahre = {j for j, _ in zahlen}
+
+    def name(jm):
+        return MONATE[jm[1]] + ("" if len(jahre) == 1 else f" {jm[0]}")
+    s = ", ".join(name(a) if a == b else f"{name(a)} bis {name(b)}" for a, b in teile)
+    return s + (f" {zahlen[0][0]}" if len(jahre) == 1 else "")
+
+
 def _neu(jahr, key):
     b, d = _daten_neu(jahr)
     if len(_PUFFER) >= 3:
@@ -142,7 +163,7 @@ def _daten_neu(jahr):
     wp_ab = r.index[r["WP_gemessen"] > 0].min() if mit_wp and (r["WP_gemessen"] > 0).any() else None
     return b, dict(jahr=jahr, von=start, bis=bis, daten_bis=ende_daten, allg=allg, wp=wp, wp_einzeln=wp_einzeln, wp_ab=wp_ab, wp_jaz=wp_jaz,
                    mit_wp=mit_wp, mieter=mieter, monate=monate,
-                   perioden=perioden, w=w, offen=offen, vorlaeufig=bool(offen) or bis < date(jahr, 12, 31),
+                   perioden=perioden, w=w, offen=offen, offen_text=monate_text(offen), vorlaeufig=bool(offen) or bis < date(jahr, 12, 31),
                    k=kennzahlen, res=r, cfg=cfg)
 
 
@@ -155,7 +176,7 @@ SEITE = """
 <a class="btn" href="jahr/excel?j={{ jahr }}">Excel</a>
 <a class="btn" href="jahr/excel?j={{ jahr }}&viertelstunden=1" title="Zusätzlich alle Viertelstunden des Jahres (grosse Datei)">Excel mit Viertelstunden</a></div>{% endif %}</div>
 {% if not d %}<div class="msg warn">Keine Daten für {{ jahr }}{% if fehler %}: {{ fehler }}{% endif %}.</div>{% else %}
-{% if d.vorlaeufig %}<div class="msg warn">Vorläufig: Lastgänge bis {{ d.daten_bis.strftime('%d.%m.%Y') }}{% if d.offen %}, noch nicht abgeschlossen: {{ d.offen|join(', ') }}{% endif %}.
+{% if d.vorlaeufig %}<div class="msg warn">Vorläufig: Lastgänge bis {{ d.daten_bis.strftime('%d.%m.%Y') }}{% if d.offen %}, noch nicht abgeschlossen: {{ d.offen_text }}{% endif %}.
 Die Zahlen können sich bis zum Abschluss aller Monate ändern.</div>{% else %}<div class="msg ok">Alle Monate von {{ jahr }} sind abgeschlossen.</div>{% endif %}
 <div class="grid" style="margin-bottom:20px">
  <div class="kpi"><div class="t">Allgemeinstrom {{ jahr }}</div><div class="v">{{ d.k.allg|f2 }} <small>CHF</small></div><div class="s">für die Nebenkostenabrechnung</div></div>

@@ -703,6 +703,8 @@ def test_nebenkosten_seite(app):
     h = c.get("/nebenkosten?p=2025-26").get_data(as_text=True)   # Testdaten liegen in dieser Periode
     assert "<h2>Verteilung</h2>" in h and "Allgemeinstrom (inkl. Grundpreis)" in h
     h = c.get("/nebenkosten?p=2026-27").get_data(as_text=True)
+    # fehlende Grundlagen: Grundlagen zuerst, Hinweise führen dorthin
+    assert h.index('id="grundlagen"') < h.index("<h2>Verteilung</h2>") and 'href="#grundlagen"' in h
     # Positionen aus dem HEV-Mietvertrag als Vorschlag, mit Verteiler
     assert '<option value="Service Lift">' in h and '"Einstellplatz Nachbarliegenschaft (Abrechnung Verwaltung)": "direkt"' in h
     assert "Fläche (m²) aller Wohnungen" in h                       # noch keine Grundlagen

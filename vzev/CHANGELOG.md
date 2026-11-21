@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.20.7
+
+- UX-Durchsicht aller Seiten (Handy und Computer):
+  - Energiefluss: Oben stehen nur noch die Bereiche, die etwas brauchen (rot, gelb); was in Ordnung ist, ist aufklappbar. Auf dem Handy füllten zehn Kacheln sonst den ganzen ersten Bildschirm, bevor der Energiefluss kam.
+  - «Nächste Aufgabe» ohne doppelten Monat («März 2026 abschliessen» statt «März 2026: März 2026 abschliessen»).
+  - Nebenkosten: Fehlen Flächen, Personen oder Akonto, stehen die Grundlagen zuoberst und die Hinweise springen dorthin. Die Auswahl der Wohnung erscheint nur beim Verteiler «direkt einer Wohnung»; kürzere Beschriftung der Verteiler (auf dem Handy nicht mehr abgeschnitten). Name und Wohnung in der Verteilung getrennt; alle Felder der Grundlagen beschriftet.
+  - Jahresabrechnung: offene Monate lesbar («März bis Dezember 2026» statt «2026-03, 2026-04, …»).
+
 ## 0.20.6
 
 - Nebenkosten: Vorschläge für die Bezeichnung um die übrigen Positionen des HEV-Mietvertrags ergänzt – Abrechnungskosten Heizung und Warmwasser, Wasserenthärtung, Zählermiete, Glühbirnen und Sicherungen, Service Lift und Lüftung, Feuerlöscher, Maschinen. Wählt man eine Bezeichnung, stellt die Seite den üblichen Verteiler ein (z. B. Wasserenthärtung nach Personen, Einstellplatz direkt einer Wohnung); ändern lässt er sich weiterhin.
