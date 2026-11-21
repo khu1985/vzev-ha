@@ -9,12 +9,18 @@ Wie in der Finanz-App. Quellen:
 - Prognose: systematische Abweichung der Solcast-Prognose
 - eigene Ideen
 
+Verlauf (wie in der Finanz-App): offene Vorschläge werden gemerkt; kommt einer nicht mehr vor, gilt er als erledigt –
+«durch Update», wenn die Version seit dem letzten Auftreten gewechselt hat, sonst «durch Änderung» (Daten, Einstellungen).
+Nach einem Update erst, wenn die neue Version einen Tag gelaufen ist: Protokoll und Leistung zählen pro Version und wären
+direkt nach dem Start sonst immer leer.
+
 Weitergegeben wird nur, was die Person selbst kopiert, herunterlädt oder als GitHub-Issue öffnet. Namen, Adressen,
 Messpunkte, Sensor-Seriennummern, IBAN, E-Mail, Datumsangaben und Beträge werden ersetzt.
 """
 import hashlib
 import json
 import re
+import threading
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from urllib.parse import quote
@@ -286,9 +292,14 @@ def _datei():
 
 def laden():
     try:
-        return json.loads(_datei().read_text(encoding="utf-8"))
+        st = json.loads(_datei().read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001
-        return {"status": {}, "ideen": []}
+        st = {}
+    if not isinstance(st, dict):
+        st = {}
+    st.setdefault("status", {})   # unvollständige Datei (z. B. leer gespeichert) darf die Seite nicht kippen
+    st.setdefault("ideen", [])
+    return st
 
 
 def speichern(st):
@@ -321,6 +332,68 @@ def idee_loeschen(iid):
     st = laden()
     st["ideen"] = [i for i in st["ideen"] if i["id"] != iid]
     speichern(st)
+
+
+# ---------------------------------------------------------------- Verlauf: erledigte Vorschläge
+
+VERLAUF_OHNE = ("Eigene Ideen",)        # verschwinden nur, wenn man sie löscht
+UPDATE_WARTEN = timedelta(hours=24)      # so lange muss eine neue Version laufen, bis ihr Fehlen etwas heisst
+_VERLAUF_SPERRE = threading.Lock()
+
+
+def _verlauf_datei():
+    return S.DATA / "vorschlaege_verlauf.json"
+
+
+def verlauf_laden():
+    try:
+        v = json.loads(_verlauf_datei().read_text(encoding="utf-8"))
+        v.setdefault("eintraege", {})
+        v.setdefault("versionen", {})
+        return v
+    except Exception:  # noqa: BLE001
+        return {"eintraege": {}, "versionen": {}}
+
+
+def verlauf_nachfuehren(liste, version, jetzt=None):
+    """Offene Vorschläge merken; was nicht mehr vorkommt, als erledigt abhaken. Kommt ein erledigter wieder vor,
+    ist er wieder offen."""
+    jetzt = jetzt or datetime.now()
+    zeit = jetzt.isoformat(timespec="seconds")
+    with _VERLAUF_SPERRE:
+        v = verlauf_laden()
+        v["versionen"].setdefault(version, zeit)
+        seit = datetime.fromisoformat(v["versionen"][version])
+        offen = {x.schluessel: x for x in liste if x.bereich not in VERLAUF_OHNE}
+        e = v["eintraege"]
+        for s, x in offen.items():
+            alt = e.get(s) or {"zuerst": version}
+            e[s] = dict(bereich=x.bereich, titel=x.titel, detail=x.detail, zuerst=alt["zuerst"], zuletzt=version)
+        for s, x in e.items():
+            if s in offen or x.get("erledigt"):
+                continue
+            if x["zuletzt"] != version:
+                if jetzt - seit < UPDATE_WARTEN:
+                    continue   # neue Version läuft noch zu kurz
+                x.update(erledigt=version, datum=zeit, durch="update")
+            else:
+                x.update(erledigt=version, datum=zeit, durch="aenderung")
+        # Liste nicht endlos wachsen lassen: erledigte nach einem Jahr vergessen
+        grenze = (jetzt - timedelta(days=365)).isoformat(timespec="seconds")
+        v["eintraege"] = {s: x for s, x in e.items() if not x.get("erledigt") or x.get("datum", "") >= grenze}
+        tmp = _verlauf_datei().with_suffix(".tmp")
+        tmp.write_text(json.dumps(v, ensure_ascii=False, indent=1), encoding="utf-8")
+        tmp.replace(_verlauf_datei())
+
+
+def erledigt(nur_version=None, anzahl=60):
+    """Erledigte Vorschläge, neueste zuerst: Liste von dict(bereich, titel, erledigt, datum, durch).
+    Mit nur_version: nur die mit dieser Version durch das Update erledigten."""
+    e = [x for x in verlauf_laden()["eintraege"].values() if x.get("erledigt")]
+    if nur_version:
+        e = [x for x in e if x["erledigt"] == nur_version and x.get("durch") == "update"]
+    e.sort(key=lambda x: (x.get("datum", ""), x["titel"]), reverse=True)
+    return e[:anzahl]
 
 
 # ---------------------------------------------------------------- Sammeln und Bericht
@@ -357,10 +430,14 @@ def _sammeln():
         eigene[t] = eigene.get(t, 0) + 1
     liste += [Vorschlag("Eigene Ideen", t, "", n, MITTEL) for t, n in eigene.items()]
     liste.sort(key=lambda v: (-v.gewicht, BEREICHE.index(v.bereich) if v.bereich in BEREICHE else 9, -v.anzahl, v.titel))
+    try:
+        verlauf_nachfuehren(liste, S.VERSION)
+    except Exception:  # noqa: BLE001 – der Verlauf darf die Vorschläge nicht verhindern
+        S.log.exception("Vorschläge: Verlauf nicht nachgeführt")
     return liste
 
 
-def bericht(vorschlaege, version, leistung=None, usability=None):
+def bericht(vorschlaege, version, leistung=None, usability=None, erledigt_=None):
     kopf = [f"Vorschläge aus der vZEV-App {version}", "",
             "_Automatisch abgeleitet und anonymisiert (keine Namen, Adressen, Messpunkte, Beträge oder Daten)._", ""]
     teile = []
@@ -372,6 +449,8 @@ def bericht(vorschlaege, version, leistung=None, usability=None):
             teile.append(f"- [{PRIO_TEXT[v.gewicht]}] {v.titel}{n}{d}")
         teile.append("")
     teile = teile or ["Keine Vorschläge.", ""]
+    if erledigt_:
+        teile += [f"### Mit {version} erledigt", ""] + [f"- {x['titel']} ({x['bereich']})" for x in erledigt_] + [""]
     if usability:
         teile += ["### Usability (Score pro Seite)", "", "```", *usability, "```", ""]
     if leistung:
@@ -394,6 +473,7 @@ SEITE = """
 <div class="grid" style="margin-bottom:20px">
  <div class="kpi"><div class="t">Vorschläge offen</div><div class="v">{{ sichtbar|length }}</div></div>
  <div class="kpi"><div class="t">davon wichtig</div><div class="v">{{ hoch }}</div></div>
+ <div class="kpi"><div class="t">mit {{ version }} erledigt</div><div class="v">{{ mit_version }}</div></div>
  <div class="kpi"><div class="t">gemeldet</div><div class="v">{{ gemeldet }}</div></div>
  <div class="kpi"><div class="t">ausgeblendet</div><div class="v">{{ ausgeblendet }}</div></div>
 </div>
@@ -412,6 +492,11 @@ Alles ist <b>anonymisiert</b> – Namen, Adressen, Messpunkte, Seriennummern, Be
 <button name="aktion" value="gemeldet">Ausgewählte als gemeldet markieren</button></p></form>
 {% else %}<p class="muted">Keine offenen Vorschläge – die App findet in deinen Daten nichts zu verbessern.</p>{% endif %}
 <p class="muted">Ausgeblendete und gemeldete Vorschläge kommen nicht in den Text zum Weitergeben. Rot = wichtig, gelb = mittel, grau = tief.</p></div>
+{% if erl %}<details class="card"{{ ' open' if mit_version }}><summary><b>Erledigt ({{ erl|length }})</b></summary>
+<ul style="margin:10px 0 0;padding-left:18px">{% for x in erl %}<li style="margin:4px 0">{{ x.titel }}
+<small class="muted">· {{ x.bereich }} · {{ 'durch Update auf ' ~ x.erledigt if x.durch == 'update' else 'durch Änderung an Daten oder Einstellungen' }} · {{ x.datum[8:10] }}.{{ x.datum[5:7] }}.{{ x.datum[:4] }}</small></li>{% endfor %}</ul>
+<p class="muted">Die App merkt sich die offenen Vorschläge. Kommt einer nach einem Update nicht mehr vor, wird er hier abgehakt –
+nach einem Update erst, wenn die neue Version einen Tag gelaufen ist. Taucht er wieder auf, ist er wieder offen.</p></details>{% endif %}
 {% if weg %}<details class="card"><summary><b>Ausgeblendet und gemeldet ({{ weg|length }})</b></summary><form method="post" action="vorschlaege">
 {% for v, s in weg %}<label class="vs"><input type="checkbox" name="sel_{{ v.schluessel }}" value="1"><span><span class="p p{{ v.gewicht }}">{{ prio[v.gewicht] }}</span>{{ v.titel }}
 <small>{{ v.bereich }} · {{ s }}</small></span></label>{% endfor %}
@@ -453,9 +538,11 @@ def seite():
     sichtbar = [v for v in alle if v.schluessel not in st]
     weg = [(v, st[v.schluessel]["status"]) for v in alle if v.schluessel in st]
     import leistung
-    text = bericht(sichtbar, S.VERSION, _leistung_text(), _usability_text())
+    mit = erledigt(S.VERSION)
+    text = bericht(sichtbar, S.VERSION, _leistung_text(), _usability_text(), mit)
     return S.page("Vorschläge", render_template_string(
         SEITE, sichtbar=sichtbar, weg=weg, hoch=sum(1 for v in sichtbar if v.gewicht == HOCH),
+        erl=erledigt(), mit_version=len(mit), version=S.VERSION,
         gemeldet=sum(1 for _, s in weg if s == "gemeldet"), ausgeblendet=sum(1 for _, s in weg if s == "ausgeblendet"),
         ideen=laden()["ideen"], text=text, link=issue_link(text, S.VERSION), prio=PRIO_TEXT,
         leistung_karte=_ux_karten() + leistung.karte()))
@@ -527,7 +614,8 @@ def aktion():
 def herunterladen():
     from flask import Response
     st = laden()["status"]
-    text = bericht([v for v in sammeln(max_alter=0) if v.schluessel not in st], S.VERSION, _leistung_text(), _usability_text())
+    text = bericht([v for v in sammeln(max_alter=0) if v.schluessel not in st], S.VERSION, _leistung_text(), _usability_text(),
+                   erledigt(S.VERSION))
     return Response(text.encode("utf-8"), mimetype="text/markdown; charset=utf-8",
                     headers={"Content-Disposition": 'attachment; filename="vzev-vorschlaege.md"'})
 

@@ -819,3 +819,25 @@ def test_jahreswerte_zwischengespeichert(app):
     os.utime(reg, (time.time() + 5, time.time() + 5))
     _, d3 = jahr.daten(2026)
     assert d3 is not d1   # neue Rechnung oder Zahlung → neu rechnen
+
+
+def test_vorschlaege_erledigt_anzeigen(app):
+    server, c, d, quelle = app
+    warten(server)
+    import json
+    v = server.VERSION
+    (server.DATA / "vorschlaege_verlauf.json").write_text(json.dumps({"versionen": {v: "2026-01-01T00:00:00"}, "eintraege": {
+        "abc": {"bereich": "Usability", "titel": "Seite «Datensammler»: Eingabefelder ohne Beschriftung", "detail": "",
+                "zuerst": "0.0.1", "zuletzt": "0.0.1", "erledigt": v, "datum": "2026-11-22T10:00:00", "durch": "update"}}}),
+        encoding="utf-8")
+    h = c.get("/vorschlaege").get_data(as_text=True)
+    for _ in range(60):   # Berechnung nach dem vorigen Test: Warteseite
+        if 'id="warten"' not in h:
+            break
+        time.sleep(0.5)
+        h = c.get("/vorschlaege").get_data(as_text=True)
+    text = re.sub(r"<style.*?</style>|<script.*?</script>|<[^>]+>|\s+", " ", h, flags=re.S)
+    assert f"mit {v} erledigt" in text, text[:1500]
+    assert "Erledigt (1)" in h and "durch Update auf " + v in h and "22.11.2026" in h
+    md = c.get("/vorschlaege.md").get_data(as_text=True)
+    assert f"### Mit {v} erledigt" in md and "Eingabefelder ohne Beschriftung (Usability)" in md

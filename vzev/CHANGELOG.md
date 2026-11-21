@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.20.4
+
+- Vorschläge werden als erledigt abgehakt, wie in der Finanz-App:
+  - Die App merkt sich jeden offenen Vorschlag. Kommt einer nicht mehr vor, steht er unter «Erledigt» – «durch Update auf …», wenn die Version gewechselt hat, sonst «durch Änderung an Daten oder Einstellungen».
+  - Nach einem Update erst, wenn die neue Version einen Tag gelaufen ist (Protokoll und Leistung zählen pro Version und wären direkt nach dem Start leer).
+  - Kennzahl «mit 0.x.y erledigt» und Abschnitt «Mit 0.x.y erledigt» im Text zum Weitergeben.
+  - Taucht ein erledigter Vorschlag wieder auf, ist er wieder offen.
+- Vorschläge: eine unvollständige Zustandsdatei bringt die Seite nicht mehr zum Absturz.
+
 ## 0.20.3
 
 - Jahresabrechnung wirklich zwischengespeichert: Der Speicher hing an allen Dateien im Datenordner, auch an Leistung, Vorschlägen und Aufgaben, die die App laufend selbst schreibt – er war darum fast nie gültig. Jetzt zählen nur Einstellungen, Abschluss, Rechnungsregister und die Messwerte bis Ende des gewählten Jahres; vergangene Jahre bleiben gültig, wenn neue Messwerte kommen.
