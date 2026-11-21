@@ -61,13 +61,17 @@ Seite wartet darauf.
 - **Daten importieren:** Dateien hochladen, ersetzen oder entfernen. Die Zuordnung erfolgt über die Messpunkt-Nummer im Dateikopf, nicht über den Dateinamen. Oben steht, bis wann die Lastgänge reichen.
 - **Primeo:** Primeo-Rechnungen für den Abgleich, manuelle Erträge.
 - **Datensammler:** Zählerstände aus Home Assistant (alle 15 Minuten) mit letztem Wert und Status, evcc-Ladevorgänge im Detail.
+  Kurze Aussetzer sind normal und erzeugen keine Warnung: Ein Sensor ohne Wert («unavailable», «unknown») wird erst nach
+  einer Stunde gemeldet, Tageszähler von Wechselrichtern (nachts «unknown») erst nach 14 Stunden. Startet Home Assistant
+  neu («Bad Gateway»), wartet der Datensammler nicht jeden Sensor einzeln ab und warnt erst beim zweiten Aussetzer in Folge;
+  PV-Prognose und Sensorliste melden sich erst, wenn sie länger nicht abrufbar sind.
 
 **Stammdaten**
 - **Mieter:** Mietverhältnisse mit Historie. In der App steht nur der Vorname; Rechnungen, Zahlungserinnerungen, Jahresabrechnung und Excel verwenden Vor- und Nachname.
 - **Tarife:** Tarife mit Gültig-ab-Datum und **Dynamische Strompreise** (Verlauf heute/morgen, Schnittstelle einstellen).
 
 **App**
-- **Einstellungen:** Betreiber, Zähler, Regeln (Aufteilung sowie Speicher und Bonus dynamischer Tarif) die Datei `vzev.yaml` direkt sowie als Reiter **Protokoll** (Uploads, Rechnungen, Zahlungen, Korrekturen, Warnungen und Fehler) und **Änderungen**.
+- **Einstellungen:** Betreiber, Zähler, Regeln (Aufteilung sowie Speicher und Bonus dynamischer Tarif) die Datei `vzev.yaml` direkt sowie als Reiter **Protokoll** (Uploads, Rechnungen, Zahlungen, Korrekturen, Warnungen und Fehler; die neuesten 40 Einträge, ältere mit «Ältere anzeigen») und **Änderungen**.
 - **Vorschläge:** Vorschläge für die Weiterentwicklung und Leistung der App (siehe unten).
 
 Ein Klick auf die **Versionsnummer** zeigt, was neu ist. Der Knopf daneben stellt die Darstellung um: **Auto** (wie das Gerät), **Hell** oder **Dunkel**. Daneben zeigt eine **Statusanzeige**, was im Hintergrund läuft (Berechnung, Abruf von Zählerständen, evcc oder Strompreisen). Seiten, die auf eine Berechnung warten, laden von selbst neu.
@@ -163,11 +167,20 @@ Entwicklung weitergeben kannst.
 
 Namen, Adressen, Messpunkte, Seriennummern in Sensor-IDs, IBAN, E-Mail, Zugangsdaten, Beträge und Daten werden ersetzt.
 Nichts wird automatisch gesendet: Der Text zum Weitergeben lässt sich kopieren, als `vzev-vorschlaege.md`
-herunterladen oder als Entwurf eines GitHub-Issues öffnen. Erledigtes lässt sich ausblenden oder als gemeldet markieren.
+herunterladen oder als Entwurf eines GitHub-Issues öffnen. Einzelne Vorschläge lassen sich ausblenden oder als gemeldet
+markieren.
+
+**Erledigt** (wie in der Finanz-App): Die App merkt sich jeden offenen Vorschlag. Kommt einer nicht mehr vor, steht er
+unter «Erledigt» – «durch Update auf 0.x.y», wenn die Version seit seinem letzten Auftreten gewechselt hat, sonst «durch
+Änderung an Daten oder Einstellungen» (z. B. ein Sensor liefert wieder Werte). Nach einem Update hakt die App erst ab,
+wenn die neue Version einen Tag gelaufen ist: Fehler und Leistung zählen pro Version und wären direkt nach dem Start
+sonst immer leer. Die Kennzahl «mit 0.x.y erledigt» und der Abschnitt «Mit 0.x.y erledigt» im Text zum Weitergeben
+zeigen, was das letzte Update gebracht hat. Taucht ein erledigter Vorschlag wieder auf, ist er wieder offen; erledigte
+werden nach einem Jahr vergessen.
 
 **Usability und UX** (wie in der Finanz-App):
 
-- **Usability-Score** (0–100): Die App zeigt einmal am Tag im Hintergrund (oder mit «Jetzt prüfen») alle Seiten mit den
+- **Usability-Score** (0–100): Die App zeigt einmal am Tag im Hintergrund (nicht in der Startphase) oder mit «Jetzt prüfen» alle Seiten mit den
   eigenen Daten an und prüft sie automatisch – lange Seiten, Tabellen, die auf dem Handy seitlich scrollen oder sehr lang
   werden, grosse Formulare, Eingabefelder ohne Beschriftung, viele Kennzahlen, Diagramme ohne Beschreibung, Ladezeit und
   den Farbkontrast in Hell und Dunkel (WCAG, mindestens 4.5:1). Pro Seite 100 Punkte minus Abzüge; Ergebnis pro Version
@@ -195,6 +208,16 @@ Vorschläge im Bereich «Leistung»: Seiten oder Aktionen ab 1,5 s im Mittel, Be
 der Vorversion deutlich langsamer wurde, eine Gesamtberechnung über einer Minute, Datenbank oder Zwischenspeicher über
 200 MB, knapper Arbeitsspeicher oder hohe Last. Die Messwerte (nur Zeiten und Mengen, keine Inhalte) stehen im Text zum
 Weitergeben und werden in `leistung.json` gespeichert (die letzten fünf Versionen).
+
+**Startphase.** In den ersten 30 Minuten nach einem Start (Update, Neustart) sind alle Zwischenspeicher leer und die
+erste Berechnung läuft. Diese Zeiten werden getrennt erfasst («Seite (Start)», im Text zum Weitergeben als eigene Zeile
+«Startphase») und lösen weder Vorschläge noch Vergleiche mit der Vorversion aus. Einen Bericht darum am besten einige
+Stunden nach einem Update erstellen.
+
+**Schnelle Seiten.** Nach jedem Ablesen des Datensammlers bereitet die App Übersicht und Jahresabrechnung im Hintergrund
+vor. Die Jahreswerte bleiben zwischengespeichert, bis sich Berechnung, Einstellungen, Abschluss, Rechnungen oder die
+Messwerte des Jahres ändern (laufendes Jahr: höchstens stündlich neu). Ruft man eine Seite auf, während die App sie gerade
+vorbereitet, wartet sie auf dieses Ergebnis, statt doppelt zu rechnen.
 
 ## Sensoren in Home Assistant
 

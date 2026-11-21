@@ -91,11 +91,11 @@ flowchart TB
 | `vzev/app/vorschau.py` | Gleiche Rechnung mit den gesammelten Zählerständen aus Home Assistant für die Zeit nach dem letzten Lastgang; Wärmepumpen-Zähler (Lücken verteilt), Jahresarbeitszahl, Viertelstundenwerte des Wechselrichters |
 | `vzev/app/server.py` | Webserver, Navigation, Statusanzeige, Import, Rechnungen, Datensammler-Seite, Protokoll |
 | `vzev/app/hastatistik.py` | Langzeit-Statistik aus Home Assistant über die WebSocket-API (kleiner Client ohne Zusatzpaket), rückwirkende Wärmepumpen-Werte |
-| `vzev/app/vorschlaege.py` | Vorschläge für die Weiterentwicklung aus Protokoll, Kontrollen, Import, Korrekturen, Datensammler, Prognose und Leistung; anonymisiert zum Weitergeben (Text, Datei, GitHub-Issue) |
+| `vzev/app/vorschlaege.py` | Vorschläge für die Weiterentwicklung aus Protokoll, Kontrollen, Import, Korrekturen, Datensammler, Prognose und Leistung; Verlauf mit erledigten Vorschlägen; anonymisiert zum Weitergeben (Text, Datei, GitHub-Issue) |
 | `vzev/app/usability.py`, `vzev/app/ux.py` | Usability-Score (alle Seiten automatisch prüfen, Kontrast) und UX-Score (Kurzbefragung UEQ-S, Nutzungsverhalten, Usability) für die Vorschläge |
 | `vzev/app/ampel.py` | Ampeln (grün/gelb/rot/grau) für alle Bereiche: Kacheln auf der Startseite, Punkte in der Navigation; im Hintergrund bewertet |
 | `vzev/app/nebenkosten.py` | Nebenkostenabrechnung 1.7.–30.6.: Kosten mit Belegen und aus der App (Wärmepumpen, Allgemeinstrom), Verteilung nach m², Personen, Wärmezähler, Tagen; Honorar, Akonto, PDF mit QR-Einzahlungsschein, Zahlungsregister |
-| `vzev/app/leistung.py` | Leistung messen: Ladezeiten der Seiten, Rechenzeiten der Berechnungen, Hintergrundaufgaben, System und Datenmengen – pro Version mit Vergleich zur Vorversion |
+| `vzev/app/leistung.py` | Leistung messen: Ladezeiten der Seiten, Rechenzeiten der Berechnungen, Hintergrundaufgaben, System und Datenmengen – pro Version mit Vergleich zur Vorversion, Startphase (erste 30 Minuten) getrennt |
 | `vzev/app/sensoren.py` | Sensoren `sensor.vzev_*` / `binary_sensor.vzev_*` über die REST-API von Home Assistant (alle 15 Minuten und nach jeder Berechnung) |
 | `vzev/app/aufgaben.py` | Aufgaben-Assistent: erkennt pro offenem Monat, Quartal und Jahr, welche Arbeiten erledigt sind, und führt zur passenden Seite |
 | `vzev/app/fluss.py` | Startseite «Energiefluss»: animiertes SVG-Diagramm der Flüsse (PV, Netz, Speicher, Haus, Verbraucher) pro Tag, Monat oder Jahr |
@@ -245,6 +245,7 @@ So fliessen sie ab 2027 in die Abrechnung ein (Entscheid Betreiber):
 | `messwerte.sqlite` | Zählerstände aus Home Assistant, evcc-Ladevorgänge, dynamische Strompreise, PV-Prognosen |
 | `aufgaben.json` | als versendet markierte Rechnungen (Aufgaben-Assistent) |
 | `vorschlaege.json` | ausgeblendete und gemeldete Vorschläge, eigene Ideen |
+| `vorschlaege_verlauf.json` | offene und erledigte Vorschläge mit Version und Datum (nur Titel, anonymisiert) |
 | `nebenkosten.json`, `nebenkosten/` | Grundlagen der Nebenkostenabrechnung (Flächen, Personen, Akonto, Honorar), Kosten und Wärmezählerstände pro Periode, Belege |
 | `ux.sqlite` | Usability-Ergebnisse pro Version, UX-Befragungen, Seitenaufrufe (nur Seitennamen) |
 | `leistung.json` | Leistungsmessungen der letzten fünf Versionen (nur Zeiten und Mengen) |
@@ -290,6 +291,9 @@ GitHub führt die Tests bei jedem Push auf `main` und `tests` und bei jedem Pull
 - **Wie im Home Assistant:** im gleichen Debian-Basisimage mit den gleichen Paketversionen wie die App (dort läuft z. B. eine ältere pandas-Version)
 - **Neueste Paketversionen:** zeigt früh, wenn künftige Versionen etwas brechen
 - **App-Image bauen:** baut das Docker-Image wie Home Assistant und prüft, dass die App startet
+
+Die ganze Suite läuft in rund einer Minute. Das App-Image enthält nur, was die App braucht (pandas, openpyxl, PyYAML,
+reportlab, Flask, requests aus den Debian-Paketen); die Diagramme in den Rechnungen zeichnet reportlab direkt ins PDF.
 
 Lokal:
 
