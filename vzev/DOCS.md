@@ -20,8 +20,9 @@ Die Navigation ist gruppiert wie in der Finanz-App: **Überblick** ist immer off
 sie die aktuelle Seite enthalten (Klick auf den Gruppennamen öffnet oder schliesst sie).
 
 **Ampeln.** Für jeden Bereich gibt es eine Ampel – grün in Ordnung, gelb prüfen, rot handeln, grau keine Daten. Die
-Startseite zeigt alle als Kacheln (Klick führt zur Seite); in der Navigation stehen gelbe und rote Punkte bei der Seite und
-bei der zugeklappten Gruppe.
+Startseite zeigt rote und gelbe als Kacheln (Klick führt zur Seite); was in Ordnung ist oder keine Daten hat, steht
+aufklappbar in einer Zeile darunter («4 in Ordnung») – ist alles in Ordnung, ist sie offen. In der Navigation stehen gelbe
+und rote Punkte bei der Seite und bei der zugeklappten Gruppe.
 
 | Ampel | grün | gelb | rot |
 |---|---|---|---|
@@ -40,8 +41,11 @@ bei der zugeklappten Gruppe.
 Die Ampeln werden im Hintergrund bewertet (höchstens alle 5 Minuten, nach jeder Änderung und neuen Berechnung) – keine
 Seite wartet darauf.
 
+**Auf dem Handy** erscheinen Tabellen als Karten (jeder Wert mit seiner Spaltenbezeichnung), statt seitlich zu scrollen;
+am Computer bleiben es Tabellen.
+
 **Überblick**
-- **Energiefluss** (Startseite): oben die Ampeln, darunter animiertes Diagramm von PV-Anlage, Netz und Speicher zum Haus und zu den Verbrauchern, für heute, gestern, einen Monat oder ein Jahr. Die Ringe zeigen den Anteil Solar-, Speicher- und Netzstrom; Werte erscheinen per Maus oder Tippen. Speicherwerte stammen vom Wechselrichter, alles andere aus derselben Rechnung wie die Abrechnung.
+- **Energiefluss** (Startseite): oben die Ampeln und die nächste Aufgabe, darunter animiertes Diagramm von PV-Anlage, Netz und Speicher zum Haus und zu den Verbrauchern, für heute, gestern, einen Monat oder ein Jahr. Die Ringe zeigen den Anteil Solar-, Speicher- und Netzstrom; Werte erscheinen per Maus oder Tippen. Speicherwerte stammen vom Wechselrichter, alles andere aus derselben Rechnung wie die Abrechnung.
 - **Übersicht:** Jahr wählen; Produktion, Autarkie, Rücklieferung und Wertschöpfung des Jahres; Diagramm «Energiefluss pro Monat» – ein Klick auf einen Monat zeigt darunter dessen Kennzahlen, Kontrollen (Abgleich mit Primeo, Ladestation, Lücken, Rückliefertarif, 80-%-Grenze Solarpreis, dynamische Preise, Wärmepumpen, Netzladung gegen Wechselrichter, Abschluss, offene Rechnungen) und Verbraucher mit Betrag inkl. Grundpreis.
 - **Aufgaben:** Assistent für den Monatsabschluss und wiederkehrende Aufgaben; erkennt erledigte Schritte selbst.
 
@@ -54,7 +58,7 @@ Seite wartet darauf.
 **Abrechnung**
 - **Rechnungen:** Quartal und Rechnungsdatum wählen und erstellen – pro Mietverhältnis eine Rechnung mit QR-Einzahlungsschein, dazu eine Gesamtrechnung Allgemeinstrom für die Nebenkostenabrechnung. Ab 2027 zusätzlich die Spalte «Speicher NT» und die Zeile «Bonus dynamischer Stromtarif», sobald sie vorkommen. Darunter **Rechnungen und Zahlungen**: offene und überfällige Beträge, Zahlungen erfassen oder entfernen, Rechnungsdatum und Fälligkeit ändern.
 - **Nebenkosten:** Nebenkostenabrechnung 1.7.–30.6. (siehe unten).
-- **Jahresabrechnung:** Allgemeinstrom fürs ganze Jahr als PDF für die Nebenkostenabrechnung, Mieter, Wertschöpfung, Excel-Export (auf Wunsch mit allen Viertelstunden).
+- **Jahresabrechnung:** Allgemeinstrom fürs ganze Jahr als PDF für die Nebenkostenabrechnung, Mieter, Wertschöpfung, Excel-Export (auf Wunsch mit allen Viertelstunden). Solange Monate offen sind, steht oben «Vorläufig» mit den offenen Monaten (z. B. «März bis Dezember 2026»).
 - **Abschluss:** Monate der Reihe nach abschliessen (mit Abschlussdatum). Danach sind Änderungen an Tarifen, Mietern und Erträgen für diesen Monat gesperrt.
 
 **Daten**
@@ -125,7 +129,7 @@ Wärmepumpen für Heizung und Warmwasser, die am Allgemeinzähler hängen, werde
 **Abrechnung → Nebenkosten** rechnet die Neben- und Betriebskosten nach Mietvertrag ab (Abrechnungsperiode 1.7.–30.6.).
 Verrechnet werden dürfen nur die im Mietvertrag aufgeführten Kosten, zu den tatsächlichen Kosten (Art. 257a/b OR, VMWG).
 
-- **Grundlagen** (einmal): Fläche jeder Wohnung, Personen bei selbst bewohnten Wohnungen, pro Mietverhältnis Personen und
+- **Grundlagen** (einmal; solange etwas fehlt, stehen sie zuoberst und die Hinweise führen dorthin): Fläche jeder Wohnung, Personen bei selbst bewohnten Wohnungen, pro Mietverhältnis Personen und
   Akonto pro Monat (aus dem Mietvertrag), Grundanteil der Heizung (Standard 30 % nach m², Rest nach Wärmezähler) und
   Honorar für die Abrechnung (Standard 3 % der Nebenkosten, oder ein fester Betrag nach m²). Optional die Sensoren der
   Wärmezähler – der Datensammler liest sie dann mit.
@@ -133,7 +137,8 @@ Verrechnet werden dürfen nur die im Mietvertrag aufgeführten Kosten, zu den ta
   abwählbar). Übrige Kosten mit Kategorie und Beleg erfassen, z. B. Wartung Heizung, Wasser/Abwasser, Kehricht,
   Hauswartung, Treppenhausreinigung, Antenne, Zählermiete, Service Lift und Lüftung, Wasserenthärtung, Feuerlöscher,
   Einstellplatz-Anteil aus der Abrechnung der Nachbarliegenschaft. Die Vorschläge für die Bezeichnung folgen dem
-  HEV-Mietvertrag und stellen den üblichen Verteiler gleich ein.
+  HEV-Mietvertrag und stellen den üblichen Verteiler gleich ein; die Wohnung wählt man nur beim Verteiler «direkt einer
+  Wohnung».
 - **Wärmezähler**: Stand am 1.7. und 30.6. für den Gesamtzähler und die Wohnungen mit eigenem Zähler (von Hand oder aus
   Home Assistant). Wohnungen ohne eigenen Zähler teilen sich den Rest nach m².
 
