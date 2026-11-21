@@ -26,15 +26,18 @@ def _jahre(b, cfg):
 _PUFFER = {}
 
 
-def _stand():
-    """Alles, wovon die Jahreswerte abhängen: Berechnung, Messwerte (Wärmepumpen) und die Dateien im Datenordner
-    (Rechnungsregister, Abschluss, Einstellungen)."""
+# Nur Dateien, von denen die Jahreswerte abhängen. Nicht den ganzen Datenordner: Leistung, Vorschläge und Aufgaben
+# schreibt die App laufend selbst – damit war der Zwischenspeicher fast nie gültig (0.20.2).
+_DATEIEN = ("vzev.yaml", "abschluss.json")
+
+
+def _stand(jahr):
+    """Alles, wovon die Werte eines Jahres abhängen: Berechnung, Messwerte bis Ende dieses Jahres (Wärmepumpen),
+    Einstellungen, Abschluss und Rechnungsregister. Ein vergangenes Jahr bleibt so gültig, wenn neue Messwerte kommen."""
     with S.collector._db() as c:
-        mw = c.execute("SELECT MAX(ts), COUNT(*) FROM messwerte").fetchone()
-    dateien = tuple(sorted((f.name, f.stat().st_mtime) for f in S.DATA.iterdir() if f.is_file() and f.suffix in (".json", ".yaml")))
-    reg = zahlungen._pfad()
-    dateien += (reg.stat().st_mtime if reg.exists() else 0,)
-    return (S._cache.get("key"), mw, dateien)
+        mw = c.execute("SELECT MAX(ts), COUNT(*) FROM messwerte WHERE ts < ?", (f"{jahr + 1}-01-01",)).fetchone()
+    pfade = [S.DATA / n for n in _DATEIEN] + [zahlungen._pfad()]
+    return (S._cache.get("key"), tuple(mw), tuple(f.stat().st_mtime if f.exists() else 0 for f in pfade))
 
 
 def daten(jahr):
@@ -42,7 +45,7 @@ def daten(jahr):
     b = S.berechnung() if any(S.PRIMEO.iterdir()) else {"ok": False, "fehler": "keine Dateien importiert"}
     if not b.get("ok"):
         return b, None
-    key = (_stand(), jahr)
+    key = (_stand(jahr), jahr)
     e = _PUFFER.get(jahr)
     if e and e[0] == key:
         return b, e[1]

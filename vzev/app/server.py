@@ -811,8 +811,8 @@ SAMMLER = """
 <td>{{ m.abrechnung|f2 }}</td><td>{{ m.preis|f2 }}</td></tr>{% endfor %}</table></div>
 <p class="muted">«Laut Abrechnung» = Ladestation aus den Primeo-Lastgängen und dem Wallbox-Export, wie sie in den Rechnungen verwendet wird. Solaranteil und Kosten berechnet evcc selbst.</p>{% endif %}
 {% if ladungen %}<h2 style="margin-top:16px">Einzelne Ladevorgänge</h2>
-<form method="get" action="sammler" style="margin-bottom:8px">Monat <select name="monat" onchange="this.form.submit()"><option value="">alle</option>
-{% for m in monate %}<option {{ 'selected' if m.monat == monat }}>{{ m.monat }}</option>{% endfor %}</select></form>
+<form method="get" action="sammler" style="margin-bottom:8px"><label>Monat <select name="monat" onchange="this.form.submit()" aria-label="Monat"><option value="">alle</option>
+{% for m in monate %}<option {{ 'selected' if m.monat == monat }}>{{ m.monat }}</option>{% endfor %}</select></label></form>
 <div class="scroll"><table>
 <tr><th class="l">Start</th><th>Ende</th><th>Dauer</th><th class="l">Ladepunkt</th><th class="l">Fahrzeug</th><th>kWh</th><th>Solar</th><th>CHF</th><th>Rp./kWh</th><th>km-Stand</th></tr>
 {% for l in ladungen %}<tr><td class="l">{{ l.start.strftime('%d.%m.%Y %H:%M') }}</td><td>{{ l.ende.strftime('%d.%m. %H:%M') if l.ende else 'läuft' }}</td>
@@ -861,7 +861,7 @@ def sammler():
 # --- Einstellungen ------------------------------------------------------------
 EINST = """
 <div class="card"><h2>Konfiguration (vzev.yaml)</h2>
-<form method="post" action="einstellungen?tab=datei"><textarea name="text" rows="40">{{ text }}</textarea>
+<form method="post" action="einstellungen?tab=datei"><textarea name="text" rows="40" aria-label="Einstellungsdatei">{{ text }}</textarea>
 <p><button class="primary">Speichern</button> <span class="muted">Wird vor dem Speichern geprüft; die vorherige Version bleibt als vzev.yaml.bak erhalten.</span></p></form></div>
 <div class="card"><h2>Datensicherung</h2>
 <p>Alle Daten der App liegen im Konfigurationsordner der App und sind im Backup von Home Assistant enthalten (ohne Zwischenspeicher).

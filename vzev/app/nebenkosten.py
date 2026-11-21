@@ -448,7 +448,7 @@ VMWG): nur im Mietvertrag aufgeführte Kosten, zu den tatsächlichen Kosten.</p>
 {% if e.auto %}<form method="post"><input type="hidden" name="aktion" value="auto"><input type="hidden" name="p" value="{{ p }}">
 <table><tr><th class="l">Aus der App</th><th class="l">Kategorie</th><th>CHF</th><th>verrechnen</th></tr>
 {% for x in e.auto %}<tr><td class="l">{{ x.titel }}</td><td class="l">{{ kat[x.kategorie][0] }}</td><td>{{ x.betrag|f2 }}</td>
-<td><input type="checkbox" name="an" value="{{ x.auto }}" {{ '' if x.auto in e.auto_aus else 'checked' }}></td></tr>{% endfor %}</table>
+<td><input type="checkbox" name="an" aria-label="{{ x.titel }} übernehmen" value="{{ x.auto }}" {{ '' if x.auto in e.auto_aus else 'checked' }}></td></tr>{% endfor %}</table>
 <button>Übernehmen</button></form>{% endif %}
 <table style="margin-top:12px"><tr><th class="l">Erfasst</th><th class="l">Kategorie</th><th>CHF</th><th class="l">Beleg</th><th></th></tr>
 {% for x in per.positionen %}<tr><td class="l">{{ x.titel }}</td><td class="l">{{ kat[x.kategorie][0] }}{% if x.kategorie == 'direkt' %}: {{ einheiten.get(x.get('einheit'), x.get('einheit')) }}{% endif %}</td><td>{{ x.betrag|f2 }}</td>
@@ -456,11 +456,11 @@ VMWG): nur im Mietvertrag aufgeführte Kosten, zu den tatsächlichen Kosten.</p>
 <td><form method="post" style="margin:0"><input type="hidden" name="aktion" value="loeschen"><input type="hidden" name="p" value="{{ p }}"><input type="hidden" name="i" value="{{ loop.index0 }}"><button>Entfernen</button></form></td></tr>
 {% else %}<tr><td class="l muted" colspan="5">Noch nichts erfasst.</td></tr>{% endfor %}</table>
 <form method="post" enctype="multipart/form-data" style="margin-top:12px"><input type="hidden" name="aktion" value="position"><input type="hidden" name="p" value="{{ p }}">
-<input name="titel" list="nk-titel" placeholder="z. B. Wasser und Abwasser" required style="min-width:240px">
+<input name="titel" aria-label="Bezeichnung" list="nk-titel" placeholder="z. B. Wasser und Abwasser" required style="min-width:240px">
 <datalist id="nk-titel">{% for v in vorschlaege %}<option value="{{ v }}">{% endfor %}</datalist>
 <select name="kategorie" aria-label="Kategorie">{% for k, v in kat.items() %}<option value="{{ k }}">{{ v[0] }} ({{ v[1] }})</option>{% endfor %}</select>
-<select name="einheit" title="nur für «Direkt»">{% for k, v in einheiten.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
-<input name="betrag" placeholder="CHF" required style="width:100px"> <input type="file" name="beleg" accept=".pdf,.jpg,.jpeg,.png">
+<select name="einheit" title="nur für «Direkt»" aria-label="Einheit (nur für «Direkt»)">{% for k, v in einheiten.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
+<input name="betrag" aria-label="Betrag in CHF" placeholder="CHF" required style="width:100px"> <input type="file" name="beleg" aria-label="Beleg" accept=".pdf,.jpg,.jpeg,.png">
 <button>Erfassen</button></form></div>
 
 <div class="card"><h2>Wärmezähler {{ text(p) }}</h2>
@@ -497,7 +497,7 @@ Honorar: <input name="honorar_wert" aria-label="Honorar" value="{{ ein.honorar_w
 <div class="card"><h2>Abrechnung erstellen</h2>
 {% if e.abgelaufen and e.vollstaendig and not e.hinweise %}
 <form method="post"><input type="hidden" name="aktion" value="erstellen"><input type="hidden" name="p" value="{{ p }}">
-Datum <input type="date" name="datum" value="{{ heute }}"> <button>Abrechnungen erstellen</button></form>
+<label>Datum <input type="date" name="datum" value="{{ heute }}" aria-label="Datum der Abrechnungen"></label> <button>Abrechnungen erstellen</button></form>
 <p class="muted">Je Mietverhältnis ein PDF; Nachzahlungen kommen mit Einzahlungsschein unter «Rechnungen» ins Zahlungsregister.</p>
 {% else %}<p class="muted">Möglich, sobald die Periode vorbei ist, die Stromdaten bis 30.6. vorliegen und keine Hinweise oben mehr offen sind.</p>{% endif %}
 <form method="post"><input type="hidden" name="aktion" value="vorschau"><input type="hidden" name="p" value="{{ p }}"><button>Vorschau als PDF</button></form>

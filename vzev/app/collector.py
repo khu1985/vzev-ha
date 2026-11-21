@@ -34,6 +34,17 @@ def _zeit(x):
     return t.astimezone().replace(tzinfo=None) if t.tzinfo else t
 
 
+NEUSTART_HTTP = (502, 503, 504)
+
+
+def geduld(eid):
+    """Wie viele Abrufe (je 15 Minuten) eine Entität fehlen darf, bevor es eine Warnung gibt. Tageszähler von
+    Wechselrichtern sind nachts «unknown», solange das Gerät schläft – das ist kein Fehler."""
+    e = eid.lower()
+    if any(w in e for w in ("today", "daily", "heute", "tages")):
+        return 56   # 14 Stunden
+    return 4        # 1 Stunde
+
 class Collector:
     def __init__(self, db_path, get_config):
         self.db_path = db_path
@@ -94,15 +105,24 @@ class Collector:
         rows, fehlt, meta = [], [], []
         jetzt = datetime.now().isoformat(timespec="seconds")
         ents = self.entities()
+        neustart = False
         for eid in ents:
             r = None
+            if neustart:   # Home Assistant startet neu: nicht jede Entität einzeln abwarten
+                fehlt.append(f"{eid} (keine Antwort)")
+                continue
             for versuch in (1, 2):  # Home Assistant ist kurz ausgelastet (Neustart, Backup): einmal mit mehr Geduld wiederholen
                 try:
                     r = requests.get(f"{base}/states/{eid}", headers={"Authorization": f"Bearer {token}"}, timeout=10 * versuch)
+                    if r.status_code in NEUSTART_HTTP:   # Supervisor-Proxy: Home Assistant startet gerade neu
+                        fehler, r = ConnectionError(f"HTTP {r.status_code}"), None
+                        time.sleep(2 * versuch)
+                        continue
                     break
                 except (requests.Timeout, requests.ConnectionError) as e:
                     fehler = e
             if r is None:
+                neustart = str(fehler).startswith("HTTP ")
                 fehlt.append(f"{eid} (keine Antwort)")
                 continue
             if r.status_code != 200:
@@ -117,13 +137,20 @@ class Collector:
                 fehlt.append(f"{eid} ({j.get('state')})")  # unavailable/unknown
         if ents and not rows and all(f.endswith("(keine Antwort)") for f in fehlt):
             raise ConnectionError(f"Home Assistant antwortet nicht ({type(fehler).__name__})")
-        meldung = ", ".join(fehlt)
+        # Einzelne Aussetzer (Gateway kurz offline, Neustart) sind normal: erst melden, wenn eine Entität länger fehlt.
+        serie = getattr(self, "_serie", {})
+        fehlend = {f.split(" (")[0]: f for f in fehlt}
+        self._serie = serie = {e: serie.get(e, 0) + 1 for e in fehlend}
+        anhaltend = [fehlend[e] for e in sorted(fehlend) if serie[e] >= geduld(e)]
+        meldung = ", ".join(anhaltend)
         if meldung != getattr(self, "_fehlt", ""):  # nur Änderungen protokollieren
-            if fehlt:
+            if anhaltend:
                 log.warning("Datensammler: keine Werte für %s", meldung)
             elif getattr(self, "_fehlt", None):
                 log.info("Datensammler: alle Entitäten liefern wieder Werte")
             self._fehlt = meldung
+        if fehlt and not anhaltend:
+            log.debug("Datensammler: kurz keine Werte für %s", ", ".join(fehlt))
         with self._db() as c:
             c.executemany("INSERT OR REPLACE INTO messwerte VALUES (?, ?, ?)", rows)
             c.executemany("INSERT OR REPLACE INTO entitaeten VALUES (?, ?, ?, ?, ?)", meta)
@@ -154,7 +181,15 @@ class Collector:
                     if s["entity_id"].startswith("sensor.") and (a.get("device_class") == "energy" or a.get("unit_of_measurement") in ("kWh", "Wh")):
                         out.append((s["entity_id"], a.get("friendly_name") or s["entity_id"], s.get("state"), a.get("unit_of_measurement") or ""))
             except Exception as e:
-                log.warning("Energie-Sensoren nicht abrufbar: %s", e)
+                # bisherige Liste behalten und in zwei Minuten erneut versuchen; melden erst, wenn es länger nicht geht
+                self._es_fehler = getattr(self, "_es_fehler", 0) + 1
+                (log.warning if self._es_fehler == 3 else log.debug)("Energie-Sensoren nicht abrufbar: %s", e)
+                self._es_laeuft = False
+                if getattr(self, "_es", None):
+                    self._es_zeit = time.time() - 480
+                    return self._es
+        if out:
+            self._es_fehler = 0
         self._es, self._es_zeit, self._es_laeuft = sorted(out), time.time(), False
         return self._es
 
@@ -260,8 +295,10 @@ class Collector:
                 # einzelne Aussetzer (Home Assistant startet neu) nur als Warnung, erst eine Stunde ohne Werte als Fehler
                 if self.fehlversuche == 4:
                     log.error("Datensammler: seit einer Stunde keine Werte – %s", e)
-                elif self.last_error is None:
+                elif self.fehlversuche == 2:   # ein einzelner Aussetzer (Neustart von Home Assistant) ist normal
                     log.warning("Datensammler: %s (nächster Versuch in 15 Minuten)", e)
+                else:
+                    log.info("Datensammler: %s (nächster Versuch in 15 Minuten)", e)
                 self.last_error = f"{datetime.now():%d.%m. %H:%M}: {e}"
             else:
                 if getattr(self, "fehlversuche", 0) >= 4:
@@ -289,9 +326,17 @@ class Collector:
                 try:
                     prognose.abrufen()
                 except Exception as e:
-                    if prognose.fehler != str(e):
-                        log.error("PV-Prognose: %s", e)
+                    # stündlicher Abruf: ein Aussetzer (Home Assistant startet neu) ist normal, erst nach drei Stunden melden
+                    prognose.fehlversuche = getattr(prognose, "fehlversuche", 0) + 1
+                    if prognose.fehlversuche == 3:
+                        log.error("PV-Prognose: seit drei Stunden nicht abrufbar – %s", e)
+                    else:
+                        log.debug("PV-Prognose: %s", e)
                     prognose.fehler = str(e)
+                else:
+                    if getattr(prognose, "fehlversuche", 0) >= 3:
+                        log.info("PV-Prognose: wieder abrufbar")
+                    prognose.fehlversuche = 0
                 finally:
                     self.aktiv = None
             nach = getattr(self, "nach_ablesen", None)

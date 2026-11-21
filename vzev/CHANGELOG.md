@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.20.3
+
+- Jahresabrechnung wirklich zwischengespeichert: Der Speicher hing an allen Dateien im Datenordner, auch an Leistung, Vorschlägen und Aufgaben, die die App laufend selbst schreibt – er war darum fast nie gültig. Jetzt zählen nur Einstellungen, Abschluss, Rechnungsregister und die Messwerte bis Ende des gewählten Jahres; vergangene Jahre bleiben gültig, wenn neue Messwerte kommen.
+- Die tägliche Usability-Prüfung bereitet die Seiten zuerst vor, wie es die App nach jedem Ablesen tut – ein Aufruf kurz nach dem Ablesen zählt nicht mehr als langsame Seite.
+- Neustart von Home Assistant erzeugt keine Fehlermeldungen mehr:
+  - Datensammler: «Bad Gateway» gilt wie «keine Antwort»; die übrigen Sensoren werden dann nicht mehr einzeln abgewartet. Erst ab dem zweiten Aussetzer in Folge eine Warnung.
+  - Einzelne Sensoren ohne Wert («unavailable», «unknown») werden erst gemeldet, wenn sie eine Stunde fehlen. Tageszähler von Wechselrichtern (nachts «unknown») erst nach 14 Stunden.
+  - Energie-Sensoren: bisherige Liste bleibt, neuer Versuch nach zwei Minuten; Warnung erst nach drei Fehlversuchen.
+  - PV-Prognose: Fehler erst, wenn sie drei Stunden lang nicht abrufbar ist.
+- Datensammler: Monatsauswahl der Ladevorgänge beschriftet; weitere Felder beschriftet, die nur mit echten Daten erscheinen (Nebenkosten, Einstellungsdatei, Vorschläge).
+
 ## 0.20.2
 
 - Usability-Befunde aus 0.20.1 behoben:

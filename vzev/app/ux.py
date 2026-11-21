@@ -330,6 +330,8 @@ def usability_pruefen(warten=False):
 
     def lauf():
         try:
+            if hasattr(S, "vorwaermen"):   # wie im Alltag: nach dem Ablesen sind die Seiten vorbereitet
+                S.vorwaermen()
             e = us.pruefen()
             us.sichern(e)
             S.log.info("Usability geprüft: Score %d/100", e.score)

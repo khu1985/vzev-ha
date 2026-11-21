@@ -419,11 +419,11 @@ Alles ist <b>anonymisiert</b> – Namen, Adressen, Messpunkte, Seriennummern, Be
 <button name="aktion" value="alle_einblenden">Alle wieder einblenden</button></p></form></details>{% endif %}
 <div class="card"><h2>Eigene Idee</h2><form method="post" action="vorschlaege">
 {% if ideen %}<ul>{% for i in ideen %}<li>{{ i.text }} <button name="aktion" value="idee_loeschen_{{ i.id }}" style="min-height:28px;padding:0 8px">Löschen</button></li>{% endfor %}</ul>{% endif %}
-<textarea name="idee" rows="3" style="width:100%" placeholder="Was fehlt dir, was stört dich?"></textarea>
+<textarea name="idee" aria-label="Eigene Idee" rows="3" style="width:100%" placeholder="Was fehlt dir, was stört dich?"></textarea>
 <p><button class="primary" name="aktion" value="idee">Hinzufügen</button></p></form>
 <p class="muted">Namen, Beträge und Daten werden beim Weitergeben ersetzt – schreib trotzdem nichts Persönliches hinein.</p></div>
 {{ leistung_karte|safe }}
-<div class="card"><h2>Weitergeben</h2><textarea id="vs-text" class="bericht" readonly>{{ text }}</textarea>
+<div class="card"><h2>Weitergeben</h2><textarea id="vs-text" class="bericht" readonly aria-label="Bericht zum Weitergeben">{{ text }}</textarea>
 <p style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" id="vs-kopieren">Kopieren</button>
 <a class="btn" href="vorschlaege.md">Herunterladen (.md)</a>
 <a class="btn primary" href="{{ link }}" target="_blank" rel="noopener">Als GitHub-Issue öffnen</a></p>

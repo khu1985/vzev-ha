@@ -807,6 +807,10 @@ def test_jahreswerte_zwischengespeichert(app):
     _, d2 = jahr.daten(2026)
     assert d1 is not None, b.get("fehler")
     assert d1 is d2
+    for name in ("leistung.json", "vorschlaege.json", "aufgaben.json"):   # schreibt die App laufend selbst
+        (server.DATA / name).write_text("{}", encoding="utf-8")
+    _, d2 = jahr.daten(2026)
+    assert d1 is d2, "eigene Protokolldateien dürfen den Zwischenspeicher nicht ungültig machen"
     reg = zahlungen._pfad()
     reg.parent.mkdir(parents=True, exist_ok=True)
     alt = reg.read_text(encoding="utf-8") if reg.exists() else None
