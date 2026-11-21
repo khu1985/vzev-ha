@@ -1,4 +1,5 @@
 """Übersicht und Verlauf pro Zähler, mit Diagrammen und Vorschau aus Home Assistant."""
+import threading
 from datetime import date
 
 import numpy as np
@@ -28,22 +29,31 @@ def daten():
         letzter = c.execute("SELECT MAX(ts), COUNT(*) FROM messwerte").fetchone()  # auch rückwirkend eingefügte Werte
     key = (b.get("key"), letzter, S.files_key())
     if _vcache.get("key") != key:
-        ab = (res_p.index.max() + VIERTEL) if res_p is not None else None
-        try:
-            res_v, info = vorschau.berechnen(S.collector._db, cfg, ab, res_p)
-        except Exception as e:
-            S.log.exception("Vorschau aus Home Assistant fehlgeschlagen")
-            res_v, info = None, {"fehlend": [f"Fehler: {e}"]}
-        if res_p is not None and res_v is not None and len(res_v):
-            res = pd.concat([res_p.assign(quelle="primeo"), res_v.assign(quelle="ha")])
-        elif res_p is not None:
-            res = res_p.assign(quelle="primeo")
-        elif res_v is not None and len(res_v):
-            res = res_v.assign(quelle="ha")
-        else:
-            res = None
-        _vcache.update(key=key, res=res, info=info, vergleich=_vergleich(cfg, res_p, b.get("key")), memo={})
+        with _VSPERRE:   # rechnet schon jemand (Vorbereitung im Hintergrund)? Dann auf dessen Ergebnis warten
+            if _vcache.get("key") != key:
+                _vorschau_neu(b, cfg, res_p, key)
     return dict(b=b, cfg=cfg, res=_vcache["res"], info=_vcache["info"], vergleich=_vcache["vergleich"])
+
+
+_VSPERRE = threading.Lock()
+
+
+def _vorschau_neu(b, cfg, res_p, key):
+    ab = (res_p.index.max() + VIERTEL) if res_p is not None else None
+    try:
+        res_v, info = vorschau.berechnen(S.collector._db, cfg, ab, res_p)
+    except Exception as e:
+        S.log.exception("Vorschau aus Home Assistant fehlgeschlagen")
+        res_v, info = None, {"fehlend": [f"Fehler: {e}"]}
+    if res_p is not None and res_v is not None and len(res_v):
+        res = pd.concat([res_p.assign(quelle="primeo"), res_v.assign(quelle="ha")])
+    elif res_p is not None:
+        res = res_p.assign(quelle="primeo")
+    elif res_v is not None and len(res_v):
+        res = res_v.assign(quelle="ha")
+    else:
+        res = None
+    _vcache.update(key=key, res=res, info=info, vergleich=_vergleich(cfg, res_p, b.get("key")), memo={})
 
 
 _VGL = {}

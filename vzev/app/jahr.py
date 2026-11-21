@@ -3,6 +3,7 @@
 Grundlage sind ausschliesslich die Primeo-Lastgänge (keine Vorschau aus Home Assistant).
 """
 import io
+import threading
 from datetime import date
 
 import pandas as pd
@@ -36,6 +37,8 @@ def _stand(jahr):
     Einstellungen, Abschluss und Rechnungsregister. Ein vergangenes Jahr bleibt so gültig, wenn neue Messwerte kommen."""
     with S.collector._db() as c:
         mw = c.execute("SELECT MAX(ts), COUNT(*) FROM messwerte WHERE ts < ?", (f"{jahr + 1}-01-01",)).fetchone()
+    if jahr >= date.today().year and mw[0]:
+        mw = (mw[0][:13],)   # laufendes Jahr: Wärmepumpen höchstens stündlich neu, nicht nach jeder Ablesung
     pfade = [S.DATA / n for n in _DATEIEN] + [zahlungen._pfad()]
     return (S._cache.get("key"), tuple(mw), tuple(f.stat().st_mtime if f.exists() else 0 for f in pfade))
 
@@ -49,6 +52,17 @@ def daten(jahr):
     e = _PUFFER.get(jahr)
     if e and e[0] == key:
         return b, e[1]
+    with _SPERRE:   # rechnet die Vorbereitung im Hintergrund gerade dasselbe? Dann warten statt doppelt rechnen
+        e = _PUFFER.get(jahr)
+        if e and e[0] == key:
+            return b, e[1]
+        return _neu(jahr, key)
+
+
+_SPERRE = threading.Lock()
+
+
+def _neu(jahr, key):
     b, d = _daten_neu(jahr)
     if len(_PUFFER) >= 3:
         _PUFFER.clear()

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.20.5
+
+- Leistung: Die ersten 30 Minuten nach einem Start (Update, Neustart) werden getrennt erfasst. Dann sind alle Zwischenspeicher leer und die erste Berechnung läuft – diese Zeiten erscheinen im Bericht als «Startphase», zählen aber nicht für die Vorschläge und den Vergleich mit der Vorversion. Bisher verglich ein Bericht kurz nach einem Update zwei Kaltstarts.
+- Die tägliche Usability-Prüfung läuft erst nach der Startphase.
+- Keine doppelte Arbeit mehr: Ruft man Übersicht oder Jahresabrechnung auf, während die App dieselben Werte im Hintergrund vorbereitet, wartet die Seite auf dieses Ergebnis, statt gleichzeitig noch einmal zu rechnen.
+- Jahresabrechnung des laufenden Jahres: Wärmepumpenwerte höchstens stündlich neu statt nach jeder Ablesung.
+
 ## 0.20.4
 
 - Vorschläge werden als erledigt abgehakt, wie in der Finanz-App:

@@ -354,7 +354,9 @@ def hintergrund(intervall=900):
             try:
                 sichern()
                 import usability as us
-                if us.faellig(S.VERSION, date.today().isoformat()):
+                import leistung
+                # nicht in der Startphase: da sind alle Zwischenspeicher leer und jede Seite wirkt langsam
+                if not leistung.im_anlauf() and us.faellig(S.VERSION, date.today().isoformat()):
                     usability_pruefen(warten=True)
                 verlauf_sichern()
             except Exception as e:  # noqa: BLE001

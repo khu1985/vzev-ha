@@ -47,7 +47,18 @@ OHNE_VORSCHLAG = ("hastatistik.", "invoices.main", "core.run", "core.load",
 NICHT_MESSEN = {"static", "status"}  # Dateien und die Abfrage der Warteseite (läuft im Sekundentakt)
 
 
+ANLAUF_S = 1800   # die ersten 30 Minuten nach dem Start: alle Zwischenspeicher leer, erste Berechnung läuft
+
+
+def im_anlauf():
+    return time.time() - _START < ANLAUF_S
+
+
 def erfassen(art, name, ms):
+    """Messung festhalten. In der Startphase getrennt («start seite …»): sie zählt nicht für die Vorschläge und den
+    Vergleich mit der Vorversion – sonst vergliche ein Bericht kurz nach einem Update zwei Kaltstarts."""
+    if im_anlauf():
+        art = "start " + art
     with _SPERRE:
         w = _WERTE.setdefault((art, name), [0, 0.0, 0.0])
         w[0] += 1
@@ -283,9 +294,16 @@ def bericht_text(anzahl=12):
               f"Last {s['last'][0]}/{s['last'][1]}/{s['last'][2]}, Datenbank {_mb(s['db'])}, Dateien {_mb(s['dateien'])}, "
               f"Zwischenspeicher {_mb(s['cache'])}",
               "Datensätze: " + (", ".join(f"{t} {n}" for t, n in s["zeilen"].items() if n) or "keine")]
-    for m in ms[:anzahl]:
+    laufend = [m for m in ms if not m.art.startswith("start ")]
+    start = [m for m in ms if m.art.startswith("start ")]
+    for m in laufend[:anzahl]:
         v = f" (vorher {m.vorher_ms:.0f})" if m.vorher_ms is not None else ""
         zeilen.append(f"{m.art} {m.name}: {m.anzahl}×, Ø {m.mittel_ms:.0f} ms{v}, max {m.max_ms:.0f} ms")
+    if not laufend:
+        zeilen.append("Noch keine Messungen nach der Startphase (erste 30 Minuten nach dem Start).")
+    if start:
+        zeilen.append("Startphase (erste 30 Minuten, nicht bewertet): " + "; ".join(
+            f"{m.art[6:]} {m.name} {m.anzahl}×, Ø {m.mittel_ms:.0f} ms, max {m.max_ms:.0f} ms" for m in start[:4]))
     if vorher:
         zeilen.append(f"Vergleich mit Version {vorher}")
     return zeilen
@@ -329,7 +347,9 @@ def karte():
     daten = ", ".join(f"{t} {n:,}".replace(",", "'") for t, n in s["zeilen"].items() if n)
     return render_template_string(KARTE, ms=ms, vorher=vorher, s=s, mb=lambda b: f"{b / 1024 / 1024:,.0f} MB".replace(",", "'"),
                                   zeit=zeit, farbe=farbe, daten=daten,
-                                  arten={"seite": "Seite", "aktion": "Aktion", "funktion": "Berechnung", "hintergrund": "Hintergrund"})
+                                  arten={"seite": "Seite", "aktion": "Aktion", "funktion": "Berechnung", "hintergrund": "Hintergrund",
+                                         "start seite": "Seite (Start)", "start aktion": "Aktion (Start)",
+                                         "start funktion": "Berechnung (Start)", "start hintergrund": "Hintergrund (Start)"})
 
 
 # ---------------------------------------------------------------- Einbindung

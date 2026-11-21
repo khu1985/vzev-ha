@@ -1,8 +1,17 @@
 """Leistung messen: Erfassen, pro Version sichern, mit der Vorversion vergleichen, Vorschläge ableiten."""
+import time
 import types
+
+import pytest
 
 import leistung as le
 import vorschlaege as vs
+
+
+@pytest.fixture(autouse=True)
+def nach_dem_start(monkeypatch):
+    """Die App läuft schon länger: Messungen zählen normal (nicht als Startphase)."""
+    monkeypatch.setattr(le, "_START", time.time() - 2 * le.ANLAUF_S)
 
 
 def _server(tmp_path, version):
@@ -93,3 +102,17 @@ def test_sensoren_nicht_als_langsam(tmp_path, monkeypatch):
     for _ in range(5):
         le.erfassen("funktion", "sensoren.schreiben", 4000)
     assert not [t for t, _, _ in le.vorschlaege() if "sensoren" in t]
+
+
+def test_startphase_getrennt(tmp_path, monkeypatch):
+    """Kurz nach dem Start (Update) sind alle Zwischenspeicher leer: getrennt erfassen, nicht bewerten."""
+    monkeypatch.setattr(le, "S", _server(tmp_path, "2.0.0"))
+    le._WERTE.clear()
+    monkeypatch.setattr(le, "_START", time.time())
+    for ms in (9000, 7000, 8000, 6000, 5000):
+        le.erfassen("seite", "index", ms)
+    monkeypatch.setattr(le, "_START", time.time() - 2 * le.ANLAUF_S)
+    le.erfassen("seite", "index", 400)
+    assert not [t for t, _, _ in le.vorschlaege() if "index" in t]
+    text = "\n".join(le.bericht_text())
+    assert "seite index: 1×, Ø 400 ms" in text and "Startphase" in text and "seite index 5×, Ø 7000 ms" in text
