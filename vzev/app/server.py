@@ -460,6 +460,11 @@ form#up{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
  .feld{flex:1 1 140px}.feld input,.feld select{width:100%!important}
  form.felder button{flex-basis:100%;justify-content:center}
  details.card summary{line-height:1.6}
+ /* lange Abschnitte (class="card klapp"): auf dem Handy zugeklappt, Überschrift antippen; am Computer immer offen */
+ .card.klapp>h2{cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:0}
+ .card.klapp>h2::after{content:"";flex:none;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);margin:-4px 4px 0 0;transition:transform .15s}
+ .card.klapp.offen>h2{margin-bottom:14px}.card.klapp.offen>h2::after{transform:rotate(225deg);margin-top:4px}
+ .card.klapp:not(.offen)>:not(h2){display:none}
 }
 
 a.ver{text-decoration:none}a.ver:hover{text-decoration:underline;color:var(--ink)}
@@ -476,7 +481,20 @@ a.ver{text-decoration:none}a.ver:hover{text-decoration:underline;color:var(--ink
 <script>(function(){var a=document.querySelector('nav a.on');if(a&&innerWidth<1200&&innerWidth>=760)a.scrollIntoView({block:'nearest',inline:'center'})})()</script>
 <main><h1>{{ title }}</h1>{% if msg %}<div class="msg {{ msgclass or 'ok' }}">{{ msg }}</div>{% endif %}{{ body|safe }}</main></div>
 <div id="neu-hinweis" class="neu-hinweis" hidden>Neu in v{{ version }}: {{ neu_kurz }} <a href="neu">Alle Änderungen</a> <button type="button" aria-label="Hinweis schliessen" onclick="try{localStorage.setItem('vzev-gesehen','{{ version }}')}catch(e){}this.parentNode.hidden=true">×</button></div>
-<script>try{if(localStorage.getItem('vzev-gesehen')!=='{{ version }}'&&location.pathname.slice(-4)!=='/neu')document.getElementById('neu-hinweis').hidden=false;else if(location.pathname.slice(-4)==='/neu')localStorage.setItem('vzev-gesehen','{{ version }}')}catch(e){}</script><script>
+<script>try{(function(){var h=document.getElementById('neu-hinweis'),v='{{ version }}';
+if(location.pathname.slice(-4)==='/neu'){localStorage.setItem('vzev-gesehen',v);return}
+if(localStorage.getItem('vzev-gesehen')===v)return;
+// Einmal pro Version zeigen: Platz unten freihalten, damit er keine Knöpfe verdeckt, und nach 12 Sekunden ausblenden
+h.hidden=false;document.body.style.paddingBottom=(h.offsetHeight+24)+'px';localStorage.setItem('vzev-gesehen',v);
+setTimeout(function(){h.hidden=true;document.body.style.paddingBottom=''},12000);
+h.querySelector('button').addEventListener('click',function(){document.body.style.paddingBottom=''});})()}catch(e){}</script>
+<script>(function(){var k=document.querySelectorAll('.card.klapp>h2');k.forEach(function(h){
+h.tabIndex=0;h.setAttribute('role','button');h.setAttribute('aria-expanded','false');
+function um(){var o=h.parentNode.classList.toggle('offen');h.setAttribute('aria-expanded',o?'true':'false')}
+h.addEventListener('click',um);h.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();um()}})});
+function ziel(){try{var z=location.hash&&document.querySelector(location.hash);var c=z&&z.closest('.card.klapp');
+if(c&&!c.classList.contains('offen')){c.classList.add('offen');c.querySelector('h2').setAttribute('aria-expanded','true')}}catch(e){}}
+ziel();window.addEventListener('hashchange',ziel);})();</script><script>
 (function(){
  var el=document.getElementById('bg'),warten=document.getElementById('warten');
  function zeit(s){return s<60?Math.round(s)+' s':Math.round(s/60)+' min'}

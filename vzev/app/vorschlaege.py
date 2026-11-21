@@ -477,7 +477,7 @@ SEITE = """
  <div class="kpi"><div class="t">gemeldet</div><div class="v">{{ gemeldet }}</div></div>
  <div class="kpi"><div class="t">ausgeblendet</div><div class="v">{{ ausgeblendet }}</div></div>
 </div>
-<div class="card"><p>Die App leitet aus deinen Daten ab, wo sie besser werden kann: Fehler im Protokoll, Kontrollen, die nicht stimmen,
+<div class="card klapp"><h2>So funktioniert es</h2><p>Die App leitet aus deinen Daten ab, wo sie besser werden kann: Fehler im Protokoll, Kontrollen, die nicht stimmen,
 Dateien, die sie nicht einlesen konnte, Korrekturen nach dem Abschluss, Sensoren ohne Werte, die Treffsicherheit der Prognose
 die eigene Leistung (langsame Seiten und Berechnungen, knapper Speicher), die Usability jeder Seite und die UX
 (Kurzbefragung und Nutzung).

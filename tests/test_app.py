@@ -845,3 +845,15 @@ def test_vorschlaege_erledigt_anzeigen(app):
     assert "Erledigt (1)" in h and "durch Update auf " + v in h and "22.11.2026" in h
     md = c.get("/vorschlaege.md").get_data(as_text=True)
     assert f"### Mit {v} erledigt" in md and "Eingabefelder ohne Beschriftung (Usability)" in md
+
+
+def test_lange_abschnitte_auf_dem_handy_klappbar(app):
+    """Lange Abschnitte tragen class="card klapp" (auf dem Handy zugeklappt); die Basisseite bringt das Skript dafür mit."""
+    server, c, d, quelle = app
+    warten(server)
+    h = c.get("/jahr").get_data(as_text=True)
+    assert '<div class="card klapp"><h2>Zähler pro Monat</h2>' in h and ".card.klapp>h2" in h and "aria-expanded" in h
+    assert '<div class="card"><h2>Allgemeinstrom' in h          # das Wichtigste bleibt offen
+    h = c.get("/vorschlaege").get_data(as_text=True)
+    assert 'class="card klapp" id="ux"' in h and "<h2>So funktioniert es</h2>" in h
+    assert '<div class="s">Last 1/5/15' in h                     # Unterzeile klein, nicht als Kennzahl

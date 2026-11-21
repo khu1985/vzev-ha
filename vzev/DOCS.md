@@ -42,7 +42,9 @@ Die Ampeln werden im Hintergrund bewertet (höchstens alle 5 Minuten, nach jeder
 Seite wartet darauf.
 
 **Auf dem Handy** erscheinen Tabellen als Karten (jeder Wert mit seiner Spaltenbezeichnung), statt seitlich zu scrollen;
-am Computer bleiben es Tabellen.
+am Computer bleiben es Tabellen. Lange Abschnitte (z. B. Verbraucher, Zähler pro Monat, Mieter, Wärmezähler, UX,
+Leistung) sind auf dem Handy zugeklappt – Überschrift antippen öffnet sie. Der Hinweis «Neu in v…» erscheint einmal pro
+Version und blendet sich nach 12 Sekunden aus; «Alle Änderungen» zeigt den Changelog.
 
 **Überblick**
 - **Energiefluss** (Startseite): oben die Ampeln und die nächste Aufgabe, darunter animiertes Diagramm von PV-Anlage, Netz und Speicher zum Haus und zu den Verbrauchern, für heute, gestern, einen Monat oder ein Jahr. Die Ringe zeigen den Anteil Solar-, Speicher- und Netzstrom; Werte erscheinen per Maus oder Tippen. Speicherwerte stammen vom Wechselrichter, alles andere aus derselben Rechnung wie die Abrechnung.

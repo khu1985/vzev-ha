@@ -440,7 +440,7 @@ def erstellen(cfg, res, p, datum=None):
 
 # ---------------------------------------------------------------- Seite
 
-SEITE = """{% set grundlagen %}<div class="card" id="grundlagen"><h2>Grundlagen</h2>
+SEITE = """{% set grundlagen %}<div class="card{{ '' if gl_zuerst else ' klapp' }}" id="grundlagen"><h2>Grundlagen</h2>
 <form method="post"><input type="hidden" name="aktion" value="grundlagen"><input type="hidden" name="p" value="{{ p }}">
 <table><tr><th class="l">Wohnung</th><th>Fläche m²</th><th>Personen ohne Mieter</th><th class="l">Wärmezähler (Sensor, optional)</th></tr>
 {% for k, v in einheiten.items() %}{% set u = ein.einheiten.get(k) or {} %}<tr><td class="l">{{ v }}</td>
@@ -503,7 +503,7 @@ var s=document.querySelector('select[name=kategorie]');var u=document.querySelec
 function einheit(){u.style.display=s.value==='direkt'?'':'none';}
 t.addEventListener('change',function(){if(k[t.value])s.value=k[t.value];einheit();});s.addEventListener('change',einheit);einheit();})();</script></div>
 
-<div class="card"><h2>Wärmezähler {{ text(p) }}</h2>
+<div class="card klapp"><h2>Wärmezähler {{ text(p) }}</h2>
 <form method="post"><input type="hidden" name="aktion" value="waerme"><input type="hidden" name="p" value="{{ p }}">
 <table><tr><th class="l">Zähler</th><th>Stand 1.7. (kWh)</th><th>Stand 30.6. (kWh)</th><th>Verbrauch</th></tr>
 {% for k, label in zaehler %}{% set w = per.waerme.get(k) or {} %}<tr><td class="l">{{ label }}</td>

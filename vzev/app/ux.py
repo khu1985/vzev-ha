@@ -372,7 +372,7 @@ def _farbe(x):
 
 
 KARTE_UX = """
-<div class="card" id="ux"><h2>UX</h2>
+<div class="card klapp" id="ux"><h2>UX</h2>
 <div class="grid" style="margin-bottom:12px">
 {% for wert, titel in kpis %}<div class="kpi"><div class="t">{{ licht(farbe(wert))|safe }}{{ titel }}</div><div class="v">{{ (wert ~ '/100') if wert is not none else '–' }}</div></div>{% endfor %}
 </div>
@@ -400,10 +400,16 @@ Seitennamen und ob ein Formular einen Eingabefehler hatte, nur im eigenen Dateno
 .ueq span:last-child{text-align:right}.ueq label{display:inline-flex}.ueq input{position:absolute;opacity:0}
 .ueq i{font-style:normal;display:inline-block;min-width:34px;text-align:center;padding:6px 0;border:1px solid var(--rand);border-radius:6px;cursor:pointer;font-size:13px}
 .ueq input:checked+i{background:var(--ink);color:var(--auf);border-color:var(--ink)}.ueq input:focus-visible+i{outline:2px solid var(--link)}
-.ueq-frage{margin:12px 0 0;font-weight:600;font-size:14px}</style></div>"""
+.ueq-frage{margin:12px 0 0;font-weight:600;font-size:14px}
+/* Handy: Gegensatzpaar oben links/rechts, darunter die ganze Skala in einer Reihe – nie umbrechen (sonst stünden +2 +3 allein
+   auf der nächsten Zeile und die Mitte der Skala wäre nicht mehr in der Mitte) */
+@media (max-width:599px){.ueq{display:grid;grid-template-columns:repeat(7,1fr);gap:4px 3px;margin:10px 0}
+.ueq.ueq5{grid-template-columns:repeat(5,1fr)}.ueq span{min-width:0;grid-row:1}.ueq span:first-child{grid-column:1/5}
+.ueq span:last-child{grid-column:5/8}.ueq.ueq5 span:first-child{grid-column:1/3}.ueq.ueq5 span:last-child{grid-column:3/6}
+.ueq label{grid-row:2;display:block}.ueq i{display:block;min-width:0;padding:9px 0}}</style></div>"""
 
 KARTE_US = """
-<div class="card" id="usability"><h2>Usability</h2>
+<div class="card klapp" id="usability"><h2>Usability</h2>
 {% if e %}<div class="grid" style="margin-bottom:12px">
 <div class="kpi"><div class="t">{{ licht(farbe_us(e.score))|safe }}Usability-Score</div><div class="v">{{ e.score }}/100</div>
 <div class="s">{% if vorher %}{{ '+' if e.score >= vorher.score }}{{ e.score - vorher.score }} seit {{ vorher.version }}{% else %}Version {{ e.version }}{% endif %}</div></div>

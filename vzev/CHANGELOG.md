@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.20.8
+
+- UX-Check umgesetzt:
+  - Kurzbefragung auf dem Handy: Die Skala −3 bis +3 steht in einer Reihe (bisher standen +2 und +3 allein auf der nächsten Zeile), die Gegensätze darüber links und rechts.
+  - Lange Seiten auf dem Handy deutlich kürzer: Abschnitte wie «Verbraucher», «Zähler pro Monat», «Mieter», «Wertschöpfung», «Wärmezähler», «UX», «Usability» und «Leistung» sind auf dem Handy zugeklappt und öffnen sich per Tipp auf die Überschrift; am Computer bleibt alles offen. Übersicht, Jahresabrechnung und Vorschläge sind damit nur noch rund halb so lang.
+  - Vorschläge: Die Erklärung oben ist ein eigener Abschnitt «So funktioniert es»; die Leistungskarte zeigt Last, Arbeitsspeicher und Datenmengen als kleine Unterzeile statt in Kennzahl-Schrift.
+  - Hinweis «Neu in v…»: erscheint einmal pro Version, hält unten Platz frei (verdeckt keine Knöpfe mehr) und blendet sich nach 12 Sekunden aus.
+
 ## 0.20.7
 
 - UX-Durchsicht aller Seiten (Handy und Computer):

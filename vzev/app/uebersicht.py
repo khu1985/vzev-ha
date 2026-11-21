@@ -164,12 +164,12 @@ Angezeigt wird nur die Vorschau aus Home Assistant. Prüfe die Dateien unter <a 
 {% for ok, t, d in kontrollen %}<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line2)">
 <span class="pill {{ 'ok' if ok == True else 'warn' if ok == False else '' }}" style="min-width:64px;text-align:center">{{ 'stimmt' if ok == True else 'prüfen' if ok == False else 'offen' }}</span>
 <div><b>{{ t }}</b><div class="muted">{{ d }}</div></div></div>{% endfor %}</div>
-<div class="card"><h2>Verbraucher {{ titel }}</h2><div class="scroll"><table>
+<div class="card klapp"><h2>Verbraucher {{ titel }}</h2><div class="scroll"><table>
 <tr><th class="l">Zähler</th><th class="l"></th><th>Solar kWh</th><th>Netz HT</th><th>Netz NT</th><th>Autarkie</th><th>Betrag CHF</th><th class="l"></th></tr>
 {% for r in verbraucher %}<tr><td class="l"><a href="verlauf?z={{ r.k }}">{{ r.label }}</a></td><td class="l muted">{{ r.partei }}</td><td>{{ r.solar|f2 }}</td><td>{{ r.ht|f2 }}</td><td>{{ r.nt|f2 }}</td>
 <td>{{ '%.1f %%'|format(r.autarkie) if r.autarkie is not none else '–' }}</td><td>{{ r.betrag|f2 if r.betrag is not none else '' }}</td><td class="l muted">{{ r.hinweis }}</td></tr>{% endfor %}
 </table></div><p class="muted">Beträge inkl. Grundpreis pro Zähler (Netznutzung anteilig, Messtarif, Konzessionsabgabe), beim 1. OG anteilig zur Mietdauer.</p></div>
-{% if vergleich %}<div class="card"><h2>Kontrolle Home Assistant gegen Primeo</h2><div class="scroll"><table>
+{% if vergleich %}<div class="card klapp"><h2>Kontrolle Home Assistant gegen Primeo</h2><div class="scroll"><table>
 <tr><th class="l">Zähler</th><th>Home Assistant kWh</th><th>Primeo kWh</th><th>Differenz</th><th>%</th></tr>
 {% for v in vergleich %}<tr><td class="l">{{ v.zaehler }}</td><td>{{ v.ha|f2 }}</td><td>{{ v.primeo|f2 }}</td><td>{{ v.diff|f2 }}</td><td>{{ '%.1f'|format(v.prozent) if v.prozent is not none else '–' }}</td></tr>{% endfor %}
 </table></div><p class="muted">Zeitraum, in dem beides vorliegt. Zeigt, wie genau die Vorschau ist.</p></div>{% endif %}
@@ -597,7 +597,7 @@ WERT = diagramme.STIL + """
 <div class="card"><h2>Wohin geht der Solarstrom?</h2>{{ c_kwh|safe }}<p class="muted">kWh pro Monat ab vZEV-Start.</p></div>
 <div class="card"><h2>Was eine kWh wert ist</h2>{{ c_wert|safe }}
 <p class="muted">Durchschnitt im Zeitraum. Selbst genutzter oder an Mieter verkaufter Solarstrom bringt ein Mehrfaches der Einspeisung – Verbrauch in sonnige Stunden zu verschieben (Ladestation, Batterie) lohnt sich deshalb.</p></div>
-<div class="card"><h2>Monate</h2><div class="scroll"><table>
+<div class="card klapp"><h2>Monate</h2><div class="scroll"><table>
 <tr><th>Monat</th><th>Verkauf Mieter kWh</th><th>CHF</th><th>Eigenverbrauch kWh</th><th>CHF</th><th>Rücklieferung kWh</th><th>CHF</th><th>Übrige CHF</th><th>Total CHF</th></tr>
 {% for m, r in w.iterrows() %}<tr><td>{{ m.strftime('%m.%Y') }}{{ '*' if m in vorl }}</td><td>{{ r.mieter_kwh|f2 }}</td><td>{{ r.mieter_chf|f2 }}</td><td>{{ r.eigen_kwh|f2 }}</td><td>{{ r.eigen_chf|f2 }}</td>
 <td>{{ r.export_kwh|f2 }}</td><td>{{ r.export_chf|f2 if r.export_chf == r.export_chf else 'offen' }}</td><td>{{ r.uebrige_chf|f2 }}</td><td><b>{{ r.total_chf|f2 }}</b></td></tr>{% endfor %}

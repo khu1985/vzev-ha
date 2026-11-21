@@ -312,12 +312,12 @@ def bericht_text(anzahl=12):
 # ---------------------------------------------------------------- Karte auf der Seite «Vorschläge»
 
 KARTE = """
-<div class="card"><h2>Leistung</h2>
+<div class="card klapp"><h2>Leistung</h2>
 <div class="grid" style="margin-bottom:12px">
- <div class="kpi"><div class="t">{{ s.kerne }} Kerne</div><div class="v">{{ s.last[1] }}</div><div class="muted">Last 1/5/15 Min.: {{ s.last[0] }} / {{ s.last[1] }} / {{ s.last[2] }}</div></div>
- <div class="kpi"><div class="t">RAM frei</div><div class="v">{{ mb(s.ram_frei) }}</div><div class="muted">von {{ mb(s.ram_total) }}</div></div>
- <div class="kpi"><div class="t">Speicher der App</div><div class="v">{{ mb(s.prozess) }}</div><div class="muted">läuft seit {{ s.laufzeit_h }} h</div></div>
- <div class="kpi"><div class="t">Daten</div><div class="v">{{ mb(s.db + s.dateien) }}</div><div class="muted">Datenbank {{ mb(s.db) }}, Dateien {{ mb(s.dateien) }}</div></div>
+ <div class="kpi"><div class="t">{{ s.kerne }} Kerne</div><div class="v">{{ s.last[1] }}</div><div class="s">Last 1/5/15 Min.: {{ s.last[0] }} / {{ s.last[1] }} / {{ s.last[2] }}</div></div>
+ <div class="kpi"><div class="t">RAM frei</div><div class="v">{{ mb(s.ram_frei) }}</div><div class="s">von {{ mb(s.ram_total) }}</div></div>
+ <div class="kpi"><div class="t">Speicher der App</div><div class="v">{{ mb(s.prozess) }}</div><div class="s">läuft seit {{ s.laufzeit_h }} h</div></div>
+ <div class="kpi"><div class="t">Daten</div><div class="v">{{ mb(s.db + s.dateien) }}</div><div class="s">Datenbank {{ mb(s.db) }}, Dateien {{ mb(s.dateien) }}</div></div>
 </div>
 {% if ms %}<details><summary>Ladezeiten und Rechenzeiten dieser Version ({{ ms|length }})</summary>
 <div style="overflow-x:auto"><table><tr><th class="l">Was</th><th class="l">Art</th><th>Aufrufe</th><th>Ø</th><th>Längster</th><th>{{ "Ø " ~ vorher if vorher else "Vorversion" }}</th></tr>
