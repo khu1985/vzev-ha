@@ -14,6 +14,27 @@ class Antwort:
         return {"state": self._state, "attributes": {}}
 
 
+class Fang(logging.Handler):
+    def __init__(self):
+        super().__init__(logging.DEBUG)
+        self.records = []
+
+    def emit(self, record):
+        self.records.append(record)
+
+
+@pytest.fixture
+def caplog():
+    """Eigener Handler direkt am Logger der App (der Logger der App gibt nicht immer an die Wurzel weiter)."""
+    f = Fang()
+    alt = C.log.level
+    C.log.addHandler(f)
+    C.log.setLevel(logging.DEBUG)
+    yield f
+    C.log.removeHandler(f)
+    C.log.setLevel(alt)
+
+
 @pytest.fixture
 def sammler(tmp_path, monkeypatch):
     cfg = {"homeassistant": {"url": "http://ha", "token": "x",
@@ -27,9 +48,8 @@ def sammler(tmp_path, monkeypatch):
 def test_neustart_von_home_assistant(sammler, monkeypatch, caplog):
     aufrufe = []
     monkeypatch.setattr(C.requests, "get", lambda url, **k: aufrufe.append(url) or Antwort(502))
-    with caplog.at_level(logging.DEBUG, logger=C.log.name):
-        with pytest.raises(ConnectionError):
-            sammler.read_now()
+    with pytest.raises(ConnectionError):
+        sammler.read_now()
     assert len(aufrufe) == 2                       # erste Entität zweimal versucht, die übrigen nicht mehr abgewartet
     assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
 
@@ -37,16 +57,15 @@ def test_neustart_von_home_assistant(sammler, monkeypatch, caplog):
 def test_kurzer_aussetzer_ohne_warnung(sammler, monkeypatch, caplog):
     zustand = {"sensor.gateway_waerme": "unavailable", "sensor.solis_energy_today": "unknown"}
     monkeypatch.setattr(C.requests, "get", lambda url, **k: Antwort(200, zustand.get(url.rsplit("/", 1)[1], "5")))
-    with caplog.at_level(logging.INFO, logger=C.log.name):
-        for _ in range(3):
-            sammler.read_now()
-        assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
-        sammler.read_now()                         # eine Stunde ohne Wert: jetzt melden – nur das Gateway
-        w = [r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING]
-        assert len(w) == 1 and "gateway_waerme" in w[0] and "solis" not in w[0]
-        zustand.clear()
+    for _ in range(3):
         sammler.read_now()
-        assert "wieder Werte" in caplog.records[-1].getMessage()
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+    sammler.read_now()                             # eine Stunde ohne Wert: jetzt melden – nur das Gateway
+    w = [r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING]
+    assert len(w) == 1 and "gateway_waerme" in w[0] and "solis" not in w[0]
+    zustand.clear()
+    sammler.read_now()
+    assert any("wieder Werte" in r.getMessage() for r in caplog.records)
 
 
 def test_geduld():
