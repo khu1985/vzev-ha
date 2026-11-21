@@ -703,6 +703,8 @@ def test_nebenkosten_seite(app):
     h = c.get("/nebenkosten?p=2025-26").get_data(as_text=True)   # Testdaten liegen in dieser Periode
     assert "<h2>Verteilung</h2>" in h and "Allgemeinstrom (inkl. Grundpreis)" in h
     h = c.get("/nebenkosten?p=2026-27").get_data(as_text=True)
+    # Positionen aus dem HEV-Mietvertrag als Vorschlag, mit Verteiler
+    assert '<option value="Service Lift">' in h and '"Einstellplatz Nachbarliegenschaft (Abrechnung Verwaltung)": "direkt"' in h
     assert "Fläche (m²) aller Wohnungen" in h                       # noch keine Grundlagen
     cfg = yaml.safe_load((d / "vzev.yaml").read_text())
     form = {"aktion": "grundlagen", "p": "2026-27", "flaeche_1OG": "90", "flaeche_2OG": "110", "personen_2OG": "2",

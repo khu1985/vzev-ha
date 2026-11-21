@@ -33,9 +33,26 @@ KATEGORIEN = {
     "flaeche": ("Übrige Neben- und Betriebskosten", "nach m²"),
     "direkt": ("Direkt einer Wohnung", "ganz der Wohnung"),
 }
-VORSCHLAEGE = ["Wartung und Service Heizung", "Wasser und Abwasser", "Kehricht und Grünabfuhr", "Hauswartung und Garten",
-               "Treppenhausreinigung", "Gemeinschaftsantenne", "Entstopfen und Schwemmen Abwasserleitungen",
-               "Einstellplatz Nachbarliegenschaft (Abrechnung Verwaltung)"]
+# Übliche Positionen (HEV-Mietvertrag, Abschnitt Neben- und Betriebskosten) mit passendem Verteiler.
+# Wählt man eine Bezeichnung, stellt die Seite den Verteiler gleich ein; ändern lässt er sich trotzdem.
+VORSCHLAEGE = {
+    "Wartung und Service Heizung": "heizung",
+    "Abrechnungskosten Heizung und Warmwasser (Ablesung Wärmezähler)": "heizung",
+    "Wasser und Abwasser": "wasser",
+    "Wasserenthärtungsanlage": "wasser",
+    "Hauswartung und Garten (inkl. Reinigungsmaterial)": "flaeche",
+    "Treppenhausreinigung": "flaeche",
+    "Kehricht, Container und Grünabfuhr": "flaeche",
+    "Entstopfen und Schwemmen Abwasserleitungen": "flaeche",
+    "Zählermiete": "flaeche",
+    "Glühbirnen und Sicherungen": "flaeche",
+    "Service Lift": "flaeche",
+    "Service Lüftung": "flaeche",
+    "Feuerlöscher": "flaeche",
+    "Maschinen (Rasenmäher usw.)": "flaeche",
+    "Gemeinschaftsantenne (Radio/TV)": "flaeche",
+    "Einstellplatz Nachbarliegenschaft (Abrechnung Verwaltung)": "direkt",
+}
 # Üblich sind 3–5 % der Nebenkosten (oder ein Ansatz nach Aufwand); einstellbar.
 STANDARD = {"heizung_grundanteil": 30.0, "honorar_art": "prozent", "honorar_wert": 3.0,
             "einheiten": {}, "waerme": {}, "mieter": {}}
@@ -458,6 +475,8 @@ VMWG): nur im Mietvertrag aufgeführte Kosten, zu den tatsächlichen Kosten.</p>
 <form method="post" enctype="multipart/form-data" style="margin-top:12px"><input type="hidden" name="aktion" value="position"><input type="hidden" name="p" value="{{ p }}">
 <input name="titel" aria-label="Bezeichnung" list="nk-titel" placeholder="z. B. Wasser und Abwasser" required style="min-width:240px">
 <datalist id="nk-titel">{% for v in vorschlaege %}<option value="{{ v }}">{% endfor %}</datalist>
+<script>(function(){var k={{ vorschlaege|tojson }};var t=document.querySelector('input[name=titel]');
+var s=document.querySelector('select[name=kategorie]');if(t&&s)t.addEventListener('change',function(){if(k[t.value])s.value=k[t.value];});})();</script>
 <select name="kategorie" aria-label="Kategorie">{% for k, v in kat.items() %}<option value="{{ k }}">{{ v[0] }} ({{ v[1] }})</option>{% endfor %}</select>
 <select name="einheit" title="nur für «Direkt»" aria-label="Einheit (nur für «Direkt»)">{% for k, v in einheiten.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
 <input name="betrag" aria-label="Betrag in CHF" placeholder="CHF" required style="width:100px"> <input type="file" name="beleg" aria-label="Beleg" accept=".pdf,.jpg,.jpeg,.png">

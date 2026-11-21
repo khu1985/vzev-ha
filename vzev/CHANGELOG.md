@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.6
+
+- Nebenkosten: Vorschläge für die Bezeichnung um die übrigen Positionen des HEV-Mietvertrags ergänzt – Abrechnungskosten Heizung und Warmwasser, Wasserenthärtung, Zählermiete, Glühbirnen und Sicherungen, Service Lift und Lüftung, Feuerlöscher, Maschinen. Wählt man eine Bezeichnung, stellt die Seite den üblichen Verteiler ein (z. B. Wasserenthärtung nach Personen, Einstellplatz direkt einer Wohnung); ändern lässt er sich weiterhin.
+
 ## 0.20.5
 
 - Leistung: Die ersten 30 Minuten nach einem Start (Update, Neustart) werden getrennt erfasst. Dann sind alle Zwischenspeicher leer und die erste Berechnung läuft – diese Zeiten erscheinen im Bericht als «Startphase», zählen aber nicht für die Vorschläge und den Vergleich mit der Vorversion. Bisher verglich ein Bericht kurz nach einem Update zwei Kaltstarts.

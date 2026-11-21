@@ -131,7 +131,9 @@ Verrechnet werden dürfen nur die im Mietvertrag aufgeführten Kosten, zu den ta
   Wärmezähler – der Datensammler liest sie dann mit.
 - **Kosten** pro Periode: Strom der Wärmepumpen (Heizung, Warmwasser) und Allgemeinstrom kommen aus der App (einzeln
   abwählbar). Übrige Kosten mit Kategorie und Beleg erfassen, z. B. Wartung Heizung, Wasser/Abwasser, Kehricht,
-  Hauswartung, Treppenhausreinigung, Antenne, Einstellplatz-Anteil aus der Abrechnung der Nachbarliegenschaft.
+  Hauswartung, Treppenhausreinigung, Antenne, Zählermiete, Service Lift und Lüftung, Wasserenthärtung, Feuerlöscher,
+  Einstellplatz-Anteil aus der Abrechnung der Nachbarliegenschaft. Die Vorschläge für die Bezeichnung folgen dem
+  HEV-Mietvertrag und stellen den üblichen Verteiler gleich ein.
 - **Wärmezähler**: Stand am 1.7. und 30.6. für den Gesamtzähler und die Wohnungen mit eigenem Zähler (von Hand oder aus
   Home Assistant). Wohnungen ohne eigenen Zähler teilen sich den Rest nach m².
 
